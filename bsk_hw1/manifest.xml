@@ -1,0 +1,16 @@
+<package>
+  <description brief="bsk_hw1">
+
+     bsk_hw1
+
+  </description>
+  <author>Ben Kaplan</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/bsk_hw1</url>
+  <depend package="roscpp"/>
+  <depend package="cwru_base"/>
+
+</package>
+
+
