@@ -1,0 +1,16 @@
+<package>
+  <description brief="bsk16_hw2">
+
+     bsk16_hw2
+
+  </description>
+  <author>user</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/bsk16_hw2</url>
+  <depend package="roscpp"/>
+  <depend package="cwru_sim_stage"/>
+
+</package>
+
+
