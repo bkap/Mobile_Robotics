@@ -10,6 +10,7 @@ const double MAX_ACCEL = 2.0;
 const double REFRESH_RATE = 0.05;
 const double MAX_ANGLE_ACCEL = 1.0;
 
+
 nav_msgs::Odometry last_odom;
 geometry_msgs::PoseStamped last_map_pose;
 tf::TransformListener *tfl;
