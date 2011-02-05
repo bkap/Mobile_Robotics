@@ -40,10 +40,16 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
     return cur_vel;
   }
 }
-
-double goDistance(double *velocity, double distance, double time_period) {
+void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_pose, double distance) {
+	desired_pose.pose.position.x += distance * cos(getYaw(desired_pose.pose.orientation));
+	desired_pose.pose.position.y += distance * sin(getYaw(desired_pose.pose.orientation));
+	//TODO: actually have this method do stuff
+	
+}
+double goDistance(double *velocity, double *rotation, geometry::PoseStamped* desired_pose, double distance, double time_period) {
   *velocity = getRobotVelocity(*velocity, distance);
   double distance_returned = distance - *velocity * time_period;
+	//TODO: call calculateSteeringRotation with the appropriate arguments
   return distance_returned;
 }
 
@@ -85,7 +91,7 @@ int main(int argc,char **argv)
 	ROS_INFO("birthday started as %f", birthday.toSec());
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
-
+	//TODO: initialize desired_pose to the initial position
   double amount_to_change = 0.0;
 	while (ros::ok()) // do work here
 	{
@@ -103,7 +109,7 @@ int main(int argc,char **argv)
 	                
       ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
       ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
-                
+      //TODO: get rid of this           
       desired_pose.header.stamp = current_time;
       desired_pose.header.frame_id = "map";
       desired_pose.pose.position.x = 1.0;
@@ -113,6 +119,7 @@ int main(int argc,char **argv)
 
     }
     if(stage == 1 || stage == 3  || stage == 5) {
+		//TODO: change this to use all of the variables
       amount_to_change = goDistance(&(vel_object.linear.x),amount_to_change,0.1);
        
     } else if(stage == 2 || stage == 4) {
