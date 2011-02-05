@@ -43,9 +43,8 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
 
 // this method needs to take the desired_pose and 
 void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_pose, double distance) {
-	desired_pose.pose.position.x += distance * cos(getYaw(desired_pose.pose.orientation));
-	desired_pose.pose.position.y += distance * sin(getYaw(desired_pose.pose.orientation));
-	
+	desired_pose.pose.position.x += distance * cos(tf::getYaw(desired_pose.pose.orientation));
+	desired_pose.pose.position.y += distance * sin(tf::getYaw(desired_pose.pose.orientation));
 	//TODO: actually have this method do stuff
 	// take the last_map_pose (current pose) vs desired_pose (what we want), in same frame
 	
@@ -62,7 +61,7 @@ void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_
 double goDistance(double *velocity, double *rotation, geometry::PoseStamped* desired_pose, double distance, double time_period) {
   *velocity = getRobotVelocity(*velocity, distance);
   double distance_returned = distance - *velocity * time_period;
-	//TODO: call calculateSteeringRotation with the appropriate arguments
+	calculateSteeringRotation(rotation, desired_pose, distance);
   return distance_returned;
 }
 
@@ -93,7 +92,6 @@ int main(int argc,char **argv)
 
 	//send robot forward for 3 seconds, reiterated at 10Hz.  Need a ROS "rate" object to enforce a rate
 	geometry_msgs::Twist vel_object;
-	ros::Duration run_duration(22.0); // specify desired duration of this command segment to be 3 seconds
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
         geometry_msgs::PoseStamped desired_pose;
@@ -104,8 +102,13 @@ int main(int argc,char **argv)
 	ROS_INFO("birthday started as %f", birthday.toSec());
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
-	//TODO: initialize desired_pose to the initial position
-  double amount_to_change = 0.0;
+
+      double amount_to_change = 0.0;    
+      desired_pose.header.stamp = current_time;
+      desired_pose.header.frame_id = "map";
+      desired_pose.pose.position.x = -13.6;
+      desired_pose.pose.position.y = -24.89;
+      desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	while (ros::ok()) // do work here
 	{
 		elapsed_time= ros::Time::now()-birthday;
@@ -121,18 +124,13 @@ int main(int argc,char **argv)
 
       ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
       ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
-      //TODO: get rid of this           
+
       desired_pose.header.stamp = current_time;
-      desired_pose.header.frame_id = "map";
-      desired_pose.pose.position.x = 1.0;
-      desired_pose.pose.position.y = 2.0;
-      desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(1.57);
       des_pose_pub.publish(desired_pose);
 
     }
     if(stage == 1 || stage == 3  || stage == 5) {
-		//TODO: change this to use all of the variables
-      amount_to_change = goDistance(&(vel_object.linear.x),amount_to_change,0.1);
+      amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change,0.1);
        
     } else if(stage == 2 || stage == 4) {
       amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, 0.1);
