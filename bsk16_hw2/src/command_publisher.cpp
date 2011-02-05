@@ -49,7 +49,7 @@ void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_
 double goDistance(double *velocity, double *rotation, geometry::PoseStamped* desired_pose, double distance, double time_period) {
   *velocity = getRobotVelocity(*velocity, distance);
   double distance_returned = distance - *velocity * time_period;
-	//TODO: call calculateSteeringRotation with the appropriate arguments
+	calculateSteeringRotation(rotation, desired_pose, distance);
   return distance_returned;
 }
 
