@@ -41,8 +41,8 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
   }
 }
 void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_pose, double distance) {
-	desired_pose.pose.position.x += distance * cos(getYaw(desired_pose.pose.orientation));
-	desired_pose.pose.position.y += distance * sin(getYaw(desired_pose.pose.orientation));
+	desired_pose.pose.position.x += distance * cos(tf::getYaw(desired_pose.pose.orientation));
+	desired_pose.pose.position.y += distance * sin(tf::getYaw(desired_pose.pose.orientation));
 	//TODO: actually have this method do stuff
 	
 }
