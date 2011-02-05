@@ -7,12 +7,12 @@ using namespace std;
 const double MAX_SPEED = 2.0;
 const double MAX_ROTATE = 2.0;
 const double MAX_ACCEL = 2.0;
-const double REFRESH_RATE = 0.1;
+const double REFRESH_RATE = 0.05;
 const double MAX_ANGLE_ACCEL = 1.0;
 double getRobotVelocity(double cur_vel, double distance_to_dest) {
   double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL * REFRESH_RATE));
   if(distance_to_dest - distance_if_decel < 0.2) {
-    return max(cur_vel - MAC_ACCEL * REFRESH_RATE, min(0.2,distance_to_dest));
+    return max(cur_vel - MAX_ACCEL * REFRESH_RATE, min(0.2,distance_to_dest));
   } else if(cur_vel < MAX_SPEED) {
     return cur_vel + MAX_ACCEL * REFRESH_RATE;
   } else {
@@ -29,7 +29,7 @@ double goDistance(double *velocity, double distance, double time_period) {
 double getRobotRotation(double cur_rotate, double remaining_rotate) {
   double rotate_if_decel = -0.5 * cur_rotate * (cur_rotate / (REFRESH_RATE * MAX_ANGLE_ACCEL));
   if(rotate_if_decel - remaining_rotate < -0.1) {
-    return min(cur_rotate + (REFRESH_RATE * MAX_ANGLE_ACCEL), max(remaining_rotate, -0.1));
+    return min(cur_rotate + (REFRESH_RATE * MAX_ANGLE_ACCEL), max(remaining_rotate * 2, -0.1));
   } else if(fabs(cur_rotate) < MAX_ROTATE) {
     return cur_rotate - MAX_ANGLE_ACCEL * REFRESH_RATE;
   } else {
@@ -55,7 +55,7 @@ int main(int argc,char **argv)
 	geometry_msgs::Twist vel_object;
 	ros::Duration run_duration(22.0); // specify desired duration of this command segment to be 3 seconds
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
-	ros::Rate naptime(10); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
 	while (!ros::Time::isValid()) {} // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid
 	ros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	ROS_INFO("birthday started as %f", birthday.toSec());
@@ -69,7 +69,7 @@ int main(int argc,char **argv)
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
     cout << amount_to_change <<endl;
-    if(fabs(amount_to_change) <=  0.02) {
+    if(fabs(amount_to_change) <=  0.01) {
       cout << "Increasing Stage";
       amount_to_change = amounts_to_change[stage];
       stage++;
