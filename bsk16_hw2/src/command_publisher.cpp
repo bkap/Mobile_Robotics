@@ -9,6 +9,27 @@ const double MAX_ROTATE = 2.0;
 const double MAX_ACCEL = 2.0;
 const double REFRESH_RATE = 0.05;
 const double MAX_ANGLE_ACCEL = 1.0;
+
+nav_msgs::Odometry last_odom;
+geometry_msgs::PoseStamped last_map_pose;
+tf::TransformListener *tfl;
+
+geometry_msgs::PoseStamped temp;
+void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
+{
+        last_odom = *odom;
+        temp.pose = last_odom.pose.pose;
+        temp.header = last_odom.header;
+        try 
+	{
+          tfl->transformPose("map", temp, last_map_pose);
+        } 
+	catch (tf::TransformException ex) 
+	{
+          ROS_ERROR("%s", ex.what());
+        }
+}
+
 double getRobotVelocity(double cur_vel, double distance_to_dest) {
   double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL * REFRESH_RATE));
   if(distance_to_dest - distance_if_decel < 0.2) {
@@ -56,8 +77,11 @@ int main(int argc,char **argv)
 	ros::Duration run_duration(22.0); // specify desired duration of this command segment to be 3 seconds
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
-	while (!ros::Time::isValid()) {} // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid
-	ros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+        geometry_msgs::PoseStamped desired_pose;
+	
+	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
+        
+	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	ROS_INFO("birthday started as %f", birthday.toSec());
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
@@ -75,6 +99,18 @@ int main(int argc,char **argv)
       stage++;
       vel_object.linear.x = 0.0;
       vel_object.angular.z = 0.0;
+
+	                
+      ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
+      ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
+                
+      desired_pose.header.stamp = current_time;
+      desired_pose.header.frame_id = "map";
+      desired_pose.pose.position.x = 1.0;
+      desired_pose.pose.position.y = 2.0;
+      desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(1.57);
+      des_pose_pub.publish(desired_pose);
+
     }
     if(stage == 1 || stage == 3  || stage == 5) {
       amount_to_change = goDistance(&(vel_object.linear.x),amount_to_change,0.1);
