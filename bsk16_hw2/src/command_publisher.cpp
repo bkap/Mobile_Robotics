@@ -3,6 +3,11 @@
 #include<math.h>
 #include <iostream>
 #include <algorithm>
+#include<geometry_msgs/PoseStamped.h> //data type for Pose combined with frame and timestamp
+#include<nav_msgs/Odometry.h> //data type for odometry information (see available fields with 'rosmsg show nav_msgs/Odometry')
+#include<tf/transform_datatypes.h> // for tf::getYaw
+#include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+
 using namespace std;
 const double MAX_SPEED = 2.0;
 const double MAX_ROTATE = 2.0;
