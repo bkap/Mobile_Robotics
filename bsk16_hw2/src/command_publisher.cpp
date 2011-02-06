@@ -48,25 +48,25 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
 }
 
 // this method needs to take the desired_pose and 
-void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_pose, double distance) {
-	desired_pose.pose.position.x += distance * cos(tf::getYaw(desired_pose.pose.orientation));
-	desired_pose.pose.position.y += distance * sin(tf::getYaw(desired_pose.pose.orientation));
+void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance) {
+	(*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
+	(*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
 	//TODO: actually have this method do stuff
 	// take the last_map_pose (current pose) vs desired_pose (what we want), in same frame
 	
 	// constants
 	double kd = 1.0;
 	double kw = 1.0;
-	double x_err = desired_pose.pose.position.x - last_map_pose.pose.pose.x;
-	double y_err = desired_pose.pose.position.y - last_map_pose.pose.pose.y;
-	double w_err = getYaw(desired_pose.pose.orientation) - getYaw(last_map_pose.pose.orientation);
+	double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
+	double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
+	double w_err = tf::getYaw((*desired_pose).pose.orientation) - tf::getYaw(last_map_pose.pose.orientation);
 	
 	// omega = rotation = - err_d kd - err_w kw
 	(*rotation) = - kd*x_err - kd*y_err - kw*w_err; // how far we are off in radians
 }
-double goDistance(double *velocity, double *rotation, geometry::PoseStamped* desired_pose, double distance, double time_period) {
-  *velocity = getRobotVelocity(*velocity, distance);
-  double distance_returned = distance - *velocity * time_period;
+double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance, double time_period) {
+  (*velocity) = getRobotVelocity(*velocity, distance);
+  double distance_returned = distance - (*velocity) * time_period;
 	calculateSteeringRotation(rotation, desired_pose, distance);
   return distance_returned;
 }
@@ -90,9 +90,11 @@ double goRotate(double *rotation, double rotate, double time_period) {
 }
 int main(int argc,char **argv)
 {
+	
 	ros::init(argc,argv,"command_publisher");//name of this node
 	ros::NodeHandle n;
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
+	  ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("desired_pose", 1);
 	//"cmd_vel" is the topic name to publish velocity commands
 	//"1" is the buffer size (could use buffer>1 in case network bogs down)
 
@@ -105,18 +107,21 @@ int main(int argc,char **argv)
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
         
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+	ros::Time birthday = ros::Time::now();
 	ROS_INFO("birthday started as %f", birthday.toSec());
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
 
       double amount_to_change = 0.0;    
-      desired_pose.header.stamp = current_time;
+     
       desired_pose.header.frame_id = "map";
       desired_pose.pose.position.x = -13.6;
       desired_pose.pose.position.y = -24.89;
       desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	while (ros::ok()) // do work here
 	{
+	ros::Time current_time = ros::Time::now();
+	 desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
