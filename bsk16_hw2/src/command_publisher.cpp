@@ -46,11 +46,23 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
     return cur_vel;
   }
 }
+
+// this method needs to take the desired_pose and 
 void calculateSteeringRotation(double *rotation, geometry::PoseStamped* desired_pose, double distance) {
 	desired_pose.pose.position.x += distance * cos(tf::getYaw(desired_pose.pose.orientation));
 	desired_pose.pose.position.y += distance * sin(tf::getYaw(desired_pose.pose.orientation));
 	//TODO: actually have this method do stuff
+	// take the last_map_pose (current pose) vs desired_pose (what we want), in same frame
 	
+	// constants
+	double kd = 1.0;
+	double kw = 1.0;
+	double x_err = desired_pose.pose.position.x - last_map_pose.pose.pose.x;
+	double y_err = desired_pose.pose.position.y - last_map_pose.pose.pose.y;
+	double w_err = getYaw(desired_pose.pose.orientation) - getYaw(last_map_pose.pose.orientation);
+	
+	// omega = rotation = - err_d kd - err_w kw
+	(*rotation) = - kd*x_err - kd*y_err - kw*w_err; // how far we are off in radians
 }
 double goDistance(double *velocity, double *rotation, geometry::PoseStamped* desired_pose, double distance, double time_period) {
   *velocity = getRobotVelocity(*velocity, distance);
@@ -116,7 +128,6 @@ int main(int argc,char **argv)
       vel_object.linear.x = 0.0;
       vel_object.angular.z = 0.0;
 
-	                
       ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
       ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
 
