@@ -94,7 +94,9 @@ int main(int argc,char **argv)
 	ros::init(argc,argv,"command_publisher");//name of this node
 	ros::NodeHandle n;
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
-	  ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("desired_pose", 1);
+	ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("desired_pose", 1);
+	tfl = new tf::TransformListener();
+	ros::Subscriber sub = n.subscribe<nav_msgs::Odometry>("odom", 1, odomCallback); 
 	//"cmd_vel" is the topic name to publish velocity commands
 	//"1" is the buffer size (could use buffer>1 in case network bogs down)
 
