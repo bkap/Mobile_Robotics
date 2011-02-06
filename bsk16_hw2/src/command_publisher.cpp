@@ -149,10 +149,10 @@ int main(int argc,char **argv)
 
     }
     if(stage == 1 || stage == 3  || stage == 5) {
-      amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change,0.1);
+      amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change, REFRESH_RATE);
 			
     } else if(stage == 2 || stage == 4) {
-      amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, 0.1);
+      amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, REFRESH_RATE);
 		}
 
     if(stage < 6) {
