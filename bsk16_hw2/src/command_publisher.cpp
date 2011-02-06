@@ -32,6 +32,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
         } 
 	catch (tf::TransformException ex) 
 	{
+	  cout << "We caught an error!" << endl;
           ROS_ERROR("%s", ex.what());
         }
 }
@@ -55,14 +56,14 @@ void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* des
 	// take the last_map_pose (current pose) vs desired_pose (what we want), in same frame
 	
 	// constants
-	double kd = 1.0;
-	double kw = 1.0;
+	double kd = 0;
+	double kw = 1;
 	double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
 	double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
-	double w_err = tf::getYaw((*desired_pose).pose.orientation) - tf::getYaw(last_map_pose.pose.orientation);
+	double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
 	
 	// omega = rotation = - err_d kd - err_w kw
-	(*rotation) = - kd*x_err - kd*y_err - kw*w_err; // how far we are off in radians
+	(*rotation) = - kd*x_err - kd*y_err + kw*w_err; // how far we are off in radians
 }
 double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance, double time_period) {
   (*velocity) = getRobotVelocity(*velocity, distance);
@@ -92,6 +93,11 @@ int main(int argc,char **argv)
 {
 	
 	ros::init(argc,argv,"command_publisher");//name of this node
+	 
+      	double amount_to_change = 0.0;    
+      	geometry_msgs::PoseStamped desired_pose;
+	
+      		
 	ros::NodeHandle n;
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("desired_pose", 1);
@@ -104,24 +110,23 @@ int main(int argc,char **argv)
 	geometry_msgs::Twist vel_object;
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
-        geometry_msgs::PoseStamped desired_pose;
-	
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-        
-	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+      
+ 	desired_pose.header.frame_id = "map";
+      	desired_pose.pose.position.x = -13.6;
+      	desired_pose.pose.position.y = -24.89;
+      	desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	ros::Time birthday = ros::Time::now();
+	desired_pose.header.stamp = birthday;
+	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+	
 	ROS_INFO("birthday started as %f", birthday.toSec());
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
 
-      double amount_to_change = 0.0;    
-     
-      desired_pose.header.frame_id = "map";
-      desired_pose.pose.position.x = -13.6;
-      desired_pose.pose.position.y = -24.89;
-      desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	while (ros::ok()) // do work here
 	{
+	  ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 	ros::Time current_time = ros::Time::now();
 	 desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
@@ -139,12 +144,13 @@ int main(int argc,char **argv)
       ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
 
       desired_pose.header.stamp = current_time;
+      desired_pose.header.frame_id = "map";
       des_pose_pub.publish(desired_pose);
 
     }
     if(stage == 1 || stage == 3  || stage == 5) {
       amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change,0.1);
-       
+			
     } else if(stage == 2 || stage == 4) {
       amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, 0.1);
 		}
@@ -152,6 +158,7 @@ int main(int argc,char **argv)
     if(stage < 6) {
 			// send out new command appropriate for this instant;
 			// boring--always send out the same speed/spin values in this example
+			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"n";
 			pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
 		}
 		else
