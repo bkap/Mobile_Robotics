@@ -20,6 +20,21 @@ nav_msgs::Odometry last_odom;
 geometry_msgs::PoseStamped last_map_pose;
 tf::TransformListener *tfl;
 
+// update desired_pose based on radius of curvature and distance of next path segment
+void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_msgs::PoseStamped* desired_pose, double curvature, double distance) {
+  (*last_desired_pose) = (*desired_pose);
+  if (curvature == 0) {
+    // go in a straight line for d m, keep current heading
+    (*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
+    (*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
+  } else {
+    // turn d radians in place, keep current position
+    // TODO: actual arcs
+    double newHeading = tf::getYaw((*desired_pose).pose.orientation) + distance;
+    (*desired_pose).pose.orientation = tf::createQuaternionMsgFromYaw(newHeading);
+  }
+}
+
 geometry_msgs::PoseStamped temp;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
@@ -96,7 +111,7 @@ int main(int argc,char **argv)
 	 
       	double amount_to_change = 0.0;    
       	geometry_msgs::PoseStamped desired_pose;
-	
+	geometry_msgs::PoseStamped last_desired_pose; // for reference
       		
 	ros::NodeHandle n;
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
