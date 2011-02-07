@@ -178,7 +178,7 @@ int main(int argc,char **argv)
     if(stage < 6) {
 			// send out new command appropriate for this instant;
 			// boring--always send out the same speed/spin values in this example
-			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"n";
+			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
 			pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
 		}
 		else
