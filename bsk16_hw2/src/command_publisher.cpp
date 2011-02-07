@@ -157,6 +157,13 @@ int main(int argc,char **argv)
       cout << "Increasing Stage";
       amount_to_change = amounts_to_change[stage];
       stage++;
+      if(stage == 1 || stage == 3  || stage == 5)
+	{
+      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amounts_to_change[stage]);
+	}
+	else if(stage == 2 || stage == 4) {
+	updateDesiredPose(&last_desired_pose, &desired_pose, 1, amounts_to_change[stage]);
+	}
       vel_object.linear.x = 0.0;
       vel_object.angular.z = 0.0;
 
