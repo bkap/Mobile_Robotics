@@ -105,7 +105,7 @@ double getRobotRotation(double cur_rotate, double remaining_rotate) {
 
 double goRotate(double *rotation, double rotate, double time_period) {
   *rotation = getRobotRotation(*rotation, rotate);
-   double rotate_returned = rotate  - *rotation * time_period;
+   double rotate_returned = rotate  - (*rotation) * time_period;
   return rotate_returned;
 
 }
@@ -159,10 +159,10 @@ int main(int argc,char **argv)
       stage++;
       if(stage == 1 || stage == 3  || stage == 5)
 	{
-      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amounts_to_change[stage]);
+      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amount_to_change);
 	}
 	else if(stage == 2 || stage == 4) {
-	updateDesiredPose(&last_desired_pose, &desired_pose, 1, amounts_to_change[stage]);
+	updateDesiredPose(&last_desired_pose, &desired_pose, 1, amount_to_change);
 	}
       vel_object.linear.x = 0.0;
       vel_object.angular.z = 0.0;
