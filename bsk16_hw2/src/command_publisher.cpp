@@ -144,6 +144,13 @@ int main(int argc,char **argv)
   int stage = 0;
   double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
 
+	
+	for(int i = 0; i < 10; i++)
+	{
+		cout<<"Teh prof's code is badz, "<<i<<"\n";
+		ros::spinOnce();
+	}
+
 	while (ros::ok()) // do work here
 	{
 	  ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
