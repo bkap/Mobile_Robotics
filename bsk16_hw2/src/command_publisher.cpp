@@ -50,21 +50,25 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
 
 // this method needs to take the desired_pose and 
 void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance) {
-	(*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
-	(*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
-	//TODO: actually have this method do stuff
-	// take the last_map_pose (current pose) vs desired_pose (what we want), in same frame
 	
-	// constants
-	double kd = 0;
-	double kw = 1;
-	double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
-	double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
-	double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
+	double kd = .1;
+	double kw = .1;
+	//double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
+	//double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
+	//double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
+	double w_error = tf::getYaw(last_map_pose.pose.orientation) - tf::getYaw((*desired_pose).pose.pose.orientation);
+	double dx = (*desired_pose).pose.pose.x;
+	double dy = (*desired_pose).pose.pose.y;
+	double mx = last_map_pose.pose.position.x;
+	double my = last_map_pose.pose.position.y;
+	double PsiDP = atan((dx-mx)/(dy-my));
+	double Theta1 = w_error-PsiDP;
+	double PsiErr = w_error;
+	double derp = sin(Theta1)*sqrt((dx-mx)^2+(dy-my)^2);
 	
 	// omega = rotation = - err_d kd - err_w kw
-	(*rotation) = - kd*x_err - kd*y_err + kw*w_err; // how far we are off in radians
-}
+	(*rotation) = kd*derp+kw*PsiErr;
+
 double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance, double time_period) {
   (*velocity) = getRobotVelocity(*velocity, distance);
   double distance_returned = distance - (*velocity) * time_period;
