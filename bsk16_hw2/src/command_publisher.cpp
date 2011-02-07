@@ -66,8 +66,8 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
 // this method needs to take the desired_pose and 
 void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance) {
 	
-	double kd = .1;
-	double kw = .1;
+	double kd = 0;
+	double kw = 1;
 	//double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
 	//double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
 	//double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
@@ -78,7 +78,7 @@ void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* des
 	double my = last_map_pose.pose.position.y;
 	double PsiDP = atan((dx-mx)/(dy-my));
 	double Theta1 = w_error-PsiDP;
-	double PsiErr = w_error;
+	double PsiErr = -w_error;
 	double derp = sin(Theta1)*sqrt((dx-mx)*(dx-mx)+(dy-my)*(dy-my));
 	
 	// omega = rotation = - err_d kd - err_w kw
