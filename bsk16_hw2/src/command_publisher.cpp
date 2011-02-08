@@ -52,14 +52,20 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
 	if (curvature == 0) 
 	{
 		// go in a straight line for d m, keep current heading
-    cout << tf::getYaw((*desired_pose).pose.orientation)<< endl;
+    		cout << tf::getYaw((*desired_pose).pose.orientation)<< endl;
 		 double dx = distance * cos(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.x += dx;
-     double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
+     		double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.y += dy;
-    cout << dx << "," << dy << endl;
-		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+1*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
-		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+1*dy/sqrt(dx*dx+dy*dy);
+		double x = last_map_pose.pose.position.x - (*last_desired_pose).pose.position.x;
+		double y = last_map_pose.pose.position.y - (*last_desired_pose).pose.position.y;
+
+		double projx = (x*dx+y*dy)*dx/(sqrt(dx*dx+dy*dy)*sqrt(x*x+y*y));
+		double projy = (x*dx+y*dy)*dy/(sqrt(dx*dx+dy*dy)*sqrt(x*x+y*y));	
+
+    		cout << dx << "," << dy << endl;
+		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+projx+1*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
+		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+projy+1*dy/sqrt(dx*dx+dy*dy);
 	} 
 	else 
 	{
