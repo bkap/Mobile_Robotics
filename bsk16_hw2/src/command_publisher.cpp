@@ -12,7 +12,7 @@ using namespace std;
 const double MAX_SPEED = 2.0;
 const double MAX_ROTATE = 2.0;
 const double MAX_ACCEL = 2.0;
-const double REFRESH_RATE = 0.05;
+const double REFRESH_RATE = 0.1;
 const double MAX_ANGLE_ACCEL = 1.0;
 
 
@@ -41,8 +41,8 @@ void updateBreadCrumb(geometry_msgs::PoseStamped* last_desired_pose, geometry_ms
 {
 	double dx = (*desired_pose).pose.position.x -(*last_desired_pose).pose.position.x;
 	double dy = (*desired_pose).pose.position.y -(*last_desired_pose).pose.position.y;
-	(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+vx*dx/sqrt(dx*dx+dy*dy)*REFRESH_RATE; //advance breadcrumb v*dt in the direction of desired pose.
-        (*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+vx*dy/sqrt(dx*dx+dy*dy)*REFRESH_RATE;
+	(*bread_crumb).pose.position.x -= vx*dx/sqrt(dx*dx+dy*dy)*REFRESH_RATE; //advance breadcrumb v*dt in the direction of desired pose.
+        (*bread_crumb).pose.position.y -= vx*dy/sqrt(dx*dx+dy*dy)*REFRESH_RATE;
 }
 
 // update desired_pose based on radius of curvature and distance of next path segment
@@ -52,12 +52,14 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
 	if (curvature == 0) 
 	{
 		// go in a straight line for d m, keep current heading
-		(*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
-		(*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
-		double dx = (*desired_pose).pose.position.x -(*last_desired_pose).pose.position.x;
-		double dy = (*desired_pose).pose.position.y -(*last_desired_pose).pose.position.y;
-		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
-		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+.5*dy/sqrt(dx*dx+dy*dy);
+    cout << tf::getYaw((*desired_pose).pose.orientation)<< endl;
+		 double dx = distance * cos(tf::getYaw((*desired_pose).pose.orientation));
+		(*desired_pose).pose.position.x += dx;
+     double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
+		(*desired_pose).pose.position.y += dy;
+    cout << dx << "," << dy << endl;
+		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+1*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
+		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+1*dy/sqrt(dx*dx+dy*dy);
 	} 
 	else 
 	{
@@ -69,7 +71,7 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
 }
 
 double getRobotVelocity(double cur_vel, double distance_to_dest) {
-  double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL * REFRESH_RATE));
+  double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL));
   if(distance_to_dest - distance_if_decel < 0.2) {
     return max(cur_vel - MAX_ACCEL * REFRESH_RATE, min(0.2,distance_to_dest));
   } else if(cur_vel < MAX_SPEED) {
@@ -102,8 +104,9 @@ void calculateSteeringRotation(geometry_msgs::PoseStamped* bread_crumb, double *
 	
 	double dx = (*bread_crumb).pose.position.x-last_map_pose.pose.position.x;//I think that this is based off of the older steering algorithm, but with a bread crumb.
 	double dy = (*bread_crumb).pose.position.y-last_map_pose.pose.position.y;
-	double PsiErr = atan2(dy,dx);
-	
+	double PsiErr = -1 *tf::getYaw(last_map_pose.pose.orientation) + atan2(dy,dx);
+  cout << "Bread Crumb: " << (*bread_crumb).pose.position.x << "," << (*bread_crumb).pose.position.y << endl;
+  cout << "Last Pose: " << last_map_pose.pose.position.x << "," << last_map_pose.pose.position.y << endl;
 	(*rotation) = kw*PsiErr;
 }
 
@@ -129,7 +132,7 @@ double getRobotRotation(double cur_rotate, double remaining_rotate)
 double goRotate(double *rotation, double rotate, double time_period) 
 {
   *rotation = getRobotRotation(*rotation, rotate);
-   double rotate_returned = rotate  - *rotation * time_period;
+   double rotate_returned = rotate  - (*rotation) * time_period;
   return rotate_returned;
 
 }
@@ -155,11 +158,12 @@ int main(int argc,char **argv)
 	geometry_msgs::Twist vel_object;
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
+  cout << "sleeping : " << REFRESH_RATE * 1000;
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
       
  	desired_pose.header.frame_id = "map";
-      	desired_pose.pose.position.x = -13.6;
-      	desired_pose.pose.position.y = -24.89;
+      	desired_pose.pose.position.x = 8.5;
+      	desired_pose.pose.position.y = 15;
       	desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	ros::Time birthday = ros::Time::now();
 	desired_pose.header.stamp = birthday;
@@ -167,7 +171,7 @@ int main(int argc,char **argv)
 	
 	ROS_INFO("birthday started as %f", birthday.toSec());
 	int stage = 0;
-	double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
+	double amounts_to_change[] = {3.3,asin(-1),12.4,asin(-1),4,-1};
 
 	
 	for(int i = 0; i < 10; i++)
@@ -193,11 +197,11 @@ int main(int argc,char **argv)
 			stage++;
 			if(stage == 1 || stage == 3  || stage == 5)
 			{
-			      updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 0, amounts_to_change[stage]);
+			      updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 0, amount_to_change);
 			}
 			else if(stage == 2 || stage == 4) 
 			{
-			     updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 1, amounts_to_change[stage]);
+			     updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 1, amount_to_change);
 			}
 			vel_object.linear.x = 0.0;
 			vel_object.angular.z = 0.0;
@@ -234,6 +238,7 @@ int main(int argc,char **argv)
 			vel_object.angular.z = 0.0;
 			pub.publish(vel_object);
 		}
+    cout << "sleeping" << endl;
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
