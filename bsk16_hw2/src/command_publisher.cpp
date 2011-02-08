@@ -92,7 +92,8 @@ double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped
   return distance_returned;
 }
 
-double getRobotRotation(double cur_rotate, double remaining_rotate) {
+double getRobotRotation(double cur_rotate, double remaining_rotate) 
+{
   double rotate_if_decel = -0.5 * cur_rotate * (cur_rotate / (REFRESH_RATE * MAX_ANGLE_ACCEL));
   if(rotate_if_decel - remaining_rotate < -0.1) {
     return min(cur_rotate + (REFRESH_RATE * MAX_ANGLE_ACCEL), max(remaining_rotate * 2, -0.1));
@@ -103,7 +104,8 @@ double getRobotRotation(double cur_rotate, double remaining_rotate) {
   }
 }
 
-double goRotate(double *rotation, double rotate, double time_period) {
+double goRotate(double *rotation, double rotate, double time_period) 
+{
   *rotation = getRobotRotation(*rotation, rotate);
    double rotate_returned = rotate  - *rotation * time_period;
   return rotate_returned;
@@ -116,6 +118,7 @@ int main(int argc,char **argv)
 	 
       	double amount_to_change = 0.0;    
       	geometry_msgs::PoseStamped desired_pose;
+	geometry_msgs::PoseStamped bread_crumb;
 	geometry_msgs::PoseStamped last_desired_pose; // for reference
       		
 	ros::NodeHandle n;
@@ -141,8 +144,8 @@ int main(int argc,char **argv)
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	
 	ROS_INFO("birthday started as %f", birthday.toSec());
-  int stage = 0;
-  double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
+	int stage = 0;
+	double amounts_to_change[] = {3.0,asin(-1),12.2,asin(-1),4,-1};
 
 	
 	for(int i = 0; i < 10; i++)
@@ -153,54 +156,58 @@ int main(int argc,char **argv)
 
 	while (ros::ok()) // do work here
 	{
-	  ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-	ros::Time current_time = ros::Time::now();
-	 desired_pose.header.stamp = current_time;
+		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
+		ros::Time current_time = ros::Time::now();
+		desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-    cout << amount_to_change <<endl;
-    if(fabs(amount_to_change) <=  0.01) {
-      cout << "Increasing Stage";
-      amount_to_change = amounts_to_change[stage];
-      stage++;
-      if(stage == 1 || stage == 3  || stage == 5)
-	{
-      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amounts_to_change[stage]);
-	}
-	else if(stage == 2 || stage == 4) {
-	updateDesiredPose(&last_desired_pose, &desired_pose, 1, amounts_to_change[stage]);
-	}
-      vel_object.linear.x = 0.0;
-      vel_object.angular.z = 0.0;
-
-      ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
-      ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
-
-      desired_pose.header.stamp = current_time;
-      desired_pose.header.frame_id = "map";
-      des_pose_pub.publish(desired_pose);
-
-    }
-    if(stage == 1 || stage == 3  || stage == 5) {
-      amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change, REFRESH_RATE);
-			
-    } else if(stage == 2 || stage == 4) {
-      amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, REFRESH_RATE);
-		}
-
-    if(stage < 6) {
-			// send out new command appropriate for this instant;
-			// boring--always send out the same speed/spin values in this example
-			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
-			pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
-		}
-		else
+		cout << amount_to_change <<endl;
+		if(fabs(amount_to_change) <=  0.01) 
 		{
-			// done with 3 seconds of commands; now send out zeros indefinitely to halt the robot
-			vel_object.linear.x = 0.0;
-			vel_object.angular.z = 0.0;
-			pub.publish(vel_object);
+		cout << "Increasing Stage";
+		amount_to_change = amounts_to_change[stage];
+		stage++;
+		if(stage == 1 || stage == 3  || stage == 5)
+		{
+		      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amounts_to_change[stage]);
+		}
+		else if(stage == 2 || stage == 4) 
+		{
+		updateDesiredPose(&last_desired_pose, &desired_pose, 1, amounts_to_change[stage]);
+		}
+		vel_object.linear.x = 0.0;
+		vel_object.angular.z = 0.0;
+
+		ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
+		ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
+
+		desired_pose.header.stamp = current_time;
+		desired_pose.header.frame_id = "map";
+		des_pose_pub.publish(desired_pose);
+
+	}
+	if(stage == 1 || stage == 3  || stage == 5)
+	{
+		amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change, REFRESH_RATE);
+	} else if(stage == 2 || stage == 4) 
+	{
+		amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, REFRESH_RATE);
+	}
+
+	if(stage < 6) 
+	{
+		// send out new command appropriate for this instant;
+		// boring--always send out the same speed/spin values in this example
+		cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
+		pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
+	}
+	else
+	{
+		// done with 3 seconds of commands; now send out zeros indefinitely to halt the robot
+		vel_object.linear.x = 0.0;
+		vel_object.angular.z = 0.0;
+		pub.publish(vel_object);
 		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
