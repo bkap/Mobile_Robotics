@@ -20,21 +20,6 @@ nav_msgs::Odometry last_odom;
 geometry_msgs::PoseStamped last_map_pose;
 tf::TransformListener *tfl;
 
-// update desired_pose based on radius of curvature and distance of next path segment
-void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_msgs::PoseStamped* desired_pose, double curvature, double distance) {
-  (*last_desired_pose) = (*desired_pose);
-  if (curvature == 0) {
-    // go in a straight line for d m, keep current heading
-    (*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
-    (*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
-  } else {
-    // turn d radians in place, keep current position
-    // TODO: actual arcs
-    double newHeading = tf::getYaw((*desired_pose).pose.orientation) + distance;
-    (*desired_pose).pose.orientation = tf::createQuaternionMsgFromYaw(newHeading);
-  }
-}
-
 geometry_msgs::PoseStamped temp;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
@@ -52,6 +37,37 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
         }
 }
 
+void updateBreadCrumb(geometry_msgs::PoseStamped* last_desired_pose, geometry_msgs::PoseStamped* desired_pose, geometry_msgs::PoseStamped* bread_crumb, double vx)
+{
+	double dx = (*desired_pose).pose.position.x -(*last_desired_pose).pose.position.x;
+	double dy = (*desired_pose).pose.position.y -(*last_desired_pose).pose.position.y;
+	(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+vx*dx/sqrt(dx*dx+dy*dy)*REFRESH_RATE; //advance breadcrumb v*dt in the direction of desired pose.
+        (*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+vx*dy/sqrt(dx*dx+dy*dy)*REFRESH_RATE;
+}
+
+// update desired_pose based on radius of curvature and distance of next path segment
+void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_msgs::PoseStamped* desired_pose, geometry_msgs::PoseStamped* bread_crumb, double curvature, double distance) 
+{
+	(*last_desired_pose) = (*desired_pose);
+	if (curvature == 0) 
+	{
+		// go in a straight line for d m, keep current heading
+		(*desired_pose).pose.position.x += distance * cos(tf::getYaw((*desired_pose).pose.orientation));
+		(*desired_pose).pose.position.y += distance * sin(tf::getYaw((*desired_pose).pose.orientation));
+		double dx = (*desired_pose).pose.position.x -(*last_desired_pose).pose.position.x;
+		double dy = (*desired_pose).pose.position.y -(*last_desired_pose).pose.position.y;
+		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
+		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+.5*dy/sqrt(dx*dx+dy*dy);
+	} 
+	else 
+	{
+		// turn d radians in place, keep current position
+		// TODO: actual arcs
+		double newHeading = tf::getYaw((*desired_pose).pose.orientation) + distance;
+		(*desired_pose).pose.orientation = tf::createQuaternionMsgFromYaw(newHeading);
+	}
+}
+
 double getRobotVelocity(double cur_vel, double distance_to_dest) {
   double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL * REFRESH_RATE));
   if(distance_to_dest - distance_if_decel < 0.2) {
@@ -63,32 +79,38 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
   }
 }
 
-// this method needs to take the desired_pose and 
-void calculateSteeringRotation(double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance) {
+// this method needs to take the bread crumb and find the desired heading from that.
+void calculateSteeringRotation(geometry_msgs::PoseStamped* bread_crumb, double *rotation, double distance) {
 	
-	double kd = 0;
+	//double kd = 0;
 	double kw = 1;
 	//double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
 	//double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
 	//double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
-	double w_error = tf::getYaw(last_map_pose.pose.orientation) - tf::getYaw((*desired_pose).pose.orientation);
-	double dx = (*desired_pose).pose.position.x;
-	double dy = (*desired_pose).pose.position.y;
-	double mx = last_map_pose.pose.position.x;
-	double my = last_map_pose.pose.position.y;
-	double PsiDP = atan((dx-mx)/(dy-my));
-	double Theta1 = w_error-PsiDP;
-	double PsiErr = -w_error;
-	double derp = sin(Theta1)*sqrt((dx-mx)*(dx-mx)+(dy-my)*(dy-my));
+	//double w_error = tf::getYaw(last_map_pose.pose.orientation) - tf::getYaw((*desired_pose).pose.orientation);
+	//double dx = (*desired_pose).pose.position.x;
+	//double dy = (*desired_pose).pose.position.y;
+	//double mx = last_map_pose.pose.position.x;
+	//double my = last_map_pose.pose.position.y;
+	//double PsiDP = atan((dx-mx)/(dy-my));
+	//double Theta1 = w_error-PsiDP;
+	//double PsiErr = -w_error;
+	//double derp = sin(Theta1)*sqrt((dx-mx)*(dx-mx)+(dy-my)*(dy-my));
 	
 	// omega = rotation = - err_d kd - err_w kw
-	(*rotation) = kd*derp+kw*PsiErr;
+	//(*rotation) = kd*derp+kw*PsiErr;
+	
+	double dx = (*bread_crumb).pose.position.x-last_map_pose.pose.position.x;//I think that this is based off of the older steering algorithm, but with a bread crumb.
+	double dy = (*bread_crumb).pose.position.y-last_map_pose.pose.position.y;
+	double PsiErr = atan2(dy,dx);
+	
+	(*rotation) = kw*PsiErr;
 }
 
-double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped* desired_pose, double distance, double time_period) {
+double goDistance(double *velocity, double *rotation, geometry_msgs::PoseStamped* bread_crumb, double distance, double time_period) {
   (*velocity) = getRobotVelocity(*velocity, distance);
   double distance_returned = distance - (*velocity) * time_period;
-	calculateSteeringRotation(rotation, desired_pose, distance);
+	calculateSteeringRotation(bread_crumb, rotation, distance);
   return distance_returned;
 }
 
@@ -150,7 +172,7 @@ int main(int argc,char **argv)
 	
 	for(int i = 0; i < 10; i++)
 	{
-		cout<<"Teh prof's code is badz, "<<i<<"\n";
+		cout<<"Waiting 10 cycles... "<<i<<"\n";
 		ros::spinOnce();
 	}
 
@@ -163,51 +185,53 @@ int main(int argc,char **argv)
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 		cout << amount_to_change <<endl;
-		if(fabs(amount_to_change) <=  0.01) 
+		
+		if(fabs(amount_to_change) <=  0.05) 
 		{
-		cout << "Increasing Stage";
-		amount_to_change = amounts_to_change[stage];
-		stage++;
+			cout << "Increasing Stage";
+			amount_to_change = amounts_to_change[stage];
+			stage++;
+			if(stage == 1 || stage == 3  || stage == 5)
+			{
+			      updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 0, amounts_to_change[stage]);
+			}
+			else if(stage == 2 || stage == 4) 
+			{
+			     updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 1, amounts_to_change[stage]);
+			}
+			vel_object.linear.x = 0.0;
+			vel_object.angular.z = 0.0;
+
+			ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
+			ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
+
+			desired_pose.header.stamp = current_time;
+			desired_pose.header.frame_id = "map";
+			des_pose_pub.publish(desired_pose);
+		}
+		
 		if(stage == 1 || stage == 3  || stage == 5)
 		{
-		      updateDesiredPose(&last_desired_pose, &desired_pose, 0, amounts_to_change[stage]);
-		}
-		else if(stage == 2 || stage == 4) 
+			amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &bread_crumb, amount_to_change, REFRESH_RATE);
+			updateBreadCrumb(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
+		} else if(stage == 2 || stage == 4) 
 		{
-		updateDesiredPose(&last_desired_pose, &desired_pose, 1, amounts_to_change[stage]);
+			amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, REFRESH_RATE);
 		}
-		vel_object.linear.x = 0.0;
-		vel_object.angular.z = 0.0;
 
-		ROS_INFO("odom = x: %f, y: %f, heading: %f", last_odom.pose.pose.position.x, last_odom.pose.pose.position.y, tf::getYaw(last_odom.pose.pose.orientation));
-		ROS_INFO("map pose = x: %f, y: %f, heading: %f", last_map_pose.pose.position.x, last_map_pose.pose.position.y, tf::getYaw(last_map_pose.pose.orientation));
-
-		desired_pose.header.stamp = current_time;
-		desired_pose.header.frame_id = "map";
-		des_pose_pub.publish(desired_pose);
-
-	}
-	if(stage == 1 || stage == 3  || stage == 5)
-	{
-		amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &desired_pose, amount_to_change, REFRESH_RATE);
-	} else if(stage == 2 || stage == 4) 
-	{
-		amount_to_change = goRotate(&(vel_object.angular.z),amount_to_change, REFRESH_RATE);
-	}
-
-	if(stage < 6) 
-	{
-		// send out new command appropriate for this instant;
-		// boring--always send out the same speed/spin values in this example
-		cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
-		pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
-	}
-	else
-	{
-		// done with 3 seconds of commands; now send out zeros indefinitely to halt the robot
-		vel_object.linear.x = 0.0;
-		vel_object.angular.z = 0.0;
-		pub.publish(vel_object);
+		if(stage < 6) 
+		{
+			// send out new command appropriate for this instant;
+			// boring--always send out the same speed/spin values in this example
+			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
+			pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
+		}
+		else
+		{
+			// done with 3 seconds of commands; now send out zeros indefinitely to halt the robot
+			vel_object.linear.x = 0.0;
+			vel_object.angular.z = 0.0;
+			pub.publish(vel_object);
 		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
