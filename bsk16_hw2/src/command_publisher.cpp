@@ -57,27 +57,26 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
 		(*desired_pose).pose.position.x += dx;
      		double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.y += dy;
-		double x = last_map_pose.pose.position.x - (*last_desired_pose).pose.position.x;
-		double y = last_map_pose.pose.position.y - (*last_desired_pose).pose.position.y;
-
-		double projx = (x*dx+y*dy)*dx/(sqrt(dx*dx+dy*dy)*sqrt(x*x+y*y));
-		double projy = (x*dx+y*dy)*dy/(sqrt(dx*dx+dy*dy)*sqrt(x*x+y*y));	
-
-    		cout << dx << "," << dy << endl;
-		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+projx+1*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
-		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+projy+1*dy/sqrt(dx*dx+dy*dy);
+    cout << dx << "," << dy << endl;
+		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+0.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
+		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+0.5*dy/sqrt(dx*dx+dy*dy);
 	} 
 	else 
 	{
 		// turn d radians in place, keep current position
 		// TODO: actual arcs
 		double newHeading = tf::getYaw((*desired_pose).pose.orientation) + distance;
+    if(newHeading < -3.14159) {
+      newHeading += 2 * 3.14159;
+    } else if(newHeading > 3.14159) {
+      newHeading -= 2 * 3.14159;
+    }
 		(*desired_pose).pose.orientation = tf::createQuaternionMsgFromYaw(newHeading);
 	}
 }
 
 double getRobotVelocity(double cur_vel, double distance_to_dest) {
-  double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL));
+  double distance_if_decel = 0.5 * cur_vel * (cur_vel / (MAX_ACCEL* REFRESH_RATE));
   if(distance_to_dest - distance_if_decel < 0.2) {
     return max(cur_vel - MAX_ACCEL * REFRESH_RATE, min(0.2,distance_to_dest));
   } else if(cur_vel < MAX_SPEED) {
@@ -91,7 +90,7 @@ double getRobotVelocity(double cur_vel, double distance_to_dest) {
 void calculateSteeringRotation(geometry_msgs::PoseStamped* bread_crumb, double *rotation, double distance) {
 	
 	//double kd = 0;
-	double kw = 1;
+	double kw = .1;
 	//double x_err = (*desired_pose).pose.position.x - last_map_pose.pose.position.x;
 	//double y_err = (*desired_pose).pose.position.y - last_map_pose.pose.position.y;
 	//double w_err = atan2(y_err, x_err) - tf::getYaw(last_map_pose.pose.orientation);
@@ -110,9 +109,10 @@ void calculateSteeringRotation(geometry_msgs::PoseStamped* bread_crumb, double *
 	
 	double dx = (*bread_crumb).pose.position.x-last_map_pose.pose.position.x;//I think that this is based off of the older steering algorithm, but with a bread crumb.
 	double dy = (*bread_crumb).pose.position.y-last_map_pose.pose.position.y;
-	double PsiErr = -1 *tf::getYaw(last_map_pose.pose.orientation) + atan2(dy,dx);
+	double PsiErr = tf::getYaw(last_map_pose.pose.orientation) - atan2(dy,dx);
   cout << "Bread Crumb: " << (*bread_crumb).pose.position.x << "," << (*bread_crumb).pose.position.y << endl;
   cout << "Last Pose: " << last_map_pose.pose.position.x << "," << last_map_pose.pose.position.y << endl;
+  cout << "PsiErr" << tf::getYaw(last_map_pose.pose.orientation);
 	(*rotation) = kw*PsiErr;
 }
 
@@ -163,7 +163,8 @@ int main(int argc,char **argv)
 	//send robot forward for 3 seconds, reiterated at 10Hz.  Need a ROS "rate" object to enforce a rate
 	geometry_msgs::Twist vel_object;
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
-	ros::Rate naptime(REFRESH_RATE * 1000); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Duration old_elapsed_time;
+  ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
   cout << "sleeping : " << REFRESH_RATE * 1000;
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
       
@@ -172,6 +173,7 @@ int main(int argc,char **argv)
       	desired_pose.pose.position.y = 15;
       	desired_pose.pose.orientation = tf::createQuaternionMsgFromYaw(-2.38342);
 	ros::Time birthday = ros::Time::now();
+  old_elapsed_time = ros::Duration(0);
 	desired_pose.header.stamp = birthday;
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	
@@ -192,6 +194,11 @@ int main(int argc,char **argv)
 		ros::Time current_time = ros::Time::now();
 		desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
+    if(elapsed_time == old_elapsed_time) {
+        naptime.sleep();
+        continue;
+    }
+    old_elapsed_time = elapsed_time;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 		cout << amount_to_change <<endl;
@@ -209,6 +216,8 @@ int main(int argc,char **argv)
 			{
 			     updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 1, amount_to_change);
 			}
+      cout << "Desired Pose: " << desired_pose.pose.position.x << "," << desired_pose.pose.position.y << endl;
+      cout << "Old Pose: " << last_desired_pose.pose.position.x << "," << last_desired_pose.pose.position.y << endl;
 			vel_object.linear.x = 0.0;
 			vel_object.angular.z = 0.0;
 
@@ -223,7 +232,6 @@ int main(int argc,char **argv)
 		if(stage == 1 || stage == 3  || stage == 5)
 		{
 			amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &bread_crumb, amount_to_change, REFRESH_RATE);
-		//	updateDesiredPose(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 			updateBreadCrumb(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 		} else if(stage == 2 || stage == 4) 
 		{
@@ -236,6 +244,12 @@ int main(int argc,char **argv)
 			// boring--always send out the same speed/spin values in this example
 			cout<<"velobject = "<<vel_object.linear.x<<","<<vel_object.angular.z<<"\n";
 			pub.publish(vel_object);  // this action causes the commands in vel_object to be published 
+
+      //update last_map_pose in case the odom callback isn't working right
+      last_map_pose.pose.position.x += REFRESH_RATE * vel_object.linear.x * cos(tf::getYaw(last_map_pose.pose.orientation));
+      last_map_pose.pose.position.y += REFRESH_RATE * vel_object.linear.x * sin(tf::getYaw(last_map_pose.pose.orientation));
+      last_map_pose.pose.orientation = tf::createQuaternionMsgFromYaw(
+        tf::getYaw(last_map_pose.pose.orientation) + vel_object.angular.z*REFRESH_RATE);
 		}
 		else
 		{
@@ -244,7 +258,6 @@ int main(int argc,char **argv)
 			vel_object.angular.z = 0.0;
 			pub.publish(vel_object);
 		}
-    cout << "sleeping" << endl;
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
