@@ -52,10 +52,10 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
 	if (curvature == 0) 
 	{
 		// go in a straight line for d m, keep current heading
-    cout << tf::getYaw((*desired_pose).pose.orientation)<< endl;
+    		cout << tf::getYaw((*desired_pose).pose.orientation)<< endl;
 		 double dx = distance * cos(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.x += dx;
-     double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
+     		double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.y += dy;
     cout << dx << "," << dy << endl;
 		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+0.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
@@ -232,6 +232,7 @@ int main(int argc,char **argv)
 		if(stage == 1 || stage == 3  || stage == 5)
 		{
 			amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &bread_crumb, amount_to_change, REFRESH_RATE);
+			updateDesiredPose(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 			updateBreadCrumb(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 		} else if(stage == 2 || stage == 4) 
 		{
