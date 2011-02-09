@@ -41,8 +41,8 @@ void updateBreadCrumb(geometry_msgs::PoseStamped* last_desired_pose, geometry_ms
 {
 	double dx = (*desired_pose).pose.position.x -(*last_desired_pose).pose.position.x;
 	double dy = (*desired_pose).pose.position.y -(*last_desired_pose).pose.position.y;
-	(*bread_crumb).pose.position.x -= vx*dx/sqrt(dx*dx+dy*dy)*REFRESH_RATE; //advance breadcrumb v*dt in the direction of desired pose.
-        (*bread_crumb).pose.position.y -= vx*dy/sqrt(dx*dx+dy*dy)*REFRESH_RATE;
+	(*bread_crumb).pose.position.x = last_map_pose.pose.position.x*dx/sqrt(dx*dx+dy*dy)*REFRESH_RATE; //advance breadcrumb v*dt in the direction of desired pose.
+        (*bread_crumb).pose.position.y = last_map_pose.pose.position.y*dy/sqrt(dx*dx+dy*dy)*REFRESH_RATE;
 }
 
 // update desired_pose based on radius of curvature and distance of next path segment
@@ -58,8 +58,8 @@ void updateDesiredPose(geometry_msgs::PoseStamped* last_desired_pose, geometry_m
      		double dy = distance * sin(tf::getYaw((*desired_pose).pose.orientation));
 		(*desired_pose).pose.position.y += dy;
     cout << dx << "," << dy << endl;
-		(*bread_crumb).pose.position.x = (*last_desired_pose).pose.position.x+0.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
-		(*bread_crumb).pose.position.y = (*last_desired_pose).pose.position.y+0.5*dy/sqrt(dx*dx+dy*dy);
+		(*bread_crumb).pose.position.x = (last_map_pose).pose.position.x+0.5*dx/sqrt(dx*dx+dy*dy); //start the bread crumb .5 meters in the direction of the goal.
+		(*bread_crumb).pose.position.y = (last_map_pose).pose.position.y+0.5*dy/sqrt(dx*dx+dy*dy);
 	} 
 	else 
 	{
@@ -203,7 +203,7 @@ int main(int argc,char **argv)
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 		cout << amount_to_change <<endl;
 		
-		if(fabs(amount_to_change) <=  0.05) 
+		if(fabs(amount_to_change) <=  0.5) 
 		{
 			cout << "Increasing Stage";
 			amount_to_change = amounts_to_change[stage];
@@ -214,6 +214,7 @@ int main(int argc,char **argv)
 			}
 			else if(stage == 2 || stage == 4) 
 			{
+			     amount_to_change = tf::getYaw(desired_pose.pose.orientation)-tf::getYaw(last_odom.pose.pose.orientation);
 			     updateDesiredPose(&last_desired_pose, &desired_pose, &bread_crumb, 1, amount_to_change);
 			}
       cout << "Desired Pose: " << desired_pose.pose.position.x << "," << desired_pose.pose.position.y << endl;
