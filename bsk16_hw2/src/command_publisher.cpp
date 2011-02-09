@@ -232,7 +232,6 @@ int main(int argc,char **argv)
 		if(stage == 1 || stage == 3  || stage == 5)
 		{
 			amount_to_change = goDistance(&(vel_object.linear.x), &(vel_object.angular.z), &bread_crumb, amount_to_change, REFRESH_RATE);
-			updateDesiredPose(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 			updateBreadCrumb(&desired_pose, &last_desired_pose, &bread_crumb, (vel_object.linear.x));
 		} else if(stage == 2 || stage == 4) 
 		{
