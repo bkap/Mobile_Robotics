@@ -10,7 +10,7 @@
   <url>http://ros.org/wiki/bsk16_hw2</url>
   <depend package="roscpp"/>
   <depend package="cwru_sim_stage"/>
-
+  <depend package="opencv2"/>
 </package>
 
 
