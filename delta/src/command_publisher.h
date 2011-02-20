@@ -1,13 +1,18 @@
 #ifndef _COMMAND_PUB
 #define _COMMAND_PUB
 #include <ros/ros.h>
-#include <geometry_msgs/PoseStampted.h>
-
-typedef struct {
+#define CSPACE_RESOLUTION = 0.05;
+struct Pose {
 	double x;
 	double y;
 	double psi;
-} Pose;
+	
+	Pose(double x, double y, double psi) {
+		this.x = x;
+		this.y = y;
+		this.psi = psi;
+	}
+};
 
 typedef struct {
 	Pose p;
@@ -16,7 +21,6 @@ typedef struct {
 	double rotation;
 } PoseState;
 
-typedef struct PathList path_list_t;
 
 struct PathList {
 	int segNum;
@@ -29,7 +33,6 @@ struct PathList {
 	double max_spin;
 	double max_accel;
 	double max_spin_accel;
-	path_list_t* next_seg;
 };
 
 typedef struct {
@@ -43,7 +46,7 @@ typedef struct {
 	double speedNominal;
 } CrawlerDesState;
 
-
+cv::Mat& getMap(OccupancyGrid);
 
 
 #endif
