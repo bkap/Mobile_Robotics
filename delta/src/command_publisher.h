@@ -1,21 +1,15 @@
 #ifndef _COMMAND_PUB
 #define _COMMAND_PUB
 #include <ros/ros.h>
+#include <geometry_msgs/Pose.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <cv.h>
 #define CSPACE_RESOLUTION = 0.05;
-struct Pose {
-	double x;
-	double y;
-	double psi;
-	
-	Pose(double x, double y, double psi) {
-		this.x = x;
-		this.y = y;
-		this.psi = psi;
-	}
-};
+
+using namespace cv;
 
 typedef struct {
-	Pose p;
+	geometry_msgs::Pose p;
 	double orientation;
 	double speed;
 	double rotation;
@@ -26,7 +20,7 @@ struct PathList {
 	int segNum;
 	double segLen;
 	int segType;
-	Pose referencePt;
+    geometry_msgs::Pose referencePt;
 	double initTanAng;
 	double curvature;
 	double max_speed;
@@ -46,7 +40,7 @@ typedef struct {
 	double speedNominal;
 } CrawlerDesState;
 
-cv::Mat& getMap(OccupancyGrid);
+cv::Mat& getMap(nav_msgs::OccupancyGrid grid);
 
 
 #endif

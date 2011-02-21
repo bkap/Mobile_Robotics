@@ -1,7 +1,7 @@
 #include "command_publisher.h"
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
-#include <gemoetry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
 #include "cv.h"
