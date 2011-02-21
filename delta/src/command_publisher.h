@@ -1,16 +1,17 @@
-#ifndef _COMMAND_PUB
-#define _COMMAND_PUB
 #include <ros/ros.h>
-#define CSPACE_RESOLUTION = 0.05;
+#include "opencv2/core/core.hpp"
+#include <nav_msgs/OccupancyGrid.h>
+#define CSPACE_RESOLUTION 0.05
+using namespace nav_msgs;
 struct Pose {
 	double x;
 	double y;
 	double psi;
 	
 	Pose(double x, double y, double psi) {
-		this.x = x;
-		this.y = y;
-		this.psi = psi;
+		this->x = x;
+		this->y = y;
+		this->psi = psi;
 	}
 };
 
@@ -46,8 +47,7 @@ typedef struct {
 	double speedNominal;
 } CrawlerDesState;
 
-cv::Mat& getMap(OccupancyGrid);
+cv::Mat_<bool>* getMap(OccupancyGrid&);
 
 
-#endif
 		
