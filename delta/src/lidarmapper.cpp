@@ -32,14 +32,14 @@ void CopyPoints()
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
-		if (last_map_cloud.points[i].y>PoseY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<PoseY+GRID_WIDTH/2.0+GRID_PADDING)
+		if ((last_map_cloud.points[i].y>PoseY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<PoseY+GRID_WIDTH/2.0+GRID_PADDING)
 		&&last_map_cloud.points[i].x>PoseX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<PoseX+GRID_HEIGHT/2.0+GRID_PADDING)
 		{
 			for (int j =0; j<DONUT_LENGTH; j++)
 			{
 				for (int k = 0; k<DONUT_LENGTH; k++)
 				{
-					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES));
+					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))=1;
 				}
 			}
 		}

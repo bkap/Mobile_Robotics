@@ -7,7 +7,7 @@
 #include<nav_msgs/Odometry.h> //data type for odometry information (see available fields with 'rosmsg show nav_msgs/Odometry')
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
-
+#include "opencv2/core/core.hpp"
 using namespace std;
 const double MAX_SPEED = 1.0;
 const double MAX_ROTATE = 1.0;
