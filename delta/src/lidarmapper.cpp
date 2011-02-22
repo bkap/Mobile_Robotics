@@ -148,7 +148,6 @@ int main(int argc,char **argv)
 	ros::init(argc,argv,"lidar_listener");//name of this node
 	tfl = new tf::TransformListener();
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-	
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	
 	ros::NodeHandle n;

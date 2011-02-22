@@ -16,17 +16,154 @@
 
 #define REFRESH_RATE 0.1
 
+#define LINE 1
+#define CURVE 2
+#define POINT_TURN 3
+
+#define STD_TURN_RAD 1.04 //given in the assignment
+
+#define MAX_LINEAR .5
+#define MAX_ANGULAR .5
+#define MAX_LINEAR_ACC .1
+#define MAX_ANGULAR_ACC .1
+
 using namespace cv;
 using namespace std;
 
+tf::TransformListener *tfl;
 
-void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine)
+geometry_msgs::Point Point3toGeoPoint (Point3 A)
 {
-	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));
+	geometry_msgs::Point Ref_Point;
+	Ref_Point.x = A.X;
+	Ref_Point.y = A.Y;
+	Ref_Point.z = A.Z;
+	return Ref_Point;
+}
+
+PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
+{
+	PathSegment P;
+	P.seg_type = LINE;
+	P.seg_number = SegNum;
+	P.seg_Length = Distance3(A-B);
+	P.ref_point = Point3toGeoPoint(A);
+	Point3 Vec = B-A;
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
+	P.curvature = 1337;
+	
+	P.max_speeds.linear.x = MAX_LINEAR;
+	P.max_speeds.linear.y = 0;
+	P.max_speeds.linear.z = 0;
+	P.min_speeds.linear.x = 0;
+	P.min_speeds.linear.y = 0;
+	P.min_speeds.linear.z = 0;
+	
+	P.max_speeds.angular.x = 0;
+	P.max_speeds.angular.y = 0;
+	P.max_speeds.angular.z = MAX_ANGULAR;
+	P.min_speeds.angular.x = 0;
+	P.min_speeds.angular.y = 0;
+	P.min_speeds.angular.z = 0;
+	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	return P;
+}
+
+PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs/Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+{
+	double theta1 = tf::getYaw(InitAngle);
+	double theta2 = tf::getYaw(FinalAngle);
+	
+	PathSegment P;
+	P.seg_type = POINT_TURN;
+	P.seg_number = SegNum;
+	P.seg_Length = theta2-theta1;
+	P.ref_point = ref_point;
+	P.init_tan_angle = InitAngle;
+	P.curvature = 1337;
+	
+	P.max_speeds.linear.x = MAX_LINEAR;
+	P.max_speeds.linear.y = 0;
+	P.max_speeds.linear.z = 0;
+	P.min_speeds.linear.x = 0;
+	P.min_speeds.linear.y = 0;
+	P.min_speeds.linear.z = 0;
+	
+	P.max_speeds.angular.x = 0;
+	P.max_speeds.angular.y = 0;
+	P.max_speeds.angular.z = MAX_ANGULAR;
+	P.min_speeds.angular.x = 0;
+	P.min_speeds.angular.y = 0;
+	P.min_speeds.angular.z = 0;
+	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	return P;
+}
+
+PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs/Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+{
+	
+	double theta1 = tf::getYaw(InitAngle);
+	double theta2 = tf::getYaw(FinalAngle);
+	
+	PathSegment P;
+	P.seg_type = CURVE;
+	P.seg_number = SegNum;
+	P.seg_Length = theta2-theta1;
+	P.ref_point = ref_point;
+	P.init_tan_angle = InitAngle;
+	P.curvature = 1/STD_TURN_RAD;
+	
+	P.max_speeds.linear.x = MAX_LINEAR;
+	P.max_speeds.linear.y = 0;
+	P.max_speeds.linear.z = 0;
+	P.min_speeds.linear.x = 0;
+	P.min_speeds.linear.y = 0;
+	P.min_speeds.linear.z = 0;
+	
+	P.max_speeds.angular.x = 0;
+	P.max_speeds.angular.y = 0;
+	P.max_speeds.angular.z = MAX_ANGULAR;
+	P.min_speeds.angular.x = 0;
+	P.min_speeds.angular.y = 0;
+	P.min_speeds.angular.z = 0;
+	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	return P;
+}
+
+void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
+{
+	A = (A-B)/2.0; //just want the distance from A to the midpoint
+	Segment->ref_point.x -= A.X;
+	Segment->ref_point.y -= A.Y;
+	Segment->seg_length +=Magnitude3(A);
+}
+
+void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
+{
+	Segment->seg_length +=Magnitude3(B-A)/2.0;
+}
+
+void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
+{
+	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
 	Point3 Center = B+(D-B)/Magnitude3(D-B)*STD_RADIUS/tan(Theta/2.0);
 	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-	Point3 Bdoubleprime = C+
+	Point3 Bdoubleprime = C+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
+	Point3 Midpoint2 = C+(C-B)/2.0;
+	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
+	{
+		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
+		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)++);
+		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine.ref_point, (*SegNum)++) ;
+	}
+	else 
+	{
+		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++;
+		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)++);
+		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine.ref_point,(*SegNum)++) ;
+	}
 }
 
 PathList insertTurns(list<Point> P)
@@ -51,22 +188,20 @@ PathList insertTurns(list<Point> P)
 	PathSegment FirstLine, Curve, SecondLine;
 	for (int i = 0; i<PointListLength-1; i++)
 	{
-		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine);//hand the points A,B,C to the curve maker thing
+		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
 		if(i == 0)
 		{
-			MoveBack(A,B, &FirstLine);
+			MoveBack1(A,B, &FirstLine);
 		}
 		else if (i == PointListLength-2)
 		{
-			MoveBack(B,C, &SecondLine);
+			MoveBack2(B,C, &SecondLine);
 		}
 		
 		ReturnVal.path_list[3*i] = FirstLine;
 		ReturnVal.path_list[3*i+1] = Curve;
 		ReturnVal.path_list[3*i+2] = SecondLine;
 	}
-	
-	Flatten(ReturnVal.path_list);
 }
 
 list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped origin) {
@@ -171,7 +306,7 @@ int main(int argc,char **argv)
 {
 	
 	ros::init(argc,argv,"pathPlanner");//name of this node
-	 
+	tfl = new tf::TransformListener();
       	double amount_to_change = 0.0;    
       		
 	ros::NodeHandle n;

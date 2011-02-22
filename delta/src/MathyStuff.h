@@ -20,6 +20,7 @@
 #include <climits>
 #include <fstream>
 #include <assert.h>
+
 #define FLOAT double
 
 class Point3;

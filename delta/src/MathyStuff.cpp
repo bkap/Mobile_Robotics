@@ -33,6 +33,7 @@ unsigned int Rand ()
 
 }
 
+
 FLOAT Magnitude2 (FLOAT X, FLOAT Y)
 {
 	return sqrt(X*X+Y*Y);
