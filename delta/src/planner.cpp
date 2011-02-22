@@ -10,27 +10,63 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
+
 #include "MathyStuff.h"
+#include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 0.1
 
 using namespace cv;
 using namespace std;
-/**assume orientation and resolution are the same*/
-Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
-	Mat_<bool>* m = new Mat_<bool>(grid.info.width, grid.info.height);
-	for(unsigned int i = 0; i < grid.info.height; i ++) {
-		for(unsigned int j = 0; j < grid.info.width; j++) {
-			(*m)(i,j) = (grid.data[i * grid.info.width + j] > 10);
-		}
-	}
-	return m;
 
+
+void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine)
+{
+	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));
+	Point3 D = (A+C)/2.0;
+	Point3 Center = B+(D-B)/Magnitude3(D-B)*STD_RADIUS/tan(Theta/2.0);
+	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
+	Point3 Bdoubleprime = C+
 }
 
 PathList insertTurns(list<Point> P)
 {
+	Point3* PointList = calloc(P.size, sizeof(Point3));  //this should be the list of points that ben's algorithm puts out
+	int PointListLength = P.size;
 	
+	list<Point>::iterator it; 
+	i = 0;
+	for (it = P.begin; it!=p.end; it++)
+	{
+		PointList[i].X = it->x;
+		PointList[i].Y = it->y;
+		PointList[i].Z = 0;
+		i++;
+	}
+	
+	PathList ReturnVal;
+	ReturnVal.path_list = malloc(sizeof(PathSegment)*(3*(PathListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
+	int SegNum = 0;
+	Point3 A, B, C;
+	PathSegment FirstLine, Curve, SecondLine;
+	for (int i = 0; i<PointListLength-1; i++)
+	{
+		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine);//hand the points A,B,C to the curve maker thing
+		if(i == 0)
+		{
+			MoveBack(A,B, &FirstLine);
+		}
+		else if (i == PointListLength-2)
+		{
+			MoveBack(B,C, &SecondLine);
+		}
+		
+		ReturnVal.path_list[3*i] = FirstLine;
+		ReturnVal.path_list[3*i+1] = Curve;
+		ReturnVal.path_list[3*i+2] = SecondLine;
+	}
+	
+	Flatten(ReturnVal.path_list);
 }
 
 list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped origin) {
