@@ -37,14 +37,23 @@ void CopyPoints()
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
+<<<<<<< HEAD
 		if (last_map_cloud.points[i].y>InitY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<InitY+GRID_WIDTH/2.0+GRID_PADDING)
 		&&last_map_cloud.points[i].x>InitX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<InitX+GRID_HEIGHT/2.0+GRID_PADDING)
+=======
+		if ((last_map_cloud.points[i].y>PoseY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<PoseY+GRID_WIDTH/2.0+GRID_PADDING)
+		&&last_map_cloud.points[i].x>PoseX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<PoseX+GRID_HEIGHT/2.0+GRID_PADDING)
+>>>>>>> 95012fdee7bac8e0f26f2f492e3c43748e2f53dd
 		{
 			for (int j =0; j<DONUT_LENGTH; j++)
 			{
 				for (int k = 0; k<DONUT_LENGTH; k++)
 				{
+<<<<<<< HEAD
 					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]=Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]||Donut[j][k];
+=======
+					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))=1;
+>>>>>>> 95012fdee7bac8e0f26f2f492e3c43748e2f53dd
 				}
 			}
 		}
