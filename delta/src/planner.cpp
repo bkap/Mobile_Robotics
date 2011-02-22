@@ -129,9 +129,9 @@ int main(int argc,char **argv)
 	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseDes", 1);
 	
-	ros::Subscriber sub1 = n.subscribe<cv::Mat>("LIDAR_Map", 1, LIDAR_Callback); 
-	ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
-	ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
+	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, LIDAR_Callback); 
+	ros::Subscriber sub2 = n.subscribe<nav_msgs::OccupancyGrid>("SONAR_Map", 1, SONAR_Callback); 
+	ros::Subscriber sub3 = n.subscribe<nav_msgs::OccupancyGrid>("VISION_Map", 1, VISION_Callback); 
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 1, poseDes_Callback);
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::PoseStamped>("goalPose", 1, goalPose_Callback);
 

@@ -9,7 +9,9 @@
 #include <math>
 #include "cv.h"
 
-#define GRID_RES .05 // 5 cm grid
+#define REFRESH_RATE 10 //hz
+
+#define GRID_RES .10 // 10 cm grid
 #define GRID_WIDTH 10// meters wide
 #define GRID_HEIGHT 10 // meters tall... should be plenty of space
 #define GRID_PADDING 1 //meters of padding to try to avoid buffer overflows.
@@ -25,6 +27,9 @@ int** JellyDonut;
 tf::TransformListener *tfl;
 double PoseX;
 double PoseY;
+double InitX;
+double InitY;
+geometry_msgs::PoseStamped last_map_pose;
 
 void CopyPoints()
 {
@@ -32,14 +37,14 @@ void CopyPoints()
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
-		if (last_map_cloud.points[i].y>PoseY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<PoseY+GRID_WIDTH/2.0+GRID_PADDING)
-		&&last_map_cloud.points[i].x>PoseX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<PoseX+GRID_HEIGHT/2.0+GRID_PADDING)
+		if (last_map_cloud.points[i].y>InitY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<InitY+GRID_WIDTH/2.0+GRID_PADDING)
+		&&last_map_cloud.points[i].x>InitX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<InitX+GRID_HEIGHT/2.0+GRID_PADDING)
 		{
 			for (int j =0; j<DONUT_LENGTH; j++)
 			{
 				for (int k = 0; k<DONUT_LENGTH; k++)
 				{
-					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES));
+					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]=Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]||Donut[j][k];
 				}
 			}
 		}
@@ -63,8 +68,8 @@ void GridInit()
 	Output.MapMetaData.map_load_time = time(NULL);
 	Output.MapMetaData.Width = NUM_WIDTH;
 	Output.MapMetaData.Height = NUM_HEIGHT;
-	Output.origin.position.x = PoseX-GRID_WIDTH/2.0-GRID_PADDING;
-	Output.origin.position.y = PoseY-GRID_HEIGHT/2.0-GRID_PADDING;
+	Output.origin.position.x = InitX-GRID_WIDTH/2.0-GRID_PADDING;
+	Output.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
 	Output.origin.position.z = 0;
 	Output.origin.orientation = tf::createQuaternionMsgFromYaw(0);
 	Output.data = (int*) calloc((NUM_WIDTH)*(NUM_HEIGHT), sizeof(int8)); //I realize that this size should be 8 by definition, but this is good practice.
@@ -84,8 +89,8 @@ void DonutInit()
 	{
 		for(int j = 0; j<DONUT_LENGTH/DONUT_RES; j++)
 		{
-			x = (i - DONUT_LENGTH/(2.0*DONUT_RES));
-			y = (j - DONUT_LENGTH/(2.0*DONUT_RES));
+			x = (i - DONUT_LENGTH/(2.0*GRID_RES));
+			y = (j - DONUT_LENGTH/(2.0*GRID_RES));
 			if (x*x+y*y<DONUT_RADIUS*DONUT_RADIUS/(DONUT_RES*DONUT_RES))
 			{
 				JellyDonut[i][j] = 100;
@@ -96,11 +101,35 @@ void DonutInit()
 }
 
 bool init = false;
-void poseActualCallback(const geometry_msgs::PoseStamped::ConstPtr& StartPose)
+geometry_msgs::PoseStamped temp;
+void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
+
+        last_odom = *odom;
+        temp.pose = last_odom.pose.pose;
+        temp.header = last_odom.header;
+	cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
+        try 
+	{
+          tfl->transformPose("map", temp, last_map_pose);
+        } 
+	catch (tf::TransformException ex) 
+	{
+	  cout << "We caught an error!" << endl;
+          ROS_ERROR("%s", ex.what());
+        }
+	
+	PoseX = last_map_pose.pose.x;
+	PoseY = last_map_pose.pose.y;
+	
+	if(init == false)
+	{
+		InitX = PoseX;
+		InitY = PoseY;
+		GridInit();
+	}
+	
 	init = true;
-	PoseX = StartPose->X;
-	PoseY = StartPose->Y;
 }
 
 void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
@@ -109,22 +138,32 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 	{
 		last_map_cloud = *scan_cloud; 
 		ROS_INFO("I got a scan cloud of size ", last_map_cloud.points.size());
-		GridInit();
 		CopyPoints();
-		free(Output.data);
 	}
 }
 
 int main(int argc,char **argv)
 {
-  DonutInit();
-  ros::init(argc,argv,"lidar_listener");//name of this node
-  tfl = new tf::TransformListener();
-  while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
-  ros::NodeHandle n;
-  ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 1, cloudCallback);
-  ros::Subscriber S2 = n.subscribe<geometry_msgs::PoseStamped>("Pose_Actual", 1, poseActualCallback);
-  ros::Publisher P = n.advertise("LIDAR_Cloud", 1);
-  ros::spin(); //spin until ctrl-C or otherwise shutdown
-  return 0; // this code will only get here if this node was told to shut down, which is
-  // reflected in ros::ok() is false 
+	DonutInit();
+	ros::init(argc,argv,"lidar_listener");//name of this node
+	tfl = new tf::TransformListener();
+	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	
+	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	
+	ros::NodeHandle n;
+	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 1, cloudCallback);
+	ros::Subscriber S2 = n.subscribe<geometry_msgs::PoseStamped>("Pose_Actual", 1, odomCallback);
+	ros::Publisher P = n.advertise("LIDAR_Cloud", 1);
+	
+	while(true)
+	{
+		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
+		P.publish(Output);
+		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+		//thus enforcing that we achieve the desired update rate (10Hz)
+	}
+	
+	return 0; // this code will only get here if this node was told to shut down, which is
+	// reflected in ros::ok() is false 
+}
