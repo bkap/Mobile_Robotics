@@ -38,8 +38,10 @@ list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped
 	double wallx, wally;
 	bool avoiding = false;
 	path.push_back(Point(x,y));
+	int points = 0;
 	//head forward until you can turn or until you hit the entrance
-	while(fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5) {
+	//also, stop at 200 points (10 meters) so we don't take too long
+	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5) && points++ < 200) {
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
 		
