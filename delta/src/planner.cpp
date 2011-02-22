@@ -10,7 +10,8 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
-
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
 #include "MathyStuff.h"
 #include "CSpaceFuncs.h"
 
@@ -29,7 +30,7 @@
 
 using namespace cv;
 using namespace std;
-
+using namespace eecs376_msgs;
 tf::TransformListener *tfl;
 
 geometry_msgs::Point Point3toGeoPoint (Point3 A)
@@ -46,7 +47,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
-	P.seg_Length = Distance3(A-B);
+	P.seg_length = Distance3(A,B);
 	P.ref_point = Point3toGeoPoint(A);
 	Point3 Vec = B-A;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
@@ -69,7 +70,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	return P;
 }
 
-PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs/Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs::Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
 {
 	double theta1 = tf::getYaw(InitAngle);
 	double theta2 = tf::getYaw(FinalAngle);
@@ -77,7 +78,7 @@ PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs/
 	PathSegment P;
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
-	P.seg_Length = theta2-theta1;
+	P.seg_length = theta2-theta1;
 	P.ref_point = ref_point;
 	P.init_tan_angle = InitAngle;
 	P.curvature = 1337;
@@ -99,7 +100,7 @@ PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs/
 	return P;
 }
 
-PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs/Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs::Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
 {
 	
 	double theta1 = tf::getYaw(InitAngle);
@@ -108,7 +109,7 @@ PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs/Quatern
 	PathSegment P;
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
-	P.seg_Length = theta2-theta1;
+	P.seg_length = theta2-theta1;
 	P.ref_point = ref_point;
 	P.init_tan_angle = InitAngle;
 	P.curvature = 1/STD_TURN_RAD;
@@ -147,7 +148,7 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 {
 	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
-	Point3 Center = B+(D-B)/Magnitude3(D-B)*STD_RADIUS/tan(Theta/2.0);
+	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/tan(Theta/2.0));
 	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
 	Point3 Bdoubleprime = C+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
 	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
@@ -156,24 +157,24 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)++);
-		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine.ref_point, (*SegNum)++) ;
+		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine->ref_point, (*SegNum)++) ;
 	}
 	else 
 	{
-		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++;
+		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
 		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)++);
-		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine.ref_point,(*SegNum)++) ;
+		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
 	}
 }
 
 PathList insertTurns(list<Point> P)
 {
-	Point3* PointList = calloc(P.size, sizeof(Point3));  //this should be the list of points that ben's algorithm puts out
-	int PointListLength = P.size;
+	Point3* PointList = (Point3*)calloc(sizeof(Point3),P.size());  //this should be the list of points that ben's algorithm puts out
+	int PointListLength = P.size();
 	
 	list<Point>::iterator it; 
-	i = 0;
-	for (it = P.begin; it!=p.end; it++)
+	int i = 0;
+	for (it = P.begin(); it!=P.end(); it++)
 	{
 		PointList[i].X = it->x;
 		PointList[i].Y = it->y;
@@ -182,7 +183,7 @@ PathList insertTurns(list<Point> P)
 	}
 	
 	PathList ReturnVal;
-	ReturnVal.path_list = malloc(sizeof(PathSegment)*(3*(PathListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
+	ReturnVal.path_list = (PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
 	Point3 A, B, C;
 	PathSegment FirstLine, Curve, SecondLine;
@@ -324,7 +325,7 @@ int main(int argc,char **argv)
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
       
 	ros::Time birthday = ros::Time::now();
-	desired_pose.header.stamp = birthday;
+	//desired_pose.header.stamp = birthday;
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	
 	ROS_INFO("birthday started as %f", birthday.toSec());
@@ -333,7 +334,7 @@ int main(int argc,char **argv)
 	{
 		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 		ros::Time current_time = ros::Time::now();
-		desired_pose.header.stamp = current_time;
+		//desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());

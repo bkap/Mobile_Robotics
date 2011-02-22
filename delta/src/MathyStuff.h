@@ -29,7 +29,7 @@ Point3 operator+(Point3 A, Point3 B);
 Point3 operator-(Point3 A, Point3 B);
 Point3 operator*(FLOAT A, Point3 B);
 Point3 operator/(Point3 B, FLOAT A);
-
+Point3 operator*(Point3 A, FLOAT B);
 class Point3
 {
 	public:
@@ -79,12 +79,13 @@ Point3 Normalize (Point3 A);
 FLOAT Magnitude2 (FLOAT X, FLOAT Y);
 FLOAT Magnitude3 (FLOAT X, FLOAT Y, FLOAT Z);
 FLOAT Magnitude2 (Point2 A);
-FLOAT Magnutude3 (Point3 A);
+FLOAT Magnitude3 (Point3 A);
 FLOAT Dot2 (Point2 A, Point2 B);
 FLOAT Dot3 (Point3 A, Point3 B);
 Point3 Cross3 (Point3 A, Point3 B);
 FLOAT Distance2 (FLOAT X1, FLOAT X2,  FLOAT Y1, FLOAT Y2);
 FLOAT Distance3 (FLOAT X1, FLOAT X2,FLOAT Y1, FLOAT Y2, FLOAT Z1, FLOAT Z2);
+FLOAT Distance3(Point3 P1, Point3 P2);
 FLOAT MagnitudeSquared2 (FLOAT X, FLOAT Y);
 FLOAT MagnitudeSquared3 (FLOAT X, FLOAT Y, FLOAT Z);
 FLOAT MagnitudeSquared2 (Point2 A);
