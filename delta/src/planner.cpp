@@ -9,7 +9,9 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
+#include "MathyStuff.h"
 
+using namespace std;
 using namespace cv;
 /**assume orientation and resolution are the same*/
 Mat& getMap(OccupancyGrid grid) {
@@ -21,6 +23,11 @@ Mat& getMap(OccupancyGrid grid) {
 	}
 	return m;
 
+}
+
+PathList insertTurns(list<Pose> P)
+{
+	
 }
 
 list<Pose> bugAlgorithm(Mat& cspace, Point_ dest, PoseStamped start) {
