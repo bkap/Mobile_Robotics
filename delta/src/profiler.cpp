@@ -4,8 +4,13 @@
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include "command_publisher.h"
 
+using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
@@ -24,9 +29,9 @@ double cur_lin_vel = 0.0;
 double cur_ang_vel = 0.0;
 
 // TODO: all of these signatures are wrong but I don't know what to put here
-void crawlerDesStateCallback(const geometry_msgs::Pose::ConstPtr& desState)
+void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
-    // get cur_x, cur_y, cur_psi    
+    /*// get cur_x, cur_y, cur_psi    
     cur_x = 0.0;
     cur_y = 0.0;
     cur_psi = 0.0;
@@ -38,18 +43,18 @@ void crawlerDesStateCallback(const geometry_msgs::Pose::ConstPtr& desState)
     rhoDes = 0.0;
     goal_lin_vel = 0.0;
     goal_ang_vel = 0.0;
-    segtype = 0;
+    segtype = 0;*/
 
 }
 
-void pathListCallback(const PathList::ConstPtr& pathlist)
+void pathListCallback(const PathList::ConstPtr& path)
 {
     // get the path segment type
     // get xDes, yDes, psiDes, rhoDes, goal_lin_vel, goal_ang_vel, max velocities/accelerations
 }
 
-// this is especially wrong
-void cspaceMapCallback(const CrawlerDesState::ConstPtr& crawlerDesState)
+//http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
+void cspaceMapCallback(const nav_msgs::OccupancyMap::ConstPtr& CSpaceMap)
 {
     // get the cspacemap
 }

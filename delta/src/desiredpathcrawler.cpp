@@ -4,8 +4,12 @@
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
 #include "command_publisher.h"
 
+using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
@@ -36,7 +40,7 @@ void pathListCallback(const PathList::ConstPtr& pathlist)
     maxAccelAng = 0.0;
 }
 
-void speedNominalCallback(const CrawlerDesState::ConstPtr& desState)
+void speedNominalCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
     // get speedNominal
     speedNominal = 0.0;
@@ -55,12 +59,12 @@ int main(int argc,char **argv)
     ros::init(argc,argv,"desiredpathcrawler");//name of this node
     
     ros::NodeHandle n;
-    ros::Publisher pub = n.advertise<CrawlerDesState>("desiredpathcrawler",1);
+    ros::Publisher pub = n.advertise<CrawlerDesiredState>("desiredpathcrawler",1);
     
     // list of subscribers
     // TODO: probably wrong types
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesState>("speedprofiler", 1, speedProfilerCallback);
+	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("speedprofiler", 1, speedNominalCallback);
 	
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
@@ -97,10 +101,10 @@ int main(int argc,char **argv)
         // figure out if we are at a new segment
         if (lsegDes >= segLen) {  // TODO: add tolerance?
             segNum++;
-            segType = pathList[segNum].segType //TODO: haha this is wrong
+            segType = pathList[segNum].segType; //TODO: haha this is wrong
         }
         
-        pub.publish(CrawlerDesState); // publish the crawlerDesState
+        pub.publish(CrawlerDesiredState); // publish the crawlerDesState
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is
