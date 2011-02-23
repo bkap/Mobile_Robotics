@@ -4,8 +4,11 @@
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
 #include "command_publisher.h"
 
+using namespace eecs376_msgs
 using namespace std;
 const double REFRESH_RATE = 0.1;
 

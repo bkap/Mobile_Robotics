@@ -9,7 +9,6 @@
 #include <nav_msgs/OccupancyGrid.h>
 
 #include <math>
-#include "cv.h"
 
 #define REFRESH_RATE 10 //hz
 
