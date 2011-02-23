@@ -1,0 +1,17 @@
+<package>
+  <description brief="eecs376_msgs">
+
+     eecs376_msgs
+
+  </description>
+  <author>Eric Perko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/eecs376_msgs</url>
+  <depend package="nav_msgs" />
+  <depend package="sensor_msgs" />
+  <depend package="geometry_msgs" />
+
+</package>
+
+
