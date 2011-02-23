@@ -8,6 +8,7 @@
 #include <tf/message_filter.h>
 #include <math>
 #include "cv.h"
+#include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 10 //hz
 

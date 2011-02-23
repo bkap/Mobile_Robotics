@@ -27,4 +27,46 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 
 }
 
+void PlotMap(list<geometry_msgs::Point> PointsToPlot, ROS::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
+{
+	//some code taken directly from the wiki and then modified
+	visualization_msgs::Marker marker;
+	marker.header.frame_id = "base_link";
+	marker.header.stamp = ros::Time();
+	marker.ns = "my_namespace";
+	marker.id = 0;
+	marker.type = visualization_msgs::Marker::CUBE_LIST;
+	marker.action = visualization_msgs::Marker::ADD;
+	marker.pose.position.x = 0;
+	marker.pose.position.y = 0;
+	marker.pose.position.z = 0;
+	marker.pose.orientation.x = 0.0;
+	marker.pose.orientation.y = 0.0;
+	marker.pose.orientation.z = 0.0;
+	marker.pose.orientation.w = 1.0;
+	marker.scale.x = cubesize;
+	marker.scale.y = cubesize;
+	marker.scale.z = cubesize;
+	marker.color.a = 0.0;
+	marker.color.r =  r;
+	marker.color.g = g;
+	marker.color.b = b;
+	
+	int i =0;
+	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size*sizeof(geometry_msgs::Point));
+	while(!PointsToPlot.empty())
+	{
+		Point P = *PointsToPlot.front;
+		PointsToPlot.pop_front();
+		RetVal[i] = P;
+		i++;
+	}
+	
+	marker.points = RetVal;
+	marker.colors = NULL;  //the wiki says that this should 
+	
+	vis_pub->publish( marker );
+
+}
+
 #endif
