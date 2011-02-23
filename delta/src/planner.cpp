@@ -203,6 +203,7 @@ PathList insertTurns(list<Point> P)
 		ReturnVal.path_list[3*i+1] = Curve;
 		ReturnVal.path_list[3*i+2] = SecondLine;
 	}
+	return ReturnVal;
 }
 
 list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped origin) {

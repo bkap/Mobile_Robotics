@@ -4,8 +4,13 @@
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include "command_publisher.h"
 
+using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
@@ -16,35 +21,40 @@ const double MAX_ANG_VEL = 1.0;
 const double MAX_ANG_ACCEL = 1.0;
 
 // TODO: get these from subscribed topics somehow
-double cur_x = 0.0;
-double cur_y = 0.0;
-double cur_psi = 0.0;
-double xDes = 0.0;
-double yDes = 0.0;
-double psiDes = 0.0;
-double rhoDes = 0.0;
-double goal_lin_vel = 0.0;
-double goal_ang_vel = 0.0;
-double lsegDes = 0.0; // how far traveled along current path segment
-int segtype = 0;
+double cur_x, cur_y, cur_psi, xDes, yDes, psiDes, rhoDes, lsegDes, goal_lin_vel, goal_ang_vel;
+int segtype;
 
 // keep track of last ordered velocities
 double cur_lin_vel = 0.0;
 double cur_ang_vel = 0.0;
 
 // TODO: all of these signatures are wrong but I don't know what to put here
-void crawlerDesStateCallback(const geometry_msgs::Pose::ConstPtr& desState)
+void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
-    // get cur_x, cur_y, cur_psi
+    /*// get cur_x, cur_y, cur_psi    
+    cur_x = 0.0;
+    cur_y = 0.0;
+    cur_psi = 0.0;
+    
+    lsegDes = 0.0; // how far traveled along current path segment
+    xDes = 0.0;
+    yDes = 0.0;
+    psiDes = 0.0;
+    rhoDes = 0.0;
+    goal_lin_vel = 0.0;
+    goal_ang_vel = 0.0;
+    segtype = 0;*/
+
 }
 
-void pathListCallback(const PathList::ConstPtr& pathlist)
+void pathListCallback(const PathList::ConstPtr& path)
 {
     // get the path segment type
     // get xDes, yDes, psiDes, rhoDes, goal_lin_vel, goal_ang_vel, max velocities/accelerations
 }
 
-void cspaceMapCallback(const CrawlerDesState::ConstPtr& crawlerDesState)
+//http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
+void cspaceMapCallback(const nav_msgs::OccupancyMap::ConstPtr& CSpaceMap)
 {
     // get the cspacemap
 }
@@ -75,7 +85,7 @@ double angleRemaining()
     }
 }
 
-// Check if path is clear within the braking distances
+// TODO: Check if path is clear within the braking distances
 bool clearPath(double dist_lin, double dist_ang)
 {
     // check along the path within braking distances
@@ -102,7 +112,7 @@ int main(int argc,char **argv)
     CrawlerDesState desState; // intialize the class
 
     ros::NodeHandle n;
-    ros::Publisher pub = n.advertise<geometry_msgs::Pose>("speedprofiler",1);
+    ros::Publisher pub = n.advertise<CrawlerDesState>("speedprofiler",1);
     
     // list of subscribers
     // TODO: not sure if these are the right strings, also these are the wrong classes for pathlist and cspacemap
