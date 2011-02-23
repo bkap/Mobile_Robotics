@@ -6,6 +6,8 @@
 #include <laser_geometry/laser_geometry.h> //for the laser projector class
 #include <message_filters/subscriber.h>
 #include <tf/message_filter.h>
+#include <nav_msgs/OccupancyGrid.h>
+
 #include <math>
 #include "cv.h"
 
@@ -30,6 +32,14 @@ double PoseY;
 double InitX;
 double InitY;
 geometry_msgs::PoseStamped last_map_pose;
+geometry_msgs::PoseStamped last_odom;
+
+using namespace std;
+
+int Address(int i, int j)
+{
+	return i*NUM_WIDTH+j;
+}
 
 void CopyPoints()
 {
@@ -37,14 +47,14 @@ void CopyPoints()
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
-		if (last_map_cloud.points[i].y>InitY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<InitY+GRID_WIDTH/2.0+GRID_PADDING)
+		if (last_map_cloud.points[i].y>InitY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<InitY+GRID_WIDTH/2.0+GRID_PADDING
 		&&last_map_cloud.points[i].x>InitX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<InitX+GRID_HEIGHT/2.0+GRID_PADDING)
 		{
 			for (int j =0; j<DONUT_LENGTH; j++)
 			{
 				for (int k = 0; k<DONUT_LENGTH; k++)
 				{
-					Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]=Output[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]||Donut[j][k];
+					Output.data[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]=Output.data[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]||JellyDonut[j][k];
 				}
 			}
 		}
@@ -54,25 +64,20 @@ void CopyPoints()
 
 // [i,j] = i*width+j
 
-int Address(int i, int j)
-{
-	return i*NUM_WIDTH+j;
-}
-
 void GridInit()
 {
 	Output.header.seq = 0;
-	Output.header.frame = "map"
-	Output.header.stamp = time(NULL);
-	Output.MapMetaData.resolution = .05;
-	Output.MapMetaData.map_load_time = time(NULL);
-	Output.MapMetaData.Width = NUM_WIDTH;
-	Output.MapMetaData.Height = NUM_HEIGHT;
-	Output.origin.position.x = InitX-GRID_WIDTH/2.0-GRID_PADDING;
-	Output.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
-	Output.origin.position.z = 0;
-	Output.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	Output.data = (int*) calloc((NUM_WIDTH)*(NUM_HEIGHT), sizeof(int8)); //I realize that this size should be 8 by definition, but this is good practice.
+	Output.header.frame_id = "map";
+	//Output.header.stamp = time(NULL);
+	Output.info.resolution = .05;
+	//Output.info.map_load_time = time(NULL);
+	Output.info.width = NUM_WIDTH;
+	Output.info.height = NUM_HEIGHT;
+	Output.info.origin.position.x = InitX-GRID_WIDTH/2.0-GRID_PADDING;
+	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
+	Output.info.origin.position.z = 0;
+	Output.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
+	Output.data = (char*) calloc((NUM_WIDTH)*(NUM_HEIGHT), sizeof(char)); //I realize that this size should be 8 by definition, but this is good practice.
 }
 
 void DonutInit()
@@ -85,13 +90,13 @@ void DonutInit()
 	
 	double x =0;
 	double y =0;
-	for (int i =0;  i <DONUT_LENGTH/DONUT_RES; i++)
+	for (int i =0;  i <DONUT_LENGTH/GRID_RES; i++)
 	{
-		for(int j = 0; j<DONUT_LENGTH/DONUT_RES; j++)
+		for(int j = 0; j<DONUT_LENGTH/GRID_RES; j++)
 		{
 			x = (i - DONUT_LENGTH/(2.0*GRID_RES));
 			y = (j - DONUT_LENGTH/(2.0*GRID_RES));
-			if (x*x+y*y<DONUT_RADIUS*DONUT_RADIUS/(DONUT_RES*DONUT_RES))
+			if (x*x+y*y<DONUT_RADIUS*DONUT_RADIUS/(GRID_RES*GRID_RES))
 			{
 				JellyDonut[i][j] = 100;
 			}
@@ -104,9 +109,7 @@ bool init = false;
 geometry_msgs::PoseStamped temp;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
-
-        last_odom = *odom;
-        temp.pose = last_odom.pose.pose;
+        temp.pose = (*odom).pose.pose;
         temp.header = last_odom.header;
 	cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
         try 
