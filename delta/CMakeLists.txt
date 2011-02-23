@@ -30,8 +30,9 @@ rosbuild_add_library(MathyStuff src/MathyStuff.cpp)
 
 #rosbuild_add_executable(command_publisher src/command_publisher.cpp)
 rosbuild_add_executable(goalpublisher src/goalpublisher.cpp)
-rosbuild_add_executable(planner src/planner.cpp)
-rosbuild_add_executable(profiler src/profiler.cpp)
-rosbuild_add_executable(lidarmapper src/lidarmapper.cpp)
+#rosbuild_add_executable(planner src/planner.cpp)
+#rosbuild_add_executable(profiler src/profiler.cpp)
+#rosbuild_add_executable(desiredpathcrawler src/desiredpathcrawler.cpp)
+#rosbuild_add_executable(lidarmapper src/lidarmapper.cpp)
 
 #target_link_libraries(example ${PROJECT_NAME})

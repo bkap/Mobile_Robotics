@@ -9,13 +9,7 @@
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
-// TODO: these are not actually constant they are part of the path lolz
-const double MAX_LINEAR_VEL = 1.0;
-const double MAX_LINEAR_ACCEL = 2.0;
-const double MAX_ANG_VEL = 1.0;
-const double MAX_ANG_ACCEL = 1.0;
-
-double speedNominal, segLen, referencePtX, referencePtY, initTanAng, curvature, maxVelLin, maxAccelLin, maxVelAng, maxAccelAng;
+double speedNominal, segLen, referencePtX, referencePtY, initTanAng, rho, maxVelLin, maxAccelLin, maxVelAng, maxAccelAng;
 int segNum, segType;
 
 // TODO: all of these signatures are wrong but I don't know what to put here
@@ -23,13 +17,13 @@ void pathListCallback(const PathList::ConstPtr& pathlist)
 {
     // get the path segment type
     // get xDes, yDes, psiDes, rhoDes, goal_lin_vel, goal_ang_vel, max velocities/accelerations
-    segNum = 0;
-    segLen = 0.0;
-    segType = 0;
-    referencePtX = 0.0;
+    segNum = 0;         // index of path segment in path list
+    segType = 0;        // 1=path, 2=arc, 3=rotate in place
+    segLen = 0.0;       // length of path, arc, or angle through which to rotate
+    referencePtX = 0.0; // if line, start of path, else, center of rotation
     referencePtY = 0.0;
-    initTanAng = 0.0;
-    curvature = 0.0;
+    initTanAng = 0.0;   // initial heading
+    rhoDes = 0.0;          // curvature (0 for lines)
     maxVelLin = 0.0;
     maxAccelLin = 0.0;
     maxVelAng = 0.0;
@@ -69,8 +63,8 @@ int main(int argc,char **argv)
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-                
-        // compute distance traveled...?
+        
+        // update total distance traveled
         lsegDes = lsegDes + speedNominal * REFRESH_RATE;
         
         // compute the x, y, psi
@@ -81,15 +75,20 @@ int main(int argc,char **argv)
                 yDes = yDes + lsegDes * sin(psiDes);
                 break;
             case 2: // arc: speedNominal is the tangential velocity (v = w R)
-                // TODO: x and y
-                double psiOld = psiDes;
-                psiDes = psiDes + speedNominal * REFRESH_RATE / rhoDes;
-                double psiDiff = psiDes - psiOld;
-                xDes = xDes + lsegDes * cos(psiDes); // know the old psi and the new psi this shouldn't be too hard right
-                yDes = yDes + lsegDes * sin(psiDes);
+                // lsegdes is distance s traveled along the arc: s = R * theta
+                double theta = 0.0; // angle from center of curvature
+                if (rho >= 0)
+                    theta = psiDes - pi/2;
+                else
+                    theta = psiDes + pi/2;
+                theta = theta + lsegDes * fabs(rhoDes)
+                psiDes = psiDes + lsegDes * fabs(rhoDes);
+                
+                xDes = xDes + cos(theta)/rhoDes;
+                yDes = yDes + sin(theta)/rhoDes;
                 break;
             case 3: // rotate about point
-                // um...?
+                // "distance" is actually the angle rotated, x and y do not change
                 psiDes = psiDes + lsegDes;
                 break;
         }

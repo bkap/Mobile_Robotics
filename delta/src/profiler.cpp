@@ -9,83 +9,91 @@
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
-// TODO: these are not actually constant they are part of the path lolz
-const double MAX_LINEAR_VEL = 1.0;
-const double MAX_LINEAR_ACCEL = 2.0;
-const double MAX_ANG_VEL = 1.0;
-const double MAX_ANG_ACCEL = 1.0;
-
 // TODO: get these from subscribed topics somehow
-double cur_x, cur_y, cur_psi, xDes, yDes, psiDes, rhoDes, lsegDes, goal_lin_vel, goal_ang_vel;
-int segtype;
-
-// keep track of last ordered velocities
-double cur_lin_vel = 0.0;
-double cur_ang_vel = 0.0;
+double lsegDes, xCur, yCur, psiCur, rhoCur, curSpeed, vLinMax, vAngMax, aLinMax, aAngMax;
+int segType, segNumber;
+Path[] pathlist;
+CrawlerDesState curState;
+CSpaceMap cspaceMap;
+// path segment options
+double pvLinMax, pvAngMax, paLinMax, paAngMax, xDes, yDes, rhoDes, psiInit;
 
 // TODO: all of these signatures are wrong but I don't know what to put here
-void crawlerDesStateCallback(const geometry_msgs::Pose::ConstPtr& desState)
+void crawlerDesStateCallback(const CrawlerDesState::ConstPtr& desState)
 {
-    // get cur_x, cur_y, cur_psi    
-    cur_x = 0.0;
-    cur_y = 0.0;
-    cur_psi = 0.0;
-    
-    lsegDes = 0.0; // how far traveled along current path segment
-    xDes = 0.0;
-    yDes = 0.0;
-    psiDes = 0.0;
-    rhoDes = 0.0;
-    goal_lin_vel = 0.0;
-    goal_ang_vel = 0.0;
-    segtype = 0;
-
+    curState = desState;
+    // get the current stats
+    lsegDes = 0.0;
+    xCur = 0.0;
+    yCur = 0.0;
+    psiCur = 0.0;
+    rhoCur = 0.0;
+    segType = 0;
+    segNumber = 0;
+    curSpeed = 0.0;
 }
 
-void pathListCallback(const PathList::ConstPtr& pathlist)
+void pathListCallback(const PathList::ConstPtr& paths)
 {
-    // get the path segment type
-    // get xDes, yDes, psiDes, rhoDes, goal_lin_vel, goal_ang_vel, max velocities/accelerations
+    // get the path list
+    pathlist = paths; // assigned here
+    /*
+    each path segment includes:
+    segNum
+    segLen
+    segType
+    referencePt
+    initTanAng (initial heading)
+    curvature (rho)
+    vLinMax
+    vAngMax
+    aLinMax
+    aAngMax
+    */
 }
 
 // this is especially wrong
-void cspaceMapCallback(const CrawlerDesState::ConstPtr& crawlerDesState)
+void cspaceMapCallback(const CSpaceMap::ConstPtr& map)
 {
     // get the cspacemap
+    cspaceMap = map;
 }
 
-// Calculate the remaining distance to the end of the path segment
-double distanceRemaining()
-{
-    switch (segtype) {
-        case 1: // line
-            return pow(pow(xDes-cur_x, 2) + pow(yDes-cur_y, 2), 0.5);
-        case 2: // arc
-            return rhoDes * (psiDes - cur_psi);
-        case 3: // rotate in place - no translation
-            return 0.0;
-    }
-}
-
-// Calculate the remaining angle to the end of the path segment
-double angleRemaining()
-{
-    switch (segtype) {
-        case 1: // line - no rotation
-            return 0.0;
-        case 2: // arc
-            return psiDes - cur_psi;
-        case 3: // rotate in place - distance is the angle left to turn
-            return psiDes - cur_psi;
-    }
-}
-
-// TODO: Check if path is clear within the braking distances
+// TODO: this
 bool clearPath(double dist_lin, double dist_ang)
 {
     // check along the path within braking distances
     // and test cspace map pixels for occupancy
     return true;
+}
+
+// Calculate how far robot will go, with max deceleration, to get to the goal speed
+double distanceToGoalSpeed(double goal_speed)
+{
+    double brakingDistance = 0.0;
+    switch (segType) {
+        case 1: // line
+        case 2: // arc
+            brakingDistance = curSpeed * (curSpeed - goal_speed) / aLinMax - pow(curSpeed - goal_speed, 2) / (2 * aLinMax);
+            break;
+        case 3: // point
+            brakingDistance = curSpeed * (curSpeed - goal_speed) / aAngMax - pow(curSpeed - goal_speed, 2) / (2 * aAngMax);
+            break;
+    }
+    return brakingDistance;
+}
+
+// Calculate the remaining distance to the end of the path segment
+double distanceRemaining()
+{
+    switch (segType) {
+        case 1: // distance along line
+            return pow(pow(xDes-xCur, 2) + pow(yDes-yCur, 2), 0.5);
+        case 2: // distance along arc
+            return (psiDes - psiCur) / rhoDes;
+        case 3: // angle remaining
+            return (psiDes - psiCur);
+    }
 }
 
 /*
@@ -98,60 +106,59 @@ if path is clear:
 if obstruction:
     brake
 
-Publishes: speednominal?
-a eecs376_msgs/CrawlerDesiredState, but with the des_speed field filled in with a correct value
+Publishes: eecs376_msgs/CrawlerDesiredState, but with the des_speed field filled in with a correct value
 */
 int main(int argc,char **argv)
 {   
     ros::init(argc,argv,"profiler");//name of this node
-    CrawlerDesState desState; // intialize the class
-
     ros::NodeHandle n;
     ros::Publisher pub = n.advertise<CrawlerDesState>("speedprofiler",1);
     
     // list of subscribers
     // TODO: not sure if these are the right strings, also these are the wrong classes for pathlist and cspacemap
-	ros::Subscriber subCrawlerDesState = n.subscribe<geometry_msgs::Pose>("crawlerDesState", 1, crawlerDesStateCallback);
+	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesState>("crawlerDesState", 1, crawlerDesStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subCspaceMap = n.subscribe<CrawlerDesState>("cspaceMap", 1, cspaceMapCallback);
+	ros::Subscriber subCspaceMap = n.subscribe<CSpaceMap>("cspaceMap", 1, cspaceMapCallback);
 	
-	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of 10 Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
-    
-    // Calculate braking distances
-    double brakingDistanceLin = cur_lin_vel * (cur_lin_vel - goal_lin_vel) / MAX_LINEAR_ACCEL - pow(cur_lin_vel - goal_lin_vel, 2) / (2 * MAX_LINEAR_ACCEL);
-    // this is an angle
-    double brakingDistanceAng = cur_ang_vel * (cur_ang_vel - goal_ang_vel) / MAX_ANG_ACCEL - pow(cur_ang_vel - goal_ang_vel, 2) / (2 * MAX_ANG_ACCEL);
     
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
         
-        // Ramp linear velocity
-        if (distanceRemaining() < brakingDistanceLin && clearPath(brakingDistanceLin, brakingDistanceAng)) {
-            // go to maximum velocity
-            if (cur_lin_vel < MAX_LINEAR_VEL)
-                cur_lin_vel = min(cur_lin_vel + MAX_LINEAR_ACCEL * REFRESH_RATE, MAX_LINEAR_VEL);
+        // Calculate braking and slowing distances
+        // TODO: get the goal velocities correctly
+        double vMax, aMax, vGoal;
+        if (segType == 3) {
+            vMax = vAngMax;
+            aMax = aAngMax;
+            vGoal = pvAngMax;
+        } else {
+            vMax = vLinMax;
+            aMax = aLinMax;
+            vGoal = pvLinMax;
+        }
+        double brakingDistance = distanceToGoalSpeed(0.0);
+        double slowingDistance = distanceToGoalSpeed(vMax);
+        double distToGo = distanceRemaining();
+        
+        // Ramp velocity
+        if (clearPath()) {
+            if (slowingDistance < distToGo) {   // go to maximum velocity
+                speedNominal = min(speedNominal + aMax * REFRESH_RATE, vGoal);
+            } else {    // ramp speed down to goal speed
+                speedNominal = max(speedNominal - aMax * REFRESH_RATE, 0.0);
+            }
         } else {
             // go to zero
-            cur_lin_vel = max(cur_lin_vel - MAX_LINEAR_ACCEL * REFRESH_RATE, 0.0);
+            speedNominal = max(speedNominal - aMax * REFRESH_RATE, 0.0);
         }
-        
-        // TODO: Ramp angular velocity... what is this I don't even (aka this probably isn't right and is going to spiral weirdly?)
-        if (angleRemaining() < brakingDistanceAng && clearPath(brakingDistanceLin, brakingDistanceAng)) {
-            // go to maximum velocity
-            if (cur_ang_vel < MAX_ANG_VEL)
-                cur_ang_vel = min(cur_ang_vel + MAX_ANG_ACCEL * REFRESH_RATE, MAX_ANG_VEL);
-        } else {
-            // go to zero
-            cur_ang_vel = max(cur_ang_vel - MAX_ANG_ACCEL * REFRESH_RATE, 0.0);
-        }
-        
+                
         // set only the speedNominal of the crawlerDesState
-        // speedNominal is the only thing to update
-        // um.  v = w/R...?
-        //pub.publish(goal_pose); // publish the crawlerDesState
+        curState.speedNominal = speedNominal;
+        pub.publish(curState); // publish the crawlerDesState
 	    
 	    naptime.sleep(); // enforce desired update rate
     }
