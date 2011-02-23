@@ -11,6 +11,8 @@
 #include <vector>
 #include <math.h>
 
+#include "CSpaceFuncs.h"
+
 #define REFRESH_RATE 10 //hz
 
 #define GRID_RES .05 // 10 cm grid
