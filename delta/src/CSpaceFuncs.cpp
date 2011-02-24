@@ -2,6 +2,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
