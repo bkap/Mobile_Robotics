@@ -4,8 +4,13 @@
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include "command_publisher.h"
 
+using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
 
@@ -19,7 +24,7 @@ CSpaceMap cspaceMap;
 double pvLinMax, pvAngMax, paLinMax, paAngMax, xDes, yDes, rhoDes, psiInit;
 
 // TODO: all of these signatures are wrong but I don't know what to put here
-void crawlerDesStateCallback(const CrawlerDesState::ConstPtr& desState)
+void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
     curState = desState;
     // get the current stats
@@ -52,11 +57,12 @@ void pathListCallback(const PathList::ConstPtr& paths)
     */
 }
 
-// this is especially wrong
-void cspaceMapCallback(const CSpaceMap::ConstPtr& map)
+// probably wrong
+//http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
+void cspaceMapCallback(const nav_msgs::OccupancyMap::ConstPtr& csMap)
 {
     // get the cspacemap
-    cspaceMap = map;
+    cspaceMap = csMap;
 }
 
 // TODO: this
