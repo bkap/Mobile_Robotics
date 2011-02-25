@@ -286,10 +286,14 @@ cv::Mat_<bool> *lastSONAR_Map;
 geometry_msgs::PoseStamped poseDes;
 geometry_msgs::PoseStamped goalPose; 
 geometry_msgs::Pose mapOrigin;
+bool LIDARcalled = false;
+bool poseDescalled = false;
+bool goalPosecalled = false;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
 	lastLIDAR_Map = getMap(*LIDAR_Map);
 	mapOrigin = (*LIDAR_Map).info.origin;
+	LIDARcalled = true;
 }
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
@@ -305,10 +309,12 @@ void VISION_Callback(const boost::shared_ptr<cv::Mat  const>& VISION_Map)
 void poseDes_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseDes)
 {
 	poseDes = *newPoseDes;
+	poseDescalled = true;
 }
 void goalPose_Callback(const geometry_msgs::PoseStamped::ConstPtr& newGoalPose)
 {
 	goalPose = *newGoalPose;
+	goalPosecalled = true;
 }
 
 
@@ -347,9 +353,11 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.position.x, poseDes.pose.position.y), goalPose, mapOrigin);	
-		PathList turns = insertTurns(points);
-		path_pub.publish(turns);	
+		if(LIDARcalled && poseDescalled && goalPosecalled) {
+			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.position.x, poseDes.pose.position.y), goalPose, mapOrigin);	
+			PathList turns = insertTurns(points);
+			path_pub.publish(turns);	
+		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
