@@ -49,58 +49,91 @@ int main(int argc,char **argv)
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
-       
+    
+    // initialize desired state
+    desState.seg_type = pathlist.path_list[0].seg_type;
+    desState.seg_number = 0;
+    desState.des_speed = 0.0;
+    desState.des_rho = pathlist.path_list[0].curvature;
+    desState.des_lseg = 0.0;
+    geometry_msgs::Pose des_pose;
+    des_pose.position = pathlist.path_list[0].ref_point;
+    des_pose.orientation = pathlist.path_list[0].init_tan_angle;
+    desState.des_pose = des_pose;
+    
+    // ref
+    bool finishedPath = false;
+    
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
         
-        // update total distance traveled
-        desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
-        
-        // compute the x, y, psi
-        double psiDes = tf::getYaw(desState.des_pose.orientation);
-        
-        switch (desState.seg_type) {
-            case 1: // line
-                // straightforward
-                desState.des_pose.position.x += desState.des_lseg * cos(psiDes);
-                desState.des_pose.position.y += desState.des_lseg * sin(psiDes);
-                break;
-            case 2: // arc: speedNominal is the tangential velocity (v = w R)
-            {   // lsegdes is distance s traveled along the arc: s = R * theta
-                double theta = 0.0; // angle from center of curvature
-                if (desState.des_rho >= 0)
-                    theta = psiDes - pi/2;
-                else
-                    theta = psiDes + pi/2;
-                theta = theta + desState.des_lseg * fabs(desState.des_rho);
-                psiDes = psiDes + desState.des_lseg * fabs(desState.des_rho);
-                
-                desState.des_pose.position.x += cos(theta) / desState.des_rho;
-                desState.des_pose.position.y += sin(theta) / desState.des_rho;
-                break;
+        // only update if it still has path segments left...
+        if (!finishedPath)
+        {
+            // update total distance traveled
+            desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
+            
+            // compute the x, y, psi
+            double psiDes = tf::getYaw(desState.des_pose.orientation);
+            
+            switch (desState.seg_type) {
+                case 1: // line
+                    // straightforward
+                    desState.des_pose.position.x += desState.des_lseg * cos(psiDes);
+                    desState.des_pose.position.y += desState.des_lseg * sin(psiDes);
+                    break;
+                case 2: // arc: speedNominal is the tangential velocity (v = w R)
+                {   // lsegdes is distance s traveled along the arc: s = R * theta
+                    double theta = 0.0; // angle from center of curvature
+                    if (desState.des_rho >= 0)
+                        theta = psiDes - pi/2;
+                    else
+                        theta = psiDes + pi/2;
+                    theta = theta + desState.des_lseg * fabs(desState.des_rho);
+                    psiDes = psiDes + desState.des_lseg * fabs(desState.des_rho);
+                    
+                    desState.des_pose.position.x += cos(theta) / desState.des_rho;
+                    desState.des_pose.position.y += sin(theta) / desState.des_rho;
+                    break;
+                }
+                case 3: // rotate about point
+                    // "distance" is actually the angle rotated, x and y do not change
+                    psiDes += desState.des_lseg;
+                    break;
             }
-            case 3: // rotate about point
-                // "distance" is actually the angle rotated, x and y do not change
-                psiDes += desState.des_lseg;
-                break;
+            
+            // fix heading
+            if (psiDes > pi)
+                psiDes -= 2*pi;
+            else if (psiDes < -pi)
+                psiDes += 2*pi;
+            
+            desState.des_pose.orientation = tf::createQuaternionMsgFromYaw(psiDes);
+            
+            // figure out if we are at a new segment
+            if (desState.des_lseg >= pathlist.path_list[desState.seg_number].seg_length) {
+                // if this is not the last segment, increment
+                if (desState.seg_number < pathlist.path_list.size()-1) {
+                    // reset the desState
+                    desState.seg_number++;
+                    desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
+                    // desState.des_speed = 0.0; // this will be set in profiler, don't change
+                    desState.des_rho = pathlist.path_list[desState.seg_number].curvature;
+                    desState.des_lseg = 0.0;
+                    geometry_msgs::Pose des_pose;
+                    des_pose.position = pathlist.path_list[desState.seg_number].ref_point;
+                    des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
+                    desState.des_pose = des_pose;
+                } else {
+                    // desState.seg_number == pathlist.size() - 1 (last element of array)
+                    finishedPath = true;
+                }
+                desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
+            }
         }
-        
-        // fix heading
-        if (psiDes > pi)
-            psiDes -= 2*pi;
-        else if (psiDes < -pi)
-            psiDes += 2*pi;
-        
-        desState.des_pose.orientation = tf::createQuaternionMsgFromYaw(psiDes);
-        
-        // figure out if we are at a new segment
-        if (desState.des_lseg >= pathlist.path_list[desState.seg_number].seg_length) {  // TODO: add tolerance?
-            desState.seg_number++;
-            desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
-        }
-        
-        pub.publish(desState); // publish the CrawlerDesiredState
+         
+        pub.publish(desState); // publish the CrawlerDesiredState (if the path is over, doesn't change)
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is
