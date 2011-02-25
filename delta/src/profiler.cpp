@@ -19,7 +19,7 @@ const double pi = 3.141592;
 
 PathList pathlist;
 CrawlerDesiredState curState;
-cv::Mat_<bool> lidarMap;
+cv::Mat_<bool> *lidarMap;
 
 void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
@@ -88,7 +88,7 @@ bool clearPath(double brakingDist)
         }
         
         // check map
-        if (lidarMap[curX][curY] == 1)  // occupied
+        if ((*lidarMap)[curX][curY] == 1)  // occupied
             return false;
     }
     
