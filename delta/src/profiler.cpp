@@ -1,6 +1,19 @@
-#include<ros/ros.h>
-#include<math.h>
-#include<iostream>
+#include "command_publisher.h"
+#include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <tf/transform_datatypes.h>
+#include<tf/transform_listener.h>
+#include "opencv2/core/core.hpp"
+#include <list>
+#include <math.h>
+#include <algorithm>
+#include <iostream>
+#include <eecs376_msgs/PathSegment.h>
+#include <eecs376_msgs/PathList.h>
+#include "MathyStuff.h"
+#include "CSpaceFuncs.h"
 #include<geometry_msgs/Pose.h> //data type for Pose combined with frame and timestamp
 #include<tf/transform_datatypes.h> // for tf::getYaw
 #include<tf/transform_listener.h> // for the TransformListener class that abstracts away a lot of tf
@@ -8,8 +21,6 @@
 #include <eecs376_msgs/PathList.h>
 #include <eecs376_msgs/CrawlerDesiredState.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include "command_publisher.h"
-#include "CSpaceFuncs.h"
 
 using namespace cv;
 using namespace eecs376_msgs;
@@ -33,7 +44,9 @@ void pathListCallback(const PathList::ConstPtr& paths)
 }
 
 //http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
-void lidarMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& newLidarMap)
+
+
+void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& newLidarMap)
 {
     // get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)
     lidarMap = getMap(*newLidarMap);
