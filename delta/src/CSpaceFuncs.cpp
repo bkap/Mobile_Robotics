@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <iostream>
 #include <visualization_msgs/Marker.h>
+#include <vector>
 #ifndef CSPACEFUNCS_cpp
 #define CSPACEFUNCS_cpp
 using namespace std;
@@ -54,17 +55,19 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, 
 	marker.color.g = g;
 	marker.color.b = b;
 	
-	int i =0;
-	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size()*sizeof(geometry_msgs::Point));
+	/*
+	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size() * sizeof(geometry_msgs::Point));
+	*/
+	
+	vector<geometry_msgs::Point>* RetVal = new vector<geometry_msgs::Point>();
 	while(!PointsToPlot.empty())
 	{
-		Point P = *PointsToPlot.front();
-		PointsToPlot.pop_front();
-		RetVal[i] = P;
-		i++;
+		geometry_msgs::Point P = PointsToPlot.back();
+		PointsToPlot.pop_back();
+		RetVal->push_back(P);
+		
 	}
-	
-	marker.points = RetVal;
+	marker.points = *RetVal;
 	marker.colors = NULL;  //the wiki says that this should 
 	
 	vis_pub->publish( marker );
