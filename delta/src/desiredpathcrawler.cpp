@@ -12,38 +12,19 @@
 using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
+const double pi = 3.141592;
 
-// TODO: these are not actually constant they are part of the path lolz
-const double MAX_LINEAR_VEL = 1.0;
-const double MAX_LINEAR_ACCEL = 2.0;
-const double MAX_ANG_VEL = 1.0;
-const double MAX_ANG_ACCEL = 1.0;
+PathList pathlist;
+CrawlerDesiredState desState;
 
-double speedNominal, segLen, referencePtX, referencePtY, initTanAng, curvature, maxVelLin, maxAccelLin, maxVelAng, maxAccelAng;
-int segNum, segType;
-
-// TODO: all of these signatures are wrong but I don't know what to put here
-void pathListCallback(const PathList::ConstPtr& pathlist)
+void pathListCallback(const PathList::ConstPtr& newPathList)
 {
-    // get the path segment type
-    // get xDes, yDes, psiDes, rhoDes, goal_lin_vel, goal_ang_vel, max velocities/accelerations
-    segNum = 0;
-    segLen = 0.0;
-    segType = 0;
-    referencePtX = 0.0;
-    referencePtY = 0.0;
-    initTanAng = 0.0;
-    curvature = 0.0;
-    maxVelLin = 0.0;
-    maxAccelLin = 0.0;
-    maxVelAng = 0.0;
-    maxAccelAng = 0.0;
+    pathlist = *newPathList;
 }
 
-void speedNominalCallback(const CrawlerDesiredState::ConstPtr& desState)
+void speedProfilerCallback(const CrawlerDesiredState::ConstPtr& oldDesState)
 {
-    // get speedNominal
-    speedNominal = 0.0;
+    desState = *oldDesState;
 }
 
 /*
@@ -62,9 +43,8 @@ int main(int argc,char **argv)
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("desiredpathcrawler",1);
     
     // list of subscribers
-    // TODO: probably wrong types
-	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("speedprofiler", 1, speedNominalCallback);
+    ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
+	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("speedprofiler", 1, speedProfilerCallback);
 	
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
@@ -73,38 +53,54 @@ int main(int argc,char **argv)
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-                
-        // compute distance traveled...?
-        lsegDes = lsegDes + speedNominal * REFRESH_RATE;
+        
+        // update total distance traveled
+        desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
         
         // compute the x, y, psi
-        switch (segType) {
+        double psiDes = tf::getYaw(desState.des_pose.orientation);
+        
+        switch (desState.seg_type) {
             case 1: // line
                 // straightforward
-                xDes = xDes + lsegDes * cos(psiDes);
-                yDes = yDes + lsegDes * sin(psiDes);
+                desState.des_pose.position.x += desState.des_lseg * cos(psiDes);
+                desState.des_pose.position.y += desState.des_lseg * sin(psiDes);
                 break;
             case 2: // arc: speedNominal is the tangential velocity (v = w R)
-                // TODO: x and y
-                double psiOld = psiDes;
-                psiDes = psiDes + speedNominal * REFRESH_RATE / rhoDes;
-                double psiDiff = psiDes - psiOld;
-                xDes = xDes + lsegDes * cos(psiDes); // know the old psi and the new psi this shouldn't be too hard right
-                yDes = yDes + lsegDes * sin(psiDes);
+            {   // lsegdes is distance s traveled along the arc: s = R * theta
+                double theta = 0.0; // angle from center of curvature
+                if (desState.des_rho >= 0)
+                    theta = psiDes - pi/2;
+                else
+                    theta = psiDes + pi/2;
+                theta = theta + desState.des_lseg * fabs(desState.des_rho);
+                psiDes = psiDes + desState.des_lseg * fabs(desState.des_rho);
+                
+                desState.des_pose.position.x += cos(theta) / desState.des_rho;
+                desState.des_pose.position.y += sin(theta) / desState.des_rho;
                 break;
+            }
             case 3: // rotate about point
-                // um...?
-                psiDes = psiDes + lsegDes;
+                // "distance" is actually the angle rotated, x and y do not change
+                psiDes += desState.des_lseg;
                 break;
         }
+        
+        // fix heading
+        if (psiDes > pi)
+            psiDes -= 2*pi;
+        else if (psiDes < -pi)
+            psiDes += 2*pi;
+        
+        desState.des_pose.orientation = tf::createQuaternionMsgFromYaw(psiDes);
         
         // figure out if we are at a new segment
-        if (lsegDes >= segLen) {  // TODO: add tolerance?
-            segNum++;
-            segType = pathList[segNum].segType; //TODO: haha this is wrong
+        if (desState.des_lseg >= pathlist.path_list[desState.seg_number].seg_length) {  // TODO: add tolerance?
+            desState.seg_number++;
+            desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
         }
         
-        pub.publish(CrawlerDesiredState); // publish the crawlerDesState
+        pub.publish(desState); // publish the CrawlerDesiredState
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is

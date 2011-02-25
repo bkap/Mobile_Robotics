@@ -36,6 +36,7 @@ rosbuild_add_executable(profiler src/profiler.cpp)
 rosbuild_add_executable(lidarmapper src/lidarmapper.cpp)
 target_link_libraries(planner MathyStuff)
 target_link_libraries(planner CSpaceFuncs)
+target_link_libraries(lidarmapper CSpaceFuncs)
 rosbuild_add_executable(desiredpathcrawler src/desiredpathcrawler.cpp)
 
 #target_link_libraries(example ${PROJECT_NAME})
