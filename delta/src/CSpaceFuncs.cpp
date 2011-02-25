@@ -16,6 +16,7 @@
 #define CSPACEFUNCS_cpp
 using namespace std;
 using namespace cv;
+using namespace std;
 /**assume orientation and resolution are the same*/
 Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 	Mat_<bool>* m = new Mat_<bool>(grid.info.width, grid.info.height);
