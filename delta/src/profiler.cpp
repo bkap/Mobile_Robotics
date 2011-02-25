@@ -135,7 +135,7 @@ double distanceRemaining()
     double yCur = curState.des_pose.position.y;
     double psiCur = tf::getYaw(curState.des_pose.orientation);
     
-    int nextSeg = curState.seg_number + 1;
+    unsigned int nextSeg = curState.seg_number + 1;
     double xDes = 0.0;
     double yDes = 0.0;
     double psiDes = 0.0;
