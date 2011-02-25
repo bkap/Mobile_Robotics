@@ -11,10 +11,10 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
-
+#include <visualization_msgs/Marker.h>
 #ifndef CSPACEFUNCS_cpp
 #define CSPACEFUNCS_cpp
-
+using namespace std;
 using namespace cv;
 /**assume orientation and resolution are the same*/
 Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
@@ -28,7 +28,7 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 
 }
 
-void PlotMap(list<geometry_msgs::Point> PointsToPlot, ROS::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
+void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
 {
 	//some code taken directly from the wiki and then modified
 	visualization_msgs::Marker marker;
