@@ -341,7 +341,7 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-	
+		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.pose.x, poseDes.pose.pose.y), goalPose, mapOrigin);	
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
