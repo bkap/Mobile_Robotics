@@ -11,10 +11,10 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
-
+#include <visualization_msgs/Marker.h>
 #ifndef CSPACEFUNCS_cpp
 #define CSPACEFUNCS_cpp
-
+using namespace std;
 using namespace cv;
 using namespace std;
 /**assume orientation and resolution are the same*/
