@@ -59,7 +59,7 @@ void pathListCallback(const PathList::ConstPtr& paths)
 
 // probably wrong
 //http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
-void cspaceMapCallback(const nav_msgs::OccupancyMap::ConstPtr& csMap)
+void cspaceMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& csMap)
 {
     // get the cspacemap
     cspaceMap = csMap;
@@ -122,7 +122,8 @@ int main(int argc,char **argv)
     
     // list of subscribers
     // TODO: not sure if these are the right strings, also these are the wrong classes for pathlist and cspacemap
-	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesState>("crawlerDesState", 1, crawlerDesStateCallback);
+
+	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesiredState>("crawlerDesState", 1, crawlerDesStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
 	ros::Subscriber subCspaceMap = n.subscribe<CSpaceMap>("cspaceMap", 1, cspaceMapCallback);
 	

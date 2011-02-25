@@ -38,5 +38,5 @@ target_link_libraries(planner MathyStuff)
 target_link_libraries(planner CSpaceFuncs)
 target_link_libraries(lidarmapper CSpaceFuncs)
 rosbuild_add_executable(desiredpathcrawler src/desiredpathcrawler.cpp)
-
+rosbuild_add_executable(steering src/steering.cpp)
 #target_link_libraries(example ${PROJECT_NAME})

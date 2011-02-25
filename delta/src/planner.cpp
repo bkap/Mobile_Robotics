@@ -189,8 +189,14 @@ PathList insertTurns(list<Point> P)
 	int SegNum = 0;
 	Point3 A, B, C;
 	PathSegment FirstLine, Curve, SecondLine;
+
+	
 	for (int i = 0; i<PointListLength-1; i++)
 	{
+		A = PointList[i];
+		B = PointList[i+1];
+		C = PointList[i+2];
+		
 		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
 		if(i == 0)
 		{
