@@ -7,6 +7,8 @@
 #include <message_filters/subscriber.h>
 #include <tf/message_filter.h>
 
+using namespace std;
+
 sensor_msgs::PointCloud last_scan_cloud;
 sensor_msgs::PointCloud last_map_cloud;
 sensor_msgs::LaserScan last_scan;
@@ -15,22 +17,29 @@ tf::TransformListener *tfl;
 ros::Publisher P;
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
+  cout<<"1callback\n";
   last_scan = *scan; // save the last scan... just incase you want it in not Point Cloud format??
   projector.projectLaser(*scan, last_scan_cloud); // Do polar coordinate to cartesian coordinate conversion on the current scan. Save the results in the last_scan_cloud.
+  cout<<"1callback\n";
   tfl->transformPointCloud("map", last_scan_cloud, last_map_cloud); //transform the cloud into the map frame
   ROS_INFO("Successfully transformed %d points", last_map_cloud.points.size());
   P.publish(last_map_cloud);
+  cout<<"1callback\n";
 }
 
 int main(int argc,char **argv)
 {
+  cout<<"1\n";
   ros::init(argc,argv,"lidar_listener");//name of this node
   ros::NodeHandle n;
+  cout<<"1\n";
   tfl = new tf::TransformListener();
   message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "scan", 1); //Subscriber object, but now we want to apply filters to it, so it's not just a standard ros::Subscriber
   tf::MessageFilter<sensor_msgs::LaserScan> laser_filter(laser_sub, *tfl, "map", 1); //Make a MessageFilter for the laser_sub that will only allow a message through when we can transform it into the given frame (in this case, map)
+  cout<<"1\n";
   laser_filter.registerCallback(boost::bind(laserCallback, _1)); //When a message passes through the laser_filter, we want it to call laserCallback
   P = n.advertise<sensor_msgs::PointCloud>("LIDAR_Cloud", 20);
+  cout<<"1\n";
   ros::spin(); //spin until ctrl-C or otherwise shutdown
   delete tfl;
   return 0; // this code will only get here if this node was told to shut down, which is

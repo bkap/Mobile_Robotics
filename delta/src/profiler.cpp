@@ -25,7 +25,7 @@
 using namespace cv;
 using namespace eecs376_msgs;
 using namespace std;
-const double REFRESH_RATE = 0.1;
+const double REFRESH_RATE = 10;
 const double pi = 3.141592;
 
 PathList pathlist;
@@ -188,14 +188,14 @@ int main(int argc,char **argv)
 {   
     ros::init(argc,argv,"profiler");//name of this node
     ros::NodeHandle n;
-    ros::Publisher pub = n.advertise<CrawlerDesiredState>("speedprofiler",1);
+    ros::Publisher pub = n.advertise<CrawlerDesiredState>("NominalSpeed",1);
     
     // list of subscribers
 	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesiredState>("crawlerDesState", 1, crawlerDesStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
 	ros::Subscriber subLidar = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, lidarMapCallback);
 	
-	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of 10 Hz
+	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of 10 Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     

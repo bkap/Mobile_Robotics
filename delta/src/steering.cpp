@@ -105,8 +105,8 @@ int main(int argc,char **argv)
 		ros::Time current_time = ros::Time::now();
 	 	desired.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
-		ROS_INFO("birthday is %f", birthday.toSec());
-		ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
+		//ROS_INFO("birthday is %f", birthday.toSec());
+		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
 
 		if(stalePos)	{continue;}
 

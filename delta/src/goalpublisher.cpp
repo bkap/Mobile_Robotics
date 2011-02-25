@@ -21,7 +21,7 @@ int main(int argc,char **argv)
   	geometry_msgs::Pose goal_pose;
 	
     ros::NodeHandle n;
-    ros::Publisher pub = n.advertise<geometry_msgs::Pose>("goal_pub",1); //topic name "goal_pub", buffer size 1
+    ros::Publisher pub = n.advertise<geometry_msgs::Pose>("goalPose",1); //topic name "goal_pub", buffer size 1
     
     ros::Duration elapsed_time; // define a variable to hold elapsed time
     ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
@@ -36,7 +36,7 @@ int main(int argc,char **argv)
       	goal_pose.position.y = 23.40;
       	goal_pose.orientation = tf::createQuaternionMsgFromYaw(0.75);
         pub.publish(goal_pose);
-	    
+	   // cout<<"hey hey listen\n";
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is

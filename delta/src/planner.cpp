@@ -15,7 +15,7 @@
 #include "MathyStuff.h"
 #include "CSpaceFuncs.h"
 
-#define REFRESH_RATE 0.1
+#define REFRESH_RATE 10
 
 #define LINE 1
 #define CURVE 2
@@ -284,7 +284,7 @@ cv::Mat_<bool> *lastLIDAR_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
 geometry_msgs::PoseStamped poseDes;
-geometry_msgs::PoseStamped goalPose; 
+geometry_msgs::Pose goalPose; 
 geometry_msgs::Pose mapOrigin;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
@@ -306,7 +306,7 @@ void poseDes_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseDes)
 {
 	poseDes = *newPoseDes;
 }
-void goalPose_Callback(const geometry_msgs::PoseStamped::ConstPtr& newGoalPose)
+void goalPose_Callback(const geometry_msgs::Pose::ConstPtr& newGoalPose)
 {
 	goalPose = *newGoalPose;
 }
@@ -315,11 +315,11 @@ void goalPose_Callback(const geometry_msgs::PoseStamped::ConstPtr& newGoalPose)
 
 int main(int argc,char **argv)
 {
-	
+	cout<<"3\n";
 	ros::init(argc,argv,"pathPlanner");//name of this node
 	tfl = new tf::TransformListener();
       	double amount_to_change = 0.0;    
-      		
+      	cout<<"3\n";
 	ros::NodeHandle n;
 	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
@@ -327,27 +327,29 @@ int main(int argc,char **argv)
 	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
 	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
-	ros::Subscriber sub5 = n.subscribe<geometry_msgs::PoseStamped>("goalPose", 10, goalPose_Callback);
-
+	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
+	cout<<"3\n";
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
-	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-      
+      	cout<<"3\n";
 	ros::Time birthday = ros::Time::now();
 	//desired_pose.header.stamp = birthday;
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
-	
+	cout<<"3\n";
 	ROS_INFO("birthday started as %f", birthday.toSec());
   
 	while (ros::ok()) // do work here
 	{
+	cout<<"3\n";
 		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 		ros::Time current_time = ros::Time::now();
 		//desired_pose.header.stamp = current_time;
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.position.x, poseDes.pose.position.y), goalPose, mapOrigin);	
+	cout<<"3\n";
+		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
 		PathList turns = insertTurns(points);
 		path_pub.publish(turns);	
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period

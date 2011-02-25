@@ -93,13 +93,13 @@ void DonutInit()
 	
 	double x =0;
 	double y =0;
-	for (int i =0;  i <DONUT_LENGTH/GRID_RES; i++)
+	for (int i =0;  i <DONUT_LENGTH; i++)
 	{
-		for(int j = 0; j<DONUT_LENGTH/GRID_RES; j++)
+		for(int j = 0; j<DONUT_LENGTH; j++)
 		{
-			x = (i - DONUT_LENGTH/(2.0*GRID_RES));
-			y = (j - DONUT_LENGTH/(2.0*GRID_RES));
-			if (x*x+y*y<DONUT_RADIUS*DONUT_RADIUS/(GRID_RES*GRID_RES))
+			x = (i - DONUT_LENGTH/(2.0));
+			y = (j - DONUT_LENGTH/(2.0));
+			if (x*x+y*y<DONUT_LENGTH)
 			{
 				JellyDonut[i][j] = 100;
 			}
@@ -143,6 +143,7 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 {
 	if (init == false)
 	{
+		cout<<"2callback\n";
 		last_map_cloud = *scan_cloud; 
 		ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
 		CopyPoints();
@@ -151,21 +152,26 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 
 int main(int argc,char **argv)
 {
+	cout<<"2\n";
 	DonutInit();
+	cout<<"2\n";
 	ros::init(argc,argv,"lidar_listener");//name of this node
 	tfl = new tf::TransformListener();
-	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	cout<<"2\n";
+	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
-	
+	cout<<"2\n";
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 10, odomCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
-	
+	cout<<"2\n";
 	while(true)
 	{
+		//cout<<"2\n";
 		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
 		P.publish(Output);
+		//cout<<"2\n";
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}

@@ -40,11 +40,11 @@ int main(int argc,char **argv)
     ros::init(argc,argv,"desiredpathcrawler");//name of this node
     
     ros::NodeHandle n;
-    ros::Publisher pub = n.advertise<CrawlerDesiredState>("desiredpathcrawler",1);
+    ros::Publisher pub = n.advertise<CrawlerDesiredState>("crawlerDesState",1);
     
     // list of subscribers
     ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("speedprofiler", 1, speedProfilerCallback);
+	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("NominalSpeed", 1, speedProfilerCallback);
 	
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
