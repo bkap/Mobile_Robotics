@@ -11,11 +11,12 @@
 #include <math.h>
 #include <algorithm>
 #include <iostream>
-
+#include <visualization_msgs/Marker.h>
 #ifndef CSPACEFUNCS_cpp
 #define CSPACEFUNCS_cpp
-
+using namespace std;
 using namespace cv;
+using namespace std;
 /**assume orientation and resolution are the same*/
 Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 	Mat_<bool>* m = new Mat_<bool>(grid.info.width, grid.info.height);
@@ -28,7 +29,7 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 
 }
 
-void PlotMap(list<geometry_msgs::Point> PointsToPlot, ROS::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
+void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
 {
 	//some code taken directly from the wiki and then modified
 	visualization_msgs::Marker marker;
@@ -54,10 +55,10 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ROS::NodeHandle *vis_pub, 
 	marker.color.b = b;
 	
 	int i =0;
-	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size*sizeof(geometry_msgs::Point));
+	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size()*sizeof(geometry_msgs::Point));
 	while(!PointsToPlot.empty())
 	{
-		Point P = *PointsToPlot.front;
+		Point P = *PointsToPlot.front();
 		PointsToPlot.pop_front();
 		RetVal[i] = P;
 		i++;

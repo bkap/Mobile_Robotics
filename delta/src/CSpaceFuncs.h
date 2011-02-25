@@ -15,6 +15,7 @@
 #ifndef CSPACEFUNCS_h
 #define CSPACEFUNCS_h
 using namespace cv;
+using namespace std;
 Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid);
-void PlotMap(list<geometry_msgs::Point> PointsToPlot, ROS::NodeHandle *vis_pub, float r, float g, float b, float cubesize);
+//void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, float r, float g, float b, float cubesize);
 #endif

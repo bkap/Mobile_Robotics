@@ -214,8 +214,9 @@ PathList insertTurns(list<Point> P)
 	return ReturnVal;
 }
 
-list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped origin) {
+list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
 	list<Point> path =  list<Point>();
+	Mat_<bool> map = *map_p;
 	//go forward until the space 75 cm to the right of the robot is clear. FInd
 	//location
 	double heading = tf::getYaw(start.pose.orientation);
@@ -234,10 +235,10 @@ list<Point> bugAlgorithm(Mat_<bool>& map, Point dest, geometry_msgs::PoseStamped
 		double distance_to_check = avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading - 3.14159/2);
 		wally = y + distance_to_check * sin(heading - 3.14159/2);
-		int grid_wall_x = (int)((wallx-origin.pose.position.x)/CSPACE_RESOLUTION);
-		int grid_wall_y = (int)((wally-origin.pose.position.y)/CSPACE_RESOLUTION);
-		int grid_x = (int)((x-origin.pose.position.x)/CSPACE_RESOLUTION);
-		int grid_y = (int)((y-origin.pose.position.y)/CSPACE_RESOLUTION);
+		int grid_wall_x = (int)((wallx-origin.position.x)/CSPACE_RESOLUTION);
+		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
+		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
+		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
 		
 		if(!map(grid_wall_x, grid_wall_y)) {
 			
@@ -321,8 +322,7 @@ int main(int argc,char **argv)
       		
 	ros::NodeHandle n;
 	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
-	ros::Publisher des_pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseDes", 1);
-	
+	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",3);
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, LIDAR_Callback); 
 	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
 	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
@@ -347,7 +347,9 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.pose.x, poseDes.pose.pose.y), goalPose, mapOrigin);	
+		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.position.x, poseDes.pose.position.y), goalPose, mapOrigin);	
+		PathList turns = insertTurns(points);
+		path_pub.publish(turns);	
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
