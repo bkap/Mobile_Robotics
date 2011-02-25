@@ -158,9 +158,9 @@ int main(int argc,char **argv)
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	
 	ros::NodeHandle n;
-	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 1, cloudCallback);
-	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 1, odomCallback);
-	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 1);
+	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
+	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 10, odomCallback);
+	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	
 	while(true)
 	{

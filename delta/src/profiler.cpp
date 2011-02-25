@@ -11,6 +11,7 @@
 #include "command_publisher.h"
 #include "CSpaceFuncs.h"
 
+using namespace cv;
 using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
@@ -152,6 +153,9 @@ double distanceRemaining()
             return (psiDes - psiCur) / curState.des_rho;
         case 3: // angle remaining
             return (psiDes - psiCur);
+
+	assert(1337);//control shouldn't get here.
+	return 9001; //it's over 9000
     }
 }
 

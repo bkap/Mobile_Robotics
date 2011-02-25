@@ -30,7 +30,7 @@ int main(int argc,char **argv)
   message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "scan", 1); //Subscriber object, but now we want to apply filters to it, so it's not just a standard ros::Subscriber
   tf::MessageFilter<sensor_msgs::LaserScan> laser_filter(laser_sub, *tfl, "map", 1); //Make a MessageFilter for the laser_sub that will only allow a message through when we can transform it into the given frame (in this case, map)
   laser_filter.registerCallback(boost::bind(laserCallback, _1)); //When a message passes through the laser_filter, we want it to call laserCallback
-  P = n.advertise<sensor_msgs::PointCloud>("LIDAR_Cloud", 1);
+  P = n.advertise<sensor_msgs::PointCloud>("LIDAR_Cloud", 20);
   ros::spin(); //spin until ctrl-C or otherwise shutdown
   delete tfl;
   return 0; // this code will only get here if this node was told to shut down, which is
