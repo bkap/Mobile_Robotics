@@ -32,24 +32,28 @@ PathList pathlist;
 CrawlerDesiredState curState;
 cv::Mat_<bool> *lidarMap;
 
+bool crawlerDesStateCalled = false;
 void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
     curState = *desState;
+	crawlerDesStateCalled = true;
 }
-
+bool pathListCalled = false;
 void pathListCallback(const PathList::ConstPtr& paths)
 {
     // get the path list
+	pathListCalled = true;
     pathlist = *paths;
 }
 
 //http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
 
-
+bool lidarMapCalled = false;
 void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& newLidarMap)
 {
     // get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)
     lidarMap = getMap(*newLidarMap);
+	lidarMapCalled = true;
 }
 
 // TODO: this
@@ -208,40 +212,41 @@ int main(int argc,char **argv)
         
         // ramp to zero if you're on the last path segment
         bool end_of_path = false;
-        if (curState.seg_number == pathlist.path_list.size() - 1)
-            end_of_path = true;
-        vGoal = 0.0;
+        if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
+			if (curState.seg_number == pathlist.path_list.size() - 1)
+            	end_of_path = true;
+        	vGoal = 0.0;
  
-        if (curState.seg_type == 3) { // point
-            vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
-            aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            if (end_of_path)
-                vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.angular.z;
-        } else { // line or arc
-            vMax = pathlist.path_list[curState.seg_number].max_speeds.linear.x;
-            aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            if (end_of_path)
-                vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
-        }
+        	if (curState.seg_type == 3) { // point
+            	vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
+            	aMax = pathlist.path_list[curState.seg_number].accel_limit;
+            	if (end_of_path)
+                	vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.angular.z;
+        	} else { // line or arc
+            	vMax = pathlist.path_list[curState.seg_number].max_speeds.linear.x;
+            	aMax = pathlist.path_list[curState.seg_number].accel_limit;
+            	if (end_of_path)
+                	vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
+        	}
         
-        double brakingDistance = distanceToGoalSpeed(0.0);
-        double slowingDistance = distanceToGoalSpeed(vMax);
-        double distToGo = distanceRemaining();
+        	double brakingDistance = distanceToGoalSpeed(0.0);
+        	double slowingDistance = distanceToGoalSpeed(vMax);
+        	double distToGo = distanceRemaining();
  
-        // Ramp velocity, set des_speed
-        if (clearPath(brakingDistance)) {
-            if (slowingDistance < distToGo) {   // go to maximum velocity
-                curState.des_speed = min(curState.des_speed + aMax * REFRESH_RATE, vGoal);
-            } else {    // ramp speed down to goal speed
-                curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
-            }
-        } else {
-            // go to zero
-            curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
-        }
+        	// Ramp velocity, set des_speed
+        	if (clearPath(brakingDistance)) {
+            	if (slowingDistance < distToGo) {   // go to maximum velocity
+                	curState.des_speed = min(curState.des_speed + aMax * REFRESH_RATE, vGoal);
+            	} else {    // ramp speed down to goal speed
+                	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
+            	}
+        	} else {
+            	// go to zero
+            	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
+        	}
 
-        pub.publish(curState); // publish the CrawlerDesiredState
-	    
+        	pub.publish(curState); // publish the CrawlerDesiredState
+	    }
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is
