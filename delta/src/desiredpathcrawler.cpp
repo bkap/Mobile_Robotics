@@ -59,7 +59,7 @@ int main(int argc,char **argv)
     geometry_msgs::Pose des_pose;
     des_pose.position = pathlist.path_list[0].ref_point;
     des_pose.orientation = pathlist.path_list[0].init_tan_angle;
-    desState.pose = des_pose;
+    desState.des_pose = des_pose;
     
     // ref
     bool finishedPath = false;
@@ -124,7 +124,7 @@ int main(int argc,char **argv)
                     geometry_msgs::Pose des_pose;
                     des_pose.position = pathlist.path_list[desState.seg_number].ref_point;
                     des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
-                    desState.pose = des_pose;
+                    desState.des_pose = des_pose;
                 } else {
                     // desState.seg_number == pathlist.size() - 1 (last element of array)
                     finishedPath = true;

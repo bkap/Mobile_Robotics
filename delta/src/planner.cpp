@@ -183,12 +183,20 @@ PathList insertTurns(list<Point> P)
 	}
 	
 	PathList ReturnVal;
-	ReturnVal.path_list = (PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
+	vector<PathSegment> path = vector<PathSegment>(3*PointListLength);
+	ReturnVal.path_list.assign(path.begin(), path.end());
+	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
 	Point3 A, B, C;
 	PathSegment FirstLine, Curve, SecondLine;
+
+	
 	for (int i = 0; i<PointListLength-1; i++)
 	{
+		A = PointList[i];
+		B = PointList[i+1];
+		C = PointList[i+2];
+		
 		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
 		if(i == 0)
 		{
@@ -339,7 +347,7 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		ROS_INFO("birthday is %f", birthday.toSec());
 		ROS_INFO("elapsed time is %f", elapsed_time.toSec());
-	
+		list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(poseDes.pose.pose.x, poseDes.pose.pose.y), goalPose, mapOrigin);	
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}

@@ -7,8 +7,9 @@
 #include <message_filters/subscriber.h>
 #include <tf/message_filter.h>
 #include <nav_msgs/OccupancyGrid.h>
-
-#include <math>
+#include <nav_msgs/Odometry.h>
+#include <vector>
+#include <math.h>
 
 #include "CSpaceFuncs.h"
 
@@ -33,7 +34,7 @@ double PoseY;
 double InitX;
 double InitY;
 geometry_msgs::PoseStamped last_map_pose;
-geometry_msgs::PoseStamped last_odom;
+nav_msgs::Odometry last_odom;
 
 using namespace std;
 
@@ -78,7 +79,8 @@ void GridInit()
 	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
 	Output.info.origin.position.z = 0;
 	Output.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	Output.data = (char*) calloc((NUM_WIDTH)*(NUM_HEIGHT), sizeof(char)); //I realize that this size should be 8 by definition, but this is good practice.
+	vector<char>* data = new vector<char>(NUM_WIDTH * NUM_HEIGHT);
+	Output.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
 }
 
 void DonutInit()
@@ -110,7 +112,8 @@ bool init = false;
 geometry_msgs::PoseStamped temp;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
-        temp.pose = (*odom).pose.pose;
+		last_odom = *odom;
+        temp.pose = last_odom.pose.pose;
         temp.header = last_odom.header;
 	cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
         try 
@@ -123,8 +126,8 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
           ROS_ERROR("%s", ex.what());
         }
 	
-	PoseX = last_map_pose.pose.x;
-	PoseY = last_map_pose.pose.y;
+	PoseX = last_map_pose.pose.position.x;
+	PoseY = last_map_pose.pose.position.y;
 	
 	if(init == false)
 	{
@@ -141,7 +144,7 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 	if (init == false)
 	{
 		last_map_cloud = *scan_cloud; 
-		ROS_INFO("I got a scan cloud of size ", last_map_cloud.points.size());
+		ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
 		CopyPoints();
 	}
 }
@@ -156,8 +159,8 @@ int main(int argc,char **argv)
 	
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 1, cloudCallback);
-	ros::Subscriber S2 = n.subscribe<geometry_msgs::PoseStamped>("Pose_Actual", 1, odomCallback);
-	ros::Publisher P = n.advertise("LIDAR_Cloud", 1);
+	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 1, odomCallback);
+	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 1);
 	
 	while(true)
 	{

@@ -149,7 +149,7 @@ int main(int argc,char **argv)
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("speedprofiler",1);
     
     // list of subscribers
-    ros::Subscriber subCrawlerDesiredState = n.subscribe<CrawlerDesiredState>("CrawlerDesiredState", 1, CrawlerDesiredStateCallback);
+	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesiredState>("crawlerDesState", 1, crawlerDesStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
 	ros::Subscriber subLidar = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, lidarMapCallback);
 	
