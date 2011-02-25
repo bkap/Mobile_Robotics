@@ -29,8 +29,8 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 	return m;
 
 }
-/*
-void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, float r, float g, float b, float cubesize)
+
+void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::Publisher *vis_pub, float r, float g, float b, float cubesize)
 {
 	//some code taken directly from the wiki and then modified
 	visualization_msgs::Marker marker;
@@ -68,10 +68,10 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, 
 		
 	}
 	marker.points = *RetVal;
-	marker.colors = NULL;  //the wiki says that this should 
+	//marker.colors = NULL;  //the wiki says that this should 
 	
 	vis_pub->publish( marker );
 
 }
-*/
+
 #endif
