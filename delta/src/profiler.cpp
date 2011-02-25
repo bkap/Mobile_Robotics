@@ -20,7 +20,7 @@ PathList pathlist;
 CrawlerDesiredState curState;
 cv::Mat_<bool> lidarMap;
 
-void CrawlerDesiredStateCallback(const CrawlerDesiredState::ConstPtr& desState)
+void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
     curState = *desState;
 }
@@ -85,6 +85,10 @@ bool clearPath(double brakingDist)
             dist = 0.0;
             curSeg++;
         }
+        
+        // check map
+        if (lidarMap[curX][curY] == 1)  // occupied
+            return false;
     }
     
     return true;
@@ -116,9 +120,30 @@ double distanceRemaining()
     double xCur = curState.des_pose.position.x;
     double yCur = curState.des_pose.position.y;
     double psiCur = tf::getYaw(curState.des_pose.orientation);
-    double xDes = pathlist.path_list[curState.seg_number+1].ref_point.x;
-    double yDes = pathlist.path_list[curState.seg_number+1].ref_point.y;
-    double psiDes = tf::getYaw(pathlist.path_list[curState.seg_number+1].init_tan_angle);
+    
+    int nextSeg = curState.seg_number + 1;
+    double xDes = 0.0;
+    double yDes = 0.0;
+    double psiDes = 0.0;
+    if (nextSeg == pathlist.path_list.size()) // at end of path
+    {
+        nextSeg = curState.seg_number;
+        
+        // find endpoint coordinates... x and y are only relevant for lines, so, only worry about those
+        xDes = pathlist.path_list[nextSeg].ref_point.x + cos(tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle)) * pathlist.path_list[nextSeg].seg_length;
+        yDes = pathlist.path_list[nextSeg].ref_point.x + sin(tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle)) * pathlist.path_list[nextSeg].seg_length;
+        
+        // find psiDes
+        if (curState.seg_type == 2) { //arc: psi = psi0 + s/rho
+            psiDes = tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle) + pathlist.path_list[nextSeg].seg_length / pathlist.path_list[nextSeg].curvature;
+        } else if (curState.seg_type == 3) { // point: psi = psi0 + dpsi
+            psiDes = tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle) + pathlist.path_list[nextSeg].seg_length;
+        }
+    } else {
+        xDes = pathlist.path_list[nextSeg].ref_point.x;
+        yDes = pathlist.path_list[nextSeg].ref_point.y;
+        psiDes = tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle);
+    }
     
     switch (curState.seg_type) {
         case 1: // distance along line
@@ -163,15 +188,23 @@ int main(int argc,char **argv)
         
         // Calculate braking and slowing distances
         double vMax, aMax, vGoal;
+        
+        // ramp to zero if you're on the last path segment
+        bool end_of_path = false;
+        if (curState.seg_number == pathlist.path_list.size() - 1)
+            end_of_path = true;
+        vGoal = 0.0;
  
-        if (curState.seg_type == 3) {
+        if (curState.seg_type == 3) { // point
             vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
             aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.angular.z;
-        } else {
+            if (end_of_path)
+                vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.angular.z;
+        } else { // line or arc
             vMax = pathlist.path_list[curState.seg_number].max_speeds.linear.x;
             aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
+            if (end_of_path)
+                vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
         }
         
         double brakingDistance = distanceToGoalSpeed(0.0);
