@@ -46,6 +46,7 @@ int Address(int i, int j)
 void CopyPoints()
 {
 
+	cout<<"24645346\n";
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
@@ -56,7 +57,7 @@ void CopyPoints()
 			{
 				for (int k = 0; k<DONUT_LENGTH; k++)
 				{
-					Output.data[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]=Output.data[Address(k-DONUT_LENGTH/(2.0*GRID_RES),j-DONUT_LENGTH/(2.0*GRID_RES))]||JellyDonut[j][k];
+					Output.data[Address(k,j)]=Output.data[Address(k,j)]||JellyDonut[j][k];
 				}
 			}
 		}
@@ -73,13 +74,13 @@ void GridInit()
 	//Output.header.stamp = time(NULL);
 	Output.info.resolution = .05;
 	//Output.info.map_load_time = time(NULL);
-	Output.info.width = NUM_WIDTH;
-	Output.info.height = NUM_HEIGHT;
+	Output.info.width = NUM_WIDTH+GRID_PADDING;
+	Output.info.height = NUM_HEIGHT+GRID_PADDING;
 	Output.info.origin.position.x = InitX-GRID_WIDTH/2.0-GRID_PADDING;
 	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
 	Output.info.origin.position.z = 0;
 	Output.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	vector<char>* data = new vector<char>(NUM_WIDTH * NUM_HEIGHT);
+	vector<char>* data = new vector<char>((NUM_WIDTH+GRID_PADDING) * (NUM_HEIGHT+GRID_PADDING));
 	Output.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
 }
 
@@ -147,6 +148,7 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 		last_map_cloud = *scan_cloud; 
 		ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
 		CopyPoints();
+		cout<<"yo\n";
 	}
 }
 
@@ -155,7 +157,7 @@ int main(int argc,char **argv)
 	cout<<"2\n";
 	DonutInit();
 	cout<<"2\n";
-	ros::init(argc,argv,"lidar_listener");//name of this node
+	ros::init(argc,argv,"lidar_mappa");//name of this node
 	tfl = new tf::TransformListener();
 	cout<<"2\n";
 	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
