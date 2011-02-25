@@ -54,10 +54,10 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::NodeHandle *vis_pub, 
 	marker.color.b = b;
 	
 	int i =0;
-	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size*sizeof(geometry_msgs::Point));
+	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size()*sizeof(geometry_msgs::Point));
 	while(!PointsToPlot.empty())
 	{
-		Point P = *PointsToPlot.front;
+		Point P = *PointsToPlot.front();
 		PointsToPlot.pop_front();
 		RetVal[i] = P;
 		i++;
