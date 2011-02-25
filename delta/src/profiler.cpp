@@ -9,14 +9,16 @@
 #include <eecs376_msgs/CrawlerDesiredState.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include "command_publisher.h"
+#include "CSpaceFuncs.h"
 
 using namespace eecs376_msgs;
 using namespace std;
 const double REFRESH_RATE = 0.1;
+const double pi = 3.141592;
 
 PathList pathlist;
 CrawlerDesiredState curState;
-CSpaceMap cspaceMap;
+cv::Mat_<bool> lidarMap;
 
 void CrawlerDesiredStateCallback(const CrawlerDesiredState::ConstPtr& desState)
 {
@@ -30,17 +32,61 @@ void pathListCallback(const PathList::ConstPtr& paths)
 }
 
 //http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
-void cspaceMapCallback(const nav_msgs::OccupancyMap::ConstPtr& csMap)
+void lidarMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& newLidarMap)
 {
-    // get the cspacemap
-    cspaceMap = *csMap;
+    // get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)
+    lidarMap = getMap(*newLidarMap);
 }
 
 // TODO: this
-bool clearPath(double dist)
+bool clearPath(double brakingDist)
 {
-    // check along the path within braking distances
+    // check along the path within the specified distance along the specified path
     // and test cspace map pixels for occupancy
+    double dist = 0.0;
+    int curSeg = curState.seg_number;
+    int curX = curState.des_pose.position.x;
+    int curY = curState.des_pose.position.y;
+    double psiCur = tf::getYaw(curState.des_pose.orientation);
+    
+    while (dist < brakingDist) {    // move forward one block in the grid
+        dist += CSPACE_RESOLUTION;
+        
+        // this is basically dpcrawler again
+        switch (pathlist.path_list[curSeg].seg_type) {
+            case 1: // line
+                curX += CSPACE_RESOLUTION * cos(psiCur);
+                curY += CSPACE_RESOLUTION * sin(psiCur);
+                break;
+            case 2: // arc: speedNominal is the tangential velocity (v = w R)
+            {   // lsegdes is distance s traveled along the arc: s = R * theta
+                double theta = 0.0; // angle from center of curvature
+                double rho = pathlist.path_list[curSeg].curvature;
+                
+                if (psiCur >= 0)
+                    theta = psiCur - pi/2;
+                else
+                    theta = psiCur + pi/2;
+                
+                theta += CSPACE_RESOLUTION * fabs(rho);
+                psiCur += CSPACE_RESOLUTION * fabs(rho);
+                
+                curX += cos(theta) / rho;
+                curY += sin(theta) / rho;
+                break;
+            }
+            case 3: // rotate about point
+                // "distance" is actually the angle rotated, x and y do not change
+                break;
+        }
+        
+        if (dist >= pathlist.path_list[curSeg].seg_length) { // end of path segment, update
+            brakingDist -= pathlist.path_list[curSeg].seg_length;
+            dist = 0.0;
+            curSeg++;
+        }
+    }
+    
     return true;
 }
 
@@ -105,7 +151,7 @@ int main(int argc,char **argv)
     // list of subscribers
     ros::Subscriber subCrawlerDesiredState = n.subscribe<CrawlerDesiredState>("CrawlerDesiredState", 1, CrawlerDesiredStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subCspaceMap = n.subscribe<CSpaceMap>("cspaceMap", 1, cspaceMapCallback);
+	ros::Subscriber subLidar = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, lidarMapCallback);
 	
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of 10 Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
