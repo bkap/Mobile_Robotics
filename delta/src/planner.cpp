@@ -286,9 +286,11 @@ cv::Mat_<bool> *lastSONAR_Map;
 geometry_msgs::PoseStamped poseDes;
 geometry_msgs::Pose goalPose; 
 geometry_msgs::Pose mapOrigin;
+geometry_msgs::PoseStamped poseActual;
 bool LIDARcalled = false;
 bool poseDescalled = false;
 bool goalPosecalled = false;
+bool poseActualcalled = false;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
 	lastLIDAR_Map = getMap(*LIDAR_Map);
@@ -306,6 +308,11 @@ void VISION_Callback(const boost::shared_ptr<cv::Mat  const>& VISION_Map)
 	lastVISION_Map = *VISION_Map;
 }
 */
+void poseActual_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseAcutal) 
+{
+	poseActual = *newPoseActual;
+	poseActualcalled=true;
+}
 void poseDes_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseDes)
 {
 	poseDes = *newPoseDes;
@@ -356,7 +363,11 @@ int main(int argc,char **argv)
 	//	ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 
 	//cout<<"3\n";
-		if(LIDARcalled && poseDescalled && goalPosecalled) {
+		if(LIDARcalled && (poseDescalled || poseActualcalled) && goalPosecalled) {
+			if(!poseDescalled) {
+				//this means we haven't used yet, so use our actual pose
+				poseDes = poseActual;
+			}
 			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
 			PathList turns = insertTurns(points);
 			path_pub.publish(turns);	
