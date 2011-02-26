@@ -370,9 +370,15 @@ int main(int argc,char **argv)
 			}
 			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
 			PathList turns = insertTurns(points);
-			path_pub.publish(turns);	
+			path_pub.publish(turns);
+			cout<<"3published"<<"\n";	
 		}
-
+		else
+		{
+			if(!LIDARcalled)cout<<"No LIDAR\n";
+			if(!poseDescalled)cout<<"No poseDes\n";
+			if(!goalPosecalled)cout<<"No goalPose\n";
+		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
