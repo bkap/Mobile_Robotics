@@ -363,15 +363,20 @@ int main(int argc,char **argv)
 	//	ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 
 	//cout<<"3\n";
-		if(LIDARcalled && (poseDescalled || poseActualcalled) && goalPosecalled) {
+		if(LIDARcalled && goalPosecalled) {
 			if(!poseDescalled) {
+				cout<<"yo1\n";
 				//this means we haven't used yet, so use our actual pose
 				poseDes.pose.position.x = 7.57;
 				poseDes.pose.position.y = 14.26;
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
+				cout<<"yo2\n";
 			}
+			cout<<"doing bug\n";
 			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
+			cout<<"inserting turns\n";
 			PathList turns = insertTurns(points);
+			cout<<"publishing\n";
 			path_pub.publish(turns);
 			cout<<"3published"<<"\n";	
 		}
@@ -380,7 +385,7 @@ int main(int argc,char **argv)
 			if(!LIDARcalled)cout<<"No LIDAR\n";
 			if(!poseDescalled)cout<<"No poseDes\n";
 			if(!goalPosecalled)cout<<"No goalPose\n";
-			if(!poseActualcalled)cout<<"No poseActual\n";
+			//if(!poseActualcalled)cout<<"No poseActual\n";
 		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
