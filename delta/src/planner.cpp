@@ -228,10 +228,24 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 	int points = 0;
 	//head forward until you can turn or until you hit the entrance
 	//also, stop at 200 points (10 meters) so we don't take too long
+	double distances[] = {3.3,12.2,4,-1};
+	int i = 0;
+	double distance = distances[0];
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5) && points++ < 200) {
+		if(distance < 0.001) {
+			i++;
+			if(i >= 3) {
+				break;
+			}
+			heading -= 3.14159/2;
+			if(heading < -2 * 3.14159) {
+				heading += 2 * 3.14159;
+			}
+			distance = distances[i];
+		}
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
-		
+		distance -= CSPACE_RESOLUTION;	
 		double distance_to_check = avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading - 3.14159/2);
 		wally = y + distance_to_check * sin(heading - 3.14159/2);
@@ -244,20 +258,24 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 			
 			if(!avoiding) {
 				//this means that we need to turn
-				path.push_back(Point(x,y));
+			/**	path.push_back(Point(x,y));
 				//now move us around the circle
 				heading -= 3.14159/2;
 				x += 0.75 * cos(heading);
 				y += 0.75 * sin(heading);
+				distance -= 0.75;
+			*/
 			} else {
 				//this means we need to readjust to go back 2 feet
+				
 				path.push_back(Point(x,y));
 				x = wallx + 1.5 * cos(heading);
 				y = wally + 1.5 * cos(heading);
 				path.push_back(Point(x,y));
 				avoiding=false;
+				distance -= 1.5;
 			}
-		} else if(map(grid_x, grid_y)) {
+		} else if(map(grid_x, grid_y) && map(grid_x+1,grid_y) && map(grid_x-1,grid_y+1) && map(grid_x+1,grid_y+1)) {
 			//we have an obstacle. Back up 1.5 m and swerve around
 		
 			//TODO: check to see if we are in fact traveling 1.5m before
@@ -265,12 +283,13 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 			double prev_turn_x = x - 1.5 * cos(heading);
 			double prev_turn_y = y - 1.5 * sin(heading);
 			path.push_back(Point(prev_turn_x, prev_turn_y));
-			
+				
 			//now get the final position
 			x += 0.6 * cos(heading + 3.14159/2);
 			y += 0.6 * sin(heading + 3.14159/2);
 			path.push_back(Point(x,y));
 			avoiding = true;
+			
 		}
 	}
 	path.push_back(Point(x,y));
@@ -363,7 +382,7 @@ int main(int argc,char **argv)
 	//	ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 
 	//cout<<"3\n";
-		if(LIDARcalled && (poseDescalled || poseActualcalled) && goalPosecalled) {
+		if(LIDARcalled  && goalPosecalled) {
 			if(!poseDescalled) {
 				//this means we haven't used yet, so use our actual pose
 				poseDes.pose.position.x = 7.57;
