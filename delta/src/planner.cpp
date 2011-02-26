@@ -5,7 +5,8 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
-#include "opencv2/core/core.hpp"
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/mat.hpp>
 #include <list>
 #include <math.h>
 #include <algorithm>
@@ -171,12 +172,12 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 	}
 }
 
-PathList insertTurns(list<Point> P)
+PathList insertTurns(list<Point2d> P)
 {
 	Point3* PointList = (Point3*)calloc(sizeof(Point3),P.size());  //this should be the list of points that ben's algorithm puts out
 	int PointListLength = P.size();
 	
-	list<Point>::iterator it; 
+	list<Point2d>::iterator it; 
 	int i = 0;
 	for (it = P.begin(); it!=P.end(); it++)
 	{
@@ -218,8 +219,8 @@ PathList insertTurns(list<Point> P)
 	return ReturnVal;
 }
 
-list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
-	list<Point> path =  list<Point>();
+list<Point2d> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
+	list<Point2d> path =  list<Point2d>();
 	Mat_<bool> map = *map_p;
 	//go forward until the space 75 cm to the right of the robot is clear. FInd
 	//location
@@ -228,14 +229,14 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 	double y = start.pose.position.y;
 	double wallx, wally;
 	bool avoiding = false;
-	path.push_back(Point(x,y));
+	path.push_back(Point2d(x,y));
 	int points = 0;
 	//head forward until you can turn or until you hit the entrance
 	//also, stop at 200 points (10 meters) so we don't take too long
 	double distances[] = {3.3,12.2,4,-1};
 	int i = 0;
 	double distance = distances[0];
-	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5) && points++ < 200) {
+	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
 		if(distance < 0.001) {
 			i++;
 			if(i >= 3) {
@@ -246,6 +247,7 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 				heading += 2 * 3.14159;
 			}
 			distance = distances[i];
+      path.push_back(Point2d(x,y));
 		}
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
@@ -258,18 +260,18 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
 		
-		if(!map(grid_wall_x, grid_wall_y)) {
+	/*	if(!map(grid_wall_x, grid_wall_y)) {
 			
 			if(!avoiding) {
 				//this means that we need to turn
-			/**	path.push_back(Point(x,y));
+			/*	path.push_back(Point(x,y));
 				//now move us around the circle
 				heading -= 3.14159/2;
 				x += 0.75 * cos(heading);
 				y += 0.75 * sin(heading);
 				distance -= 0.75;
 			*/
-			} else {
+	/*		} else {
 				//this means we need to readjust to go back 2 feet
 				
 				path.push_back(Point(x,y));
@@ -279,7 +281,7 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 				avoiding=false;
 				distance -= 1.5;
 			}
-		} else if(map(grid_x, grid_y) && map(grid_x+1,grid_y) && map(grid_x-1,grid_y+1) && map(grid_x+1,grid_y+1)) {
+		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) && map(grid_x+1,grid_y+1)) {
 			//we have an obstacle. Back up 1.5 m and swerve around
 		
 			//TODO: check to see if we are in fact traveling 1.5m before
@@ -294,9 +296,9 @@ list<Point> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamp
 			path.push_back(Point(x,y));
 			avoiding = true;
 			
-		}
+		} */
 	}
-	path.push_back(Point(x,y));
+	path.push_back(Point2d(x,y));
 	return path;
 }
 
@@ -395,9 +397,10 @@ int main(int argc,char **argv)
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
 				cout<<"yo2\n";
 			}
-			cout<<"doing bug\n";
-			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
-			cout<<"inserting turns\n";
+			list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+			for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
+				cout << (*it).x << "," << (*it).y << endl;
+			}
 			PathList turns = insertTurns(points);
 			cout<<"publishing\n";
 			path_pub.publish(turns);
