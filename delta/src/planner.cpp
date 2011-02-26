@@ -341,7 +341,6 @@ int main(int argc,char **argv)
 	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
-	ros::Subscriber sub6 = n.subscribe<geometry_msgs::PoseStamped>("poseActual",10,poseActual_Callback);
 	cout<<"3\n";
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
@@ -367,7 +366,9 @@ int main(int argc,char **argv)
 		if(LIDARcalled && (poseDescalled || poseActualcalled) && goalPosecalled) {
 			if(!poseDescalled) {
 				//this means we haven't used yet, so use our actual pose
-				poseDes = poseActual;
+				poseDes.pose.position.x = 7.57;
+				poseDes.pose.position.y = 14.26;
+				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
 			}
 			list<Point> points = bugAlgorithm(lastLIDAR_Map, Point(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);	
 			PathList turns = insertTurns(points);
