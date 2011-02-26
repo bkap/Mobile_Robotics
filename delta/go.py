@@ -15,6 +15,6 @@ JobList = ["lidar", "goalpublisher", "lidarmapper", "planner", "desiredpathcrawl
 for Job in JobList:
 	t = threading.Thread(None, Run, None, [Job])
 	t.start()
-	time.sleep(4)
+	time.sleep(2)
 while 1:
 	time.sleep(1)

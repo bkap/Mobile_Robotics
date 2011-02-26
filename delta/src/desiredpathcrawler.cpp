@@ -17,9 +17,13 @@ const double pi = 3.141592;
 PathList pathlist;
 CrawlerDesiredState desState;
 
+bool pathListInit = false;
+bool speedProfilerInit = false;
+
 void pathListCallback(const PathList::ConstPtr& newPathList)
 {
     pathlist = *newPathList;
+    pathListInit = true;
 }
 
 void speedProfilerCallback(const CrawlerDesiredState::ConstPtr& oldDesState)
@@ -50,6 +54,8 @@ int main(int argc,char **argv)
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
+    while(!pathListInit){ros::spinOnce();naptime.sleep();}
+
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
     desState.seg_number = 0;
