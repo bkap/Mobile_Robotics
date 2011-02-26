@@ -47,6 +47,8 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
+	cout<<"A "<<A.X<<","<<A.Y<<"\n";
+	cout<<"B "<<B.X<<","<<B.Y<<"\n";
 	P.seg_length = Distance3(A,B);
 	P.ref_point = Point3toGeoPoint(A);
 	Point3 Vec = B-A;
@@ -156,14 +158,14 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
-		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+2);
+		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
 		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine->ref_point, (*SegNum)++) ;
 		(*SegNum)++;
 	}
 	else 
 	{
 		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
-		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+2);
+		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
 		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
 		(*SegNum)++;
 	}
