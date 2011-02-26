@@ -16,14 +16,15 @@
 #define REFRESH_RATE 10 //hz
 
 #define GRID_RES .05 // 10 cm grid
-#define GRID_WIDTH 10// meters wide
-#define GRID_HEIGHT 10 // meters tall... should be plenty of space
-#define GRID_PADDING 1 //meters of padding to try to avoid buffer overflows.
-#define NUM_WIDTH ceil((GRID_WIDTH+2.0*GRID_PADDING)/GRID_RES)  //number of squares wide and tall for occupancy grid.
-#define NUM_HEIGHT ceil((GRID_HEIGHT+2.0*GRID_PADDING)/GRID_RES)
+#define GRID_WIDTH 100// meters wide
+#define GRID_HEIGHT 100 // meters tall... should be plenty of space
+//#define GRID_PADDING 1 //meters of padding to try to avoid buffer overflows.
+#define NUM_WIDTH ceil(GRID_WIDTH/GRID_RES)  //number of squares wide and tall for occupancy grid.
+#define NUM_HEIGHT ceil(GRID_HEIGHT/GRID_RES)
 
 #define DONUT_RADIUS 2.54*.210/2.0 //the radius of the donut in m
-#define DONUT_LENGTH (int)(ceil(DONUT_RADIUS)*2.0) //the size length of the side of a square to make to contain the donut rounded up to the nearest m.
+#define DONUT_LENGTH ((DONUT_RADIUS)*2.0) //the size length of the side of a square to make to contain the donut rounded up to the nearest m.
+#define NUM_DONUT ((int)2*ceil(DONUT_LENGTH/(2.0*GRID_RES)))
 
 sensor_msgs::PointCloud last_map_cloud;
 nav_msgs::OccupancyGrid Output;
@@ -43,21 +44,33 @@ int Address(int i, int j)
 	return i*NUM_WIDTH+j;
 }
 
+int Address(double X, double Y)
+{
+	X -=Output.info.origin.position.x;
+	Y -=Output.info.origin.position.y;
+	int x = X/GRID_RES;
+	int y = Y/GRID_RES;
+	return Address(y,x);
+}
+
 void CopyPoints()
 {
 
-	cout<<"24645346\n";
 	int numPts = last_map_cloud.points.size();
 	for(int i = 0; i<numPts; i++)
 	{
-		if (last_map_cloud.points[i].y>InitY-GRID_WIDTH/2.0-GRID_PADDING&&last_map_cloud.points[i].y<InitY+GRID_WIDTH/2.0+GRID_PADDING
-		&&last_map_cloud.points[i].x>InitX-GRID_HEIGHT/2.0-GRID_PADDING&&last_map_cloud.points[i].x<InitX+GRID_HEIGHT/2.0+GRID_PADDING)
+		double X = last_map_cloud.points[i].x;
+		double Y = last_map_cloud.points[i].y;
+		if (Y>InitY-GRID_WIDTH/2.0+DONUT_LENGTH/2.0&&Y<InitY+GRID_WIDTH/2.0-DONUT_LENGTH/2.0
+		&&X>InitX-GRID_HEIGHT/2.0+DONUT_LENGTH/2.0&&X<InitX+GRID_HEIGHT/2.0-DONUT_LENGTH/2.0)
 		{
-			for (int j =0; j<DONUT_LENGTH; j++)
+			for (int j =1; j<DONUT_LENGTH; j++)
 			{
-				for (int k = 0; k<DONUT_LENGTH; k++)
+				double x = X-DONUT_LENGTH/2.0+j*GRID_RES;
+				double y = Y-DONUT_LENGTH/2.0+i*GRID_RES;
+				for (int k = 1; k<DONUT_LENGTH; k++)
 				{
-					Output.data[Address(k,j)]=Output.data[Address(k,j)]||JellyDonut[j][k];
+					Output.data[Address(x,y)]=Output.data[Address(x,y)]||JellyDonut[j][k];
 				}
 			}
 		}
@@ -74,32 +87,32 @@ void GridInit()
 	//Output.header.stamp = time(NULL);
 	Output.info.resolution = .05;
 	//Output.info.map_load_time = time(NULL);
-	Output.info.width = NUM_WIDTH+GRID_PADDING;
-	Output.info.height = NUM_HEIGHT+GRID_PADDING;
-	Output.info.origin.position.x = InitX-GRID_WIDTH/2.0-GRID_PADDING;
-	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0-GRID_PADDING;
+	Output.info.width = NUM_WIDTH;
+	Output.info.height = NUM_HEIGHT;
+	Output.info.origin.position.x = InitX-GRID_WIDTH/2.0;
+	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0;
 	Output.info.origin.position.z = 0;
 	Output.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	vector<char>* data = new vector<char>((NUM_WIDTH+GRID_PADDING) * (NUM_HEIGHT+GRID_PADDING));
+	vector<char>* data = new vector<char>((NUM_WIDTH) * (NUM_HEIGHT));
 	Output.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
 }
 
 void DonutInit()
 {
-	JellyDonut = (int **)calloc(DONUT_LENGTH, sizeof(int));
-	for (int i = 0; i< DONUT_LENGTH; i++)
+	JellyDonut = (int **)calloc(NUM_DONUT, sizeof(int));
+	for (int i = 0; i< NUM_DONUT; i++)
 	{
-		JellyDonut[i] = (int*) calloc(DONUT_LENGTH, sizeof(int));
+		JellyDonut[i] = (int*) calloc(NUM_DONUT, sizeof(int));
 	}
 	
 	double x =0;
 	double y =0;
-	for (int i =0;  i <DONUT_LENGTH; i++)
+	for (int i =0;  i <NUM_DONUT; i++)
 	{
-		for(int j = 0; j<DONUT_LENGTH; j++)
+		for(int j = 0; j<NUM_DONUT; j++)
 		{
-			x = (i - DONUT_LENGTH/(2.0));
-			y = (j - DONUT_LENGTH/(2.0));
+			x = (i - DONUT_LENGTH/(2.0))/GRID_RES;
+			y = (j - DONUT_LENGTH/(2.0))/GRID_RES;
 			if (x*x+y*y<DONUT_LENGTH)
 			{
 				JellyDonut[i][j] = 100;
@@ -144,11 +157,11 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 {
 	if (init == false)
 	{
-		cout<<"2callback\n";
+		//cout<<"2callback\n";
 		last_map_cloud = *scan_cloud; 
-		ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
+		//ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
 		CopyPoints();
-		cout<<"yo\n";
+		//cout<<"yo\n";
 	}
 }
 
