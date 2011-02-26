@@ -379,6 +379,7 @@ int main(int argc,char **argv)
 			if(!LIDARcalled)cout<<"No LIDAR\n";
 			if(!poseDescalled)cout<<"No poseDes\n";
 			if(!goalPosecalled)cout<<"No goalPose\n";
+			if(!poseActualcalled)cout<<"No poseActual\n";
 		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
