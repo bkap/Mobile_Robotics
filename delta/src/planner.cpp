@@ -308,7 +308,7 @@ void VISION_Callback(const boost::shared_ptr<cv::Mat  const>& VISION_Map)
 	lastVISION_Map = *VISION_Map;
 }
 */
-void poseActual_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseAcutal) 
+void poseActual_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseActual) 
 {
 	poseActual = *newPoseActual;
 	poseActualcalled=true;
