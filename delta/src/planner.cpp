@@ -183,7 +183,7 @@ PathList insertTurns(list<Point> P)
 	}
 	
 	PathList ReturnVal;
-	vector<PathSegment> path = vector<PathSegment>(3*PointListLength);
+	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));
 	ReturnVal.path_list.assign(path.begin(), path.end());
 	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
@@ -202,7 +202,7 @@ PathList insertTurns(list<Point> P)
 		{
 			MoveBack1(A,B, &FirstLine);
 		}
-		else if (i == PointListLength-2)
+		else if (i == PointListLength-3)
 		{
 			MoveBack2(B,C, &SecondLine);
 		}
