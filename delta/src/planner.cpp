@@ -157,14 +157,16 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
-		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)++);
+		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
 		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine->ref_point, (*SegNum)++) ;
+		(*SegNum)++;
 	}
 	else 
 	{
 		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
-		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)++);
+		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
 		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
+		(*SegNum)++;
 	}
 }
 
@@ -184,7 +186,7 @@ PathList insertTurns(list<Point2d> P)
 	}
 	
 	PathList ReturnVal;
-	vector<PathSegment> path = vector<PathSegment>(3*PointListLength);
+	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));
 	ReturnVal.path_list.assign(path.begin(), path.end());
 	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
@@ -192,7 +194,7 @@ PathList insertTurns(list<Point2d> P)
 	PathSegment FirstLine, Curve, SecondLine;
 
 	
-	for (int i = 0; i<PointListLength-1; i++)
+	for (int i = 0; i<PointListLength-2; i++)
 	{
 		A = PointList[i];
 		B = PointList[i+1];
@@ -203,7 +205,7 @@ PathList insertTurns(list<Point2d> P)
 		{
 			MoveBack1(A,B, &FirstLine);
 		}
-		else if (i == PointListLength-2)
+		else if (i == PointListLength-3)
 		{
 			MoveBack2(B,C, &SecondLine);
 		}
@@ -384,18 +386,21 @@ int main(int argc,char **argv)
 	//	ROS_INFO("elapsed time is %f", elapsed_time.toSec());
 
 	//cout<<"3\n";
-		if(LIDARcalled  && goalPosecalled) {
+		if(LIDARcalled && goalPosecalled) {
 			if(!poseDescalled) {
+				cout<<"yo1\n";
 				//this means we haven't used yet, so use our actual pose
 				poseDes.pose.position.x = 7.57;
 				poseDes.pose.position.y = 14.26;
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
+				cout<<"yo2\n";
 			}
 			list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 			for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
 				cout << (*it).x << "," << (*it).y << endl;
 			}
 			PathList turns = insertTurns(points);
+			cout<<"publishing\n";
 			path_pub.publish(turns);
 			cout<<"3published"<<"\n";	
 		}
@@ -404,6 +409,7 @@ int main(int argc,char **argv)
 			if(!LIDARcalled)cout<<"No LIDAR\n";
 			if(!poseDescalled)cout<<"No poseDes\n";
 			if(!goalPosecalled)cout<<"No goalPose\n";
+			//if(!poseActualcalled)cout<<"No poseActual\n";
 		}
 		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
