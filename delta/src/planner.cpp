@@ -74,17 +74,17 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	return P;
 }
 
-PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs::Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs::Point ref_point, int SegNum)
 {
-	double theta1 = tf::getYaw(InitAngle);
-	double theta2 = tf::getYaw(FinalAngle);
+	double theta1 = InitAngle;
+	double theta2 = FinalAngle;
 	
 	PathSegment P;
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
 	P.seg_length = theta2-theta1;
 	P.ref_point = ref_point;
-	P.init_tan_angle = InitAngle;
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
 	P.curvature = 1337;
 	
 	P.max_speeds.linear.x = MAX_LINEAR;
@@ -104,24 +104,29 @@ PathSegment MakeTurnInPlace (geometry_msgs::Quaternion InitAngle, geometry_msgs:
 	return P;
 }
 
-PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs::Quaternion FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A, Point3 B)
 {
-	
-	double theta1 = tf::getYaw(InitAngle);
-	double theta2 = tf::getYaw(FinalAngle);
-	
+	Point3 M = (A+B)/2.0;  //midpoint
+	Point3 MA = M-A;  //vector from midpoint to A
+	Point3 Center = M + Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point
+	double Radius = Distance3(A, M);
+
 	PathSegment P;
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
-	P.seg_length = theta2-theta1;
-	if(P.seg_length > 3.14159) {
+	P.seg_length = FinalAngle-InitAngle;
+		if(P.seg_length > 3.14159) {
 		P.seg_length -= 2 * 3.14159;
 	} else if(P.seg_length < -3.14159) {
 		P.seg_length += 2 * 3.14159;
 	}
-	P.ref_point = ref_point;
-	P.init_tan_angle = InitAngle;
-	P.curvature = 1/STD_TURN_RAD;
+	geometry_msgs::Point gmPoint;
+	gmPoint.x = Center.X;
+	gmPoint.y = Center.Y;
+	gmPoint.z = 0.0f;
+	P.ref_point = gmPoint;
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
+	P.curvature = 1/Radius;
 	
 	P.max_speeds.linear.x = MAX_LINEAR;
 	P.max_speeds.linear.y = 0;
@@ -153,16 +158,17 @@ void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
 	Segment->seg_length +=Magnitude3(B-A)/2.0;
 }
 
-void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
+/*void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
 	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
 	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
 	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-	Point3 Bdoubleprime = B+Dot3(Center-B,C-B)*(C-B)/Magnitude3(C-B); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3 Midpoint1 = A-(A-B)/2.0;  //midpoints are used in a sec
+
+	Point3 Bdoubleprime = B+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
 	Point3 Midpoint2 = C-(C-B)/2.0;
-	if (Dot3(Midpoint1, B-A)>Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)>Dot3(Bdoubleprime, B-C))
+	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
@@ -223,7 +229,7 @@ PathList insertTurns(list<Point2d> P)
 		ReturnVal.path_list[3*i+2] = SecondLine;
 	}
 	return ReturnVal;
-}
+}*/
 Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
 		if(change_in_heading > 0) {
@@ -247,7 +253,6 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	double y = start.pose.position.y;
 	double wallx, wally;
 	bool avoiding = false;
-	path.push_back(Point2d(x,y));
 	int points = 0;
 	int segnum = 0;
 	//head forward until you can turn or until you hit the entrance
@@ -255,7 +260,9 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	double distances[] = {3.3,12.2,4,-1};
 	int i = 0;
 	double distance = distances[0];
-	double old_x, old_y = x,y;
+	double old_x, old_y;
+	old_x = x;
+	old_y = y;
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
 		if(distance < 0.001) {
 			i++;
@@ -278,7 +285,6 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			//TODO: this header is probably going to be wrong
 
 			Point3 curve_end;
-			MakeCurve(initheading, finalheading, segnum A, B);
 			double oldheading = heading;
 			heading -= 3.14159/2;
 			if(heading < -3.14159) {
@@ -290,12 +296,9 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			curve_end.Y = y + sin(heading) * STD_TURN_RAD;
 			curve_end.Z = 0.0;
 
-			Point3 curve_middle;
-			curve_middle.X = x;
-			curve_middle.Y = y;
-			curve_middle.Z = 0.0;
+	
 			//make the curve now
-			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_middle, curve_end));
+			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_end));
 			x = curve_end.X;
 			y = curve_end.Y;
 			old_x = x;
@@ -312,7 +315,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
-		
+		cout << grid_wall_x << "," << grid_wall_y << ":" << map.size().width << endl;	
 		if(!map(grid_wall_x, grid_wall_y)) {
 			
 			if(!avoiding) {
@@ -345,7 +348,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				
 				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
 				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,3.14159/4.0,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading - 3.14159/4.0, segnum++, midcurve, endcurve));
+				path.push_back(MakeCurve(heading - 3.14159/4.0, heading, segnum++, midcurve, endcurve));
 				x = endcurve.X;
 				y = endcurve.Y;
 				old_x = x;
@@ -353,7 +356,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				avoiding=false;
 				distance -= 1.5;
 			}
-		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) && map(grid_x+1,grid_y+1)) {
+		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1)) {
 				Point3 start = Point3(old_x,old_y,0.0);
 				Point3 endline;
 
@@ -371,7 +374,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				
 				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
 				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,3.14159/4,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading - 3.14159/4.0, segnum++, midcurve, endcurve));
+				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
 				x = endcurve.X;
 				y = endcurve.Y;
 				old_x = x;
@@ -487,7 +490,7 @@ int main(int argc,char **argv)
 			///	cout << (*it).x << "," << (*it).y << endl;
 			//}
 			//PathList turns = insertTurns(points);
-			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position,x, goalPose.position.y),poseDes, mapOrigin);
+			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 			cout<<"publishing\n";
 			path_pub.publish(turns);
 			cout<<"3published"<<"\n";	
