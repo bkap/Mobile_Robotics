@@ -188,7 +188,7 @@ int main(int argc,char **argv)
 	cSpaceInit();
 	init=true;
 	cout<<"2\n";
-	ros::init(argc,argv,"lidar_mappa");//name of this node
+	ros::init(argc,argv,"lidar_mapper");//name of this node
 	tfl = new tf::TransformListener();
 	cout<<"2\n";
 	ros::Rate loopTimer(loopRate); //will perform sleeps to enforce loop rate of "10" Hz
