@@ -22,7 +22,7 @@ try :
 		time.sleep(1)
 except KeyboardInterrupt, e:
 	for p in pidlist[::-1] :
-		p.send_signal(signal.SIGINT)
+		p.send_signal(signal.SIGTERM)
 	for job in JobList :
-		subprocess.call('killall -%d %s' % (signal.SIGINT,job),shell=True)
-	exit(signal.SIGINT)
+		subprocess.call('killall -%d %s' % (signal.SIGTERM,job),shell=True)
+	exit(0)
