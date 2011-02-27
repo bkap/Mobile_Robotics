@@ -47,16 +47,18 @@ inline bool inGrid(double x, double y){
 }
 
 inline bool fatInGrid(double x, double y){
-	return inGrid(x+patchRadius+gridRes,y)&&inGrid(x-patchRadius+gridRes,y)
-		&&inGrid(x,y+patchRadius+gridRes)&&inGrid(x,y-patchRadius+gridRes);
+	return inGrid(x+patchRadius+gridRes,y)&&inGrid(x-patchRadius-gridRes,y)
+		&&inGrid(x,y+patchRadius+gridRes)&&inGrid(x,y-patchRadius-gridRes);
 }
 
 inline int address(int x, int y)
 {
+	cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
 	return y * gridSize + x;
 }
-void GridInit()
+void cSpaceInit()
 {
+	cout<<"creating cSpace grid:"<<endl;
 	cSpace.header.seq = 0;
 	cSpace.header.frame_id = "map";
 	//Output.header.stamp = time(NULL);
@@ -70,30 +72,31 @@ void GridInit()
 	cSpace.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
 	vector<char>* data = new vector<char>((cSpace.info.width) * (cSpace.info.height));
 	cSpace.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
+	cout<<"\tcreated cSpace grid with "<<cSpace.info.width*cSpace.info.width<<" elements"<<endl;
 }
 
 void patchInit()
 {
 	patch = (int **)calloc(patchSize, sizeof(int));
+	//cout<<"creating patch of size "<<patchSize<<endl;
+	int center = (patchSize-1)/2;	//center pixel coordinate
+	int rsquared = center*center;
 	for (int i = 0; i< patchSize; i++)
 	{
 		patch[i] = (int*) calloc(patchSize, sizeof(int));
-	}
-	int x,y;
-	int center = (patchSize-1)/2+1;	//center pixel coordinate
-	for(double r= (patchSize-1)/2 -2;r <= (patchSize-1)/2;r+=.1)
-	{
-		for(double theta = 0;theta< 2 * pi;theta+=0.01)
+		for(int j=0;j<patchSize;j++)
 		{
-			x = center + round(r * cos(theta));
-			y = center + round(r * sin(theta));
-			patch[y][x] = 100; //[row][col] = (y,x)
-		}	
+			if((i-center)*(i-center) + (j-center)*(j-center) < rsquared)
+			{
+				patch[i][j] = 100;
+			}
+		}
 	}
 }
 
 void copyPoints()	
 {
+	cout<<"copying points:"<<endl;
 	int numPts = scanCloud.points.size();
 	for(int i = 0;i<numPts;i++)
 	{
@@ -102,6 +105,7 @@ void copyPoints()
 
 		if(fatInGrid(x,y))
 		{
+			cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
 			int Gx = round((x - gridOx)/gridRes) - (patchSize-1)/2;
 			int Gy = round((y - gridOy)/gridRes) - (patchSize-1)/2;
 			for(int j = 0; j < patchSize;j++)	//rows - y
@@ -114,6 +118,7 @@ void copyPoints()
 			}
 		}
 	}
+	cout<<"copied points"<<endl;
 }
 
 bool init = false;
@@ -140,17 +145,18 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 	
 	if(init == false)
 	{
+		cout<<"odom callback initialized"<<endl;
 		InitX = PoseX;
 		InitY = PoseY;
-		GridInit();
+		cSpaceInit();
+		init = true;
 	}
 	
-	init = true;
 }
 
 void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	if (init == false)
+	if (init == true)
 	{
 		//cout<<"2callback\n";
 		scanCloud = *scan_cloud; 
