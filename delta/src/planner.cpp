@@ -82,10 +82,10 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	PathSegment P;
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
-	P.seg_length = theta2-theta1;
+	P.seg_length = fabs(theta2-theta1);
 	P.ref_point = ref_point;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
-	P.curvature = 1337;
+	P.curvature = (FinalAngle>InitAngle)?1:-1;
 	
 	P.max_speeds.linear.x = 0;
 	P.max_speeds.linear.y = 0;
@@ -114,7 +114,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	PathSegment P;
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
-	P.seg_length = FinalAngle-InitAngle;
+	P.seg_length = fabs(FinalAngle-InitAngle);
 		if(P.seg_length > 3.14159) {
 		P.seg_length -= 2 * 3.14159;
 	} else if(P.seg_length < -3.14159) {
@@ -127,6 +127,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	P.ref_point = gmPoint;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
 	P.curvature = 1/Radius;
+	P.curvature *= (FinalAngle>InitAngle)?1:-1;
 	
 	P.max_speeds.linear.x = MAX_LINEAR;
 	P.max_speeds.linear.y = 0;
