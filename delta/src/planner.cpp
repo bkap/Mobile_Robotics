@@ -315,7 +315,6 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
-		cout << grid_wall_x << "," << grid_wall_y << ":" << map.size().width << endl;	
 		if(!map(grid_wall_x, grid_wall_y)) {
 			
 			if(!avoiding) {
@@ -406,6 +405,7 @@ bool goalPosecalled = false;
 bool poseActualcalled = false;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
+	cout << "recieved width: " <<  (*LIDAR_Map).info.width<< endl;
 	lastLIDAR_Map = getMap(*LIDAR_Map);
 	mapOrigin = (*LIDAR_Map).info.origin;
 	LIDARcalled = true;
