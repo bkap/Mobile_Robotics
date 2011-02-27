@@ -56,11 +56,10 @@ void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& n
 	lidarMapCalled = true;
 }
 
-// TODO: this
+// check along the path within the specified distance along the specified path
+// and test cspace map pixels for occupancy
 bool clearPath(double brakingDist)
 {
-    // check along the path within the specified distance along the specified path
-    // and test cspace map pixels for occupancy
     double dist = 0.0;
     int curSeg = curState.seg_number;
     int curX = curState.des_pose.position.x;
