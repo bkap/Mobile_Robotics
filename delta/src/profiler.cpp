@@ -170,7 +170,7 @@ double distanceRemaining()
         case 3: // angle remaining
             return (psiDes - psiCur);
 
-	assert(1337);//control shouldn't get here.
+	assert(1337==0);//control shouldn't get here.
 	return 9001; //it's over 9000
     }
 }
@@ -212,19 +212,21 @@ int main(int argc,char **argv)
         // ramp to zero if you're on the last path segment
         bool end_of_path = false;
         if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
-			if (curState.seg_number == pathlist.path_list.size() - 1)
+			if (curState.seg_number == pathlist.path_list.size() - 1) {
+                cout << "\npro: End of path";
             	end_of_path = true;
+        	}
         	vGoal = 0.0;
  
         	if (curState.seg_type == 3) { // point
-            	vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
+        	    vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
             	aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            	if (end_of_path)
+            	if (!end_of_path)
                 	vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.angular.z;
         	} else { // line or arc
-            	vMax = pathlist.path_list[curState.seg_number].max_speeds.linear.x;
+        	    vMax = pathlist.path_list[curState.seg_number].max_speeds.linear.x;
             	aMax = pathlist.path_list[curState.seg_number].accel_limit;
-            	if (end_of_path)
+            	if (!end_of_path)
                 	vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
         	}
         
@@ -234,16 +236,20 @@ int main(int argc,char **argv)
  
         	// Ramp velocity, set des_speed
         	if (clearPath(brakingDistance)) {
+        	    cout << "\npro: clearpath woo";
             	if (slowingDistance < distToGo) {   // go to maximum velocity
+                    cout << " TO THE MAX which is " << vGoal;
                 	curState.des_speed = min(curState.des_speed + aMax * REFRESH_RATE, vGoal);
             	} else {    // ramp speed down to goal speed
-                	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
+            	    cout << " goal speed is slowsauce " << vGoal;
+                	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, vGoal);
             	}
         	} else {
             	// go to zero
+            	cout << " BRAKINGGGGG";
             	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
         	}
-
+            cout << "\npro: des_speed = " << curState.des_speed;
         	pub.publish(curState); // publish the CrawlerDesiredState
 	    }
 	    naptime.sleep(); // enforce desired update rate

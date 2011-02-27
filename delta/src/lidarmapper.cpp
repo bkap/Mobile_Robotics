@@ -109,7 +109,7 @@ void patchInit()
 void copyPoints()	
 {
 //	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
-	cout<<"copying points:"<<endl;
+	//cout<<"copying points:"<<endl;
 	int numPts = scanCloud.points.size();
 	for(int i = 0;i<numPts;i++)
 	{
@@ -133,7 +133,7 @@ void copyPoints()
 	}
 //	cv::imshow("cSpace",image);
 //	waitKey(50);
-	cout<<"copied points"<<endl;
+	//cout<<"copied points"<<endl;
 }
 
 bool init = false;
@@ -144,7 +144,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 		last_odom = *odom;
         temp.pose = last_odom.pose.pose;
         temp.header = last_odom.header;
-	cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
+	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
         try 
 	{
           tfl->transformPose("map", temp, last_map_pose);
@@ -175,7 +175,7 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 //	{
 		//cout<<"2callback\n";
 		scanCloud = *scan_cloud; 
-		ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
+		//ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
 		copyPoints();
 		//cout<<"yo\n";
 //	}
@@ -204,7 +204,7 @@ int main(int argc,char **argv)
 	{
 		//cout<<"2\n";
 		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
-		cout<<"grid dimensions "<<cSpace.info.width<<" by "<< cSpace.info.height<<endl;
+		//cout<<"grid dimensions "<<cSpace.info.width<<" by "<< cSpace.info.height<<endl;
 		P.publish(cSpace);
 		//cout<<"2\n";
 		loopTimer.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
