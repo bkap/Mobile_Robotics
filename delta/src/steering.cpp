@@ -7,6 +7,7 @@
 #include<nav_msgs/Odometry.h>
 #include<tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
+#include "opencv2/core/core.hpp"
 
 #define pi 3.14159265358979323846264338327950288
 
@@ -14,7 +15,7 @@
 using namespace std;
 
 const double LOOP_RATE = 10;
-const double kV = 1;
+const double kS = .1;
 const double kD = .75;
 const double kP = .75;
 
@@ -30,7 +31,7 @@ tf::TransformListener *tfl;
 geometry_msgs::PoseStamped temp;
 void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {	
-	cout<<"steering odom callback: "<<odom->pose.pose;
+	cout<<"steering odom callback happened"<<endl;
 	last_odom = *odom;
 
         temp.pose = last_odom.pose.pose;
@@ -64,8 +65,8 @@ void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed)
 }
 
 inline double coerceAngle(double angle){
-	if (angle<-2*pi) {return angle + 2*pi;}
-	if (angle> 2*pi) {return angle - 2*pi;}
+	if (angle<-pi) {return angle + 2*pi;}
+	if (angle> pi) {return angle - 2*pi;}
 	return angle;
 }
 
@@ -83,6 +84,18 @@ inline double max(double a, double b){
 	return (a > b)? a:b;
 }
 
+cv::Vec3d calculateSteeringParameters(geometry_msgs::Pose *poseA, geometry_msgs::Pose *poseD)
+{
+	cv::Vec2d posA(poseA->position.x,poseA->position.y);
+	cv::Vec2d posD(poseD->position.x,poseD->position.y);
+	double dirA= tf::getYaw(poseA->orientation);
+	double dirD=tf::getYaw(poseD->orientation);
+	cv::Vec2d psiA(cos(dirA),sin(dirA));
+	cv::Vec2d psiD(cos(dirD),sin(dirD));
+	cv::Vec2d psiN(cos(dirD+pi/2),sin(dirD+pi/2));
+ 
+	return cv::Vec3d((posA - posD).dot(psiD),(posA - posD).dot(psiN),coerceAngle(dirA - dirD));
+}
 int main(int argc,char **argv)
 {
 
@@ -102,11 +115,11 @@ int main(int argc,char **argv)
 	ros::Time birthday = ros::Time::now();
 	
 	double v, w;
-
+	cv::Vec3d sdp;
 	while(ros::ok()){
-		cout<<"STEERING\n";
+//		cout<<"STEERING\n";
 		loopTimer.sleep();
-		cout<<"STEERING AWAKE"<<endl;
+//		cout<<"STEERING AWAKE"<<endl;
 		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 
 		ros::Time current_time = ros::Time::now();
@@ -114,22 +127,26 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		//ROS_INFO("birthday is %f", birthday.toSec());
 		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
-		if(stalePos)	{cout<<"steering aborted"<<endl;continue;}
-		cout<<"Steering activate!"<<endl;
+		if(stalePos)	{continue;}
+//		cout<<"Steering activate!"<<endl;
+		
+		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);			
 		switch(desired.seg_type){
 			case 1:	//line
 			{
 				cout<<"STEERING IN A LINE\n";
-				double x_err = desired.des_pose.position.x - poseActual.pose.position.x;
-				double y_err = desired.des_pose.position.y - poseActual.pose.position.y;
-				double theta = tf::getYaw(desired.des_pose.orientation) - atan2(y_err,x_err);
+				cout<<"desired: "<<desired.des_pose<<endl;
+				cout<<"actual: "<<poseActual.pose<<endl;
+				//double x_err = poseActual.pose.position.x - desired.des_pose.position.x;
+				//double y_err = poseActual.pose.position.y - desired.des_pose.position.y;
+				//double theta = tf::getYaw(desired.des_pose.orientation) - atan2(y_err,x_err);
 
-				double d_err = sin(theta) * norm(x_err,y_err);
-				double s_err = cos(theta) * norm(x_err,y_err);
-				double p_err=coerceAngle(tf::getYaw(poseActual.pose.orientation) - tf::getYaw(desired.des_pose.orientation));
-
-				v = desired.des_speed + kV * s_err;
-				w = kD*d_err+kP*p_err;
+				//double d_err = sin(theta) * norm(x_err,y_err);
+				//double s_err = cos(theta) * norm(x_err,y_err);
+				//double p_err=coerceAngle(tf::getYaw(poseActual.pose.orientation) - tf::getYaw(desired.des_pose.orientation));
+				//cout<<" d s p: "<<d_err<<","<<s_err<<","<<p_err<<endl;
+				v = desired.des_speed - kS * sdp[0];
+				w = -kD*sdp[1]-kP*sdp[2];
 				break;
 			}
 
@@ -137,29 +154,29 @@ int main(int argc,char **argv)
 			{
 				cout<<"STEERING IN A ARC"<<endl;
 				double r = 1.f / desired.des_rho;
-				double theta = tf::getYaw(desired.des_pose.orientation) + pi/2 * (r>0?1:-1);			//heading to arc center from desired
-				double cX = desired.des_pose.position.x + r * cos(theta);					//x coordinate of arc center
-				double cY = desired.des_pose.position.y + r * sin(theta);					//y coordinate of arc center
-				double pX = cX + r * cos(atan2(poseActual.pose.position.y - cY,poseActual.pose.position.x-cX));	//x coordinate of projection onto arc
-				double pY = cY + r * sin(atan2(poseActual.pose.position.y - cY,poseActual.pose.position.x-cX));	//y coordinate of projection onto arc
-				double p = coerceAngle(atan2(pY-cY,pX-cX) + pi/2 * (r>0?1:-1));					//heading of projection onto arc
+//				double theta = tf::getYaw(desired.des_pose.orientation) + pi/2 * (r>0?1:-1);			//heading to arc center from desired
+//				double cX = desired.des_pose.position.x + r * cos(theta);					//x coordinate of arc center
+//				double cY = desired.des_pose.position.y + r * sin(theta);					//y coordinate of arc center
+//				double pX = cX + r * cos(atan2(poseActual.pose.position.y - cY,poseActual.pose.position.x-cX));	//x coordinate of projection onto arc
+//				double pY = cY + r * sin(atan2(poseActual.pose.position.y - cY,poseActual.pose.position.x-cX));	//y coordinate of projection onto arc
+//				double p = coerceAngle(atan2(pY-cY,pX-cX) + pi/2 * (r>0?1:-1));					//heading of projection onto arc
 
-				double p_err = coerceAngle(tf::getYaw(poseActual.pose.orientation) - p); 
-				double s_err = r * coerceAngle(p - tf::getYaw(desired.des_pose.orientation));
-				double d_err = norm(pX,pY,poseActual.pose.position.x,poseActual.pose.position.y) * (norm(poseActual.pose.position.x-cX,poseActual.pose.position.y-cY)>r?1:-1);
+//				double p_err = coerceAngle(tf::getYaw(poseActual.pose.orientation) - p); 
+//				double s_err = r * coerceAngle(p - tf::getYaw(desired.des_pose.orientation));
+//				double d_err = norm(pX,pY,poseActual.pose.position.x,poseActual.pose.position.y) * (norm(poseActual.pose.position.x-cX,poseActual.pose.position.y-cY)>r?1:-1);
 
-				v = desired.des_speed + kV * s_err;
-				w = v / r + kD*d_err+kP*p_err;
+				v = desired.des_speed + kS * sdp[0];
+				w = v / r + (kD*sdp[1]+kP*sdp[1])*(r>0?1:-1);
 				break;
 			}
 
 			case 3:	//turn in place
 			{
-				cout<<"STEERING IN A CIRCLE"<<endl;
-				double s_err = tf::getYaw(desired.des_pose.orientation) - tf::getYaw(poseActual.pose.orientation);
+				cout<<"STEERING IN A CIRCLE"<<endl;	
+				//double s_err = tf::getYaw(desired.des_pose.orientation) - tf::getYaw(poseActual.pose.orientation);
 
 				v = 0;
-				w = desired.des_speed + kV * s_err;
+				w = desired.des_speed - kS * sdp[0];
 				break;
 			}
 
