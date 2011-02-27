@@ -159,7 +159,7 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 	Point3 D = (A+C)/2.0;
 	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
 	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-	Point3 Bdoubleprime = B+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3 Bdoubleprime = B+Dot3(Center-B,C-B)*(C-B)/Magnitude3(C-B); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
 	Point3 Midpoint1 = A-(A-B)/2.0;  //midpoints are used in a sec
 	Point3 Midpoint2 = C-(C-B)/2.0;
 	if (Dot3(Midpoint1, B-A)>Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)>Dot3(Bdoubleprime, B-C))
@@ -224,9 +224,21 @@ PathList insertTurns(list<Point2d> P)
 	}
 	return ReturnVal;
 }
-
-list<Point2d> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
-	list<Point2d> path =  list<Point2d>();
+Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
+		double heading = initial_heading;
+		if(change_in_heading > 0) {
+			//we are going positive angle, add 90
+			heading += 3.14159 / 2;
+		} else {
+			heading -= 3.14159/2;
+		}
+		Point3 center = Point3(startPoint.X + cos(heading) * radius, startPoint.Y + sin(heading) * radius,0.0);
+		//now invert heading and adjust it by by change_in_heading
+		heading = -heading + change_in_heading;
+		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
+}
+PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
+	vector<PathSegment> path;
 	Mat_<bool> map = *map_p;
 	//go forward until the space 75 cm to the right of the robot is clear. FInd
 	//location
@@ -237,23 +249,58 @@ list<Point2d> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseSta
 	bool avoiding = false;
 	path.push_back(Point2d(x,y));
 	int points = 0;
+	int segnum = 0;
 	//head forward until you can turn or until you hit the entrance
 	//also, stop at 200 points (10 meters) so we don't take too long
 	double distances[] = {3.3,12.2,4,-1};
 	int i = 0;
 	double distance = distances[0];
+	double old_x, old_y = x,y;
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
 		if(distance < 0.001) {
 			i++;
 			if(i >= 3) {
 				break;
 			}
+
+			//create our lines and curve, then update x, y, and old vals
+			int curve_start_x = x - cos(heading) * STD_TURN_RAD;
+			int curve_start_y = y - sin(heading) * STD_TURN_RAD;
+			Point3 start_line;
+			start_line.X = old_x;
+			start_line.Y = old_y;
+			Point3 curve_start;
+			curve_start.X = curve_start_x;
+			curve_start.Y = curve_start_y;
+			curve_start.Z = 0.0;
+			path.push_back(MakeLine(start_line,curve_start,segnum++));
+			//make a line from the previous point to the start of the curve
+			//TODO: this header is probably going to be wrong
+
+			Point3 curve_end;
+			MakeCurve(initheading, finalheading, segnum A, B);
+			double oldheading = heading;
 			heading -= 3.14159/2;
-			if(heading < -2 * 3.14159) {
+			if(heading < -3.14159) {
 				heading += 2 * 3.14159;
+			} else if(heading > 3.14159) {
+				heading -= 2 * 3.14159;
 			}
+			curve_end.X = x + cos(heading) * STD_TURN_RAD;
+			curve_end.Y = y + sin(heading) * STD_TURN_RAD;
+			curve_end.Z = 0.0;
+
+			Point3 curve_middle;
+			curve_middle.X = x;
+			curve_middle.Y = y;
+			curve_middle.Z = 0.0;
+			//make the curve now
+			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_middle, curve_end));
+			x = curve_end.X;
+			y = curve_end.Y;
+			old_x = x;
+			old_y = y;
 			distance = distances[i];
-      path.push_back(Point2d(x,y));
 		}
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
@@ -266,7 +313,7 @@ list<Point2d> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseSta
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
 		
-	/*	if(!map(grid_wall_x, grid_wall_y)) {
+		if(!map(grid_wall_x, grid_wall_y)) {
 			
 			if(!avoiding) {
 				//this means that we need to turn
@@ -277,35 +324,67 @@ list<Point2d> bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseSta
 				y += 0.75 * sin(heading);
 				distance -= 0.75;
 			*/
-	/*		} else {
+			} else {
 				//this means we need to readjust to go back 2 feet
 				
-				path.push_back(Point(x,y));
-				x = wallx + 1.5 * cos(heading);
-				y = wally + 1.5 * cos(heading);
-				path.push_back(Point(x,y));
+				//first make the straight line to this point
+				Point3 start = Point3(old_x,old_y,0.0);
+				Point3 endline;
+
+				endline.X = x;
+				endline.Y = y;
+				endline.Z = 0.0;
+				path.push_back(MakeLine(start,endline, segnum++));
+				//path.push_back(Point(x,y));
+				
+				//now we need to make a curve that does a 45 degree arc
+				//we should get halfway to wall
+				Point3 midcurve = findPointAlongCircle(endline, heading, - 3.14159/4.0, STD_TURN_RAD);
+
+				//now make the first curve
+				
+				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
+				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,3.14159/4.0,STD_TURN_RAD);	
+				path.push_back(MakeCurve(heading - 3.14159/4.0, segnum++, midcurve, endcurve));
+				x = endcurve.X;
+				y = endcurve.Y;
+				old_x = x;
+				old_y = y;
 				avoiding=false;
 				distance -= 1.5;
 			}
 		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) && map(grid_x+1,grid_y+1)) {
-			//we have an obstacle. Back up 1.5 m and swerve around
-		
-			//TODO: check to see if we are in fact traveling 1.5m before
-			//turning
-			double prev_turn_x = x - 1.5 * cos(heading);
-			double prev_turn_y = y - 1.5 * sin(heading);
-			path.push_back(Point(prev_turn_x, prev_turn_y));
+				Point3 start = Point3(old_x,old_y,0.0);
+				Point3 endline;
+
+				endline.X = x;
+				endline.Y = y;
+				endline.Z = 0.0;
+				path.push_back(MakeLine(start,endline, segnum++));
+				//path.push_back(Point(x,y));
 				
-			//now get the final position
-			x += 0.6 * cos(heading + 3.14159/2);
-			y += 0.6 * sin(heading + 3.14159/2);
-			path.push_back(Point(x,y));
+				//now we need to make a curve that does a 45 degree arc
+				//we should get halfway to wall
+				Point3 midcurve = findPointAlongCircle(endline, heading,  3.14159/4.0, STD_TURN_RAD);
+
+				//now make the first curve
+				
+				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
+				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,3.14159/4,STD_TURN_RAD);	
+				path.push_back(MakeCurve(heading - 3.14159/4.0, segnum++, midcurve, endcurve));
+				x = endcurve.X;
+				y = endcurve.Y;
+				old_x = x;
+				old_y = y;
+
 			avoiding = true;
 			
-		} */
+		} 
 	}
-	path.push_back(Point2d(x,y));
-	return path;
+	path.push_back(MakeLine(Point3(old_x,old_y,0.0),Point3(x,y,0.0),segnum++));
+	PathList pathList;
+	pathList.path_list = path;
+	return pathList;
 }
 
 
@@ -403,11 +482,12 @@ int main(int argc,char **argv)
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
 				cout<<"yo2\n";
 			}
-			list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
-				cout << (*it).x << "," << (*it).y << endl;
-			}
-			PathList turns = insertTurns(points);
+			//list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+			//for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {/
+			///	cout << (*it).x << "," << (*it).y << endl;
+			//}
+			//PathList turns = insertTurns(points);
+			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position,x, goalPose.position.y),poseDes, mapOrigin);
 			cout<<"publishing\n";
 			path_pub.publish(turns);
 			cout<<"3published"<<"\n";	
