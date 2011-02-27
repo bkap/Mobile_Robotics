@@ -13,13 +13,26 @@
 #include <iostream>		
 #include "CSpaceFuncs.h"
 
-
+//#include "opencv2/imgproc/imgproc.hpp"
+//#include "opencv2/highgui/highgui.hpp"
+//#include "opencv2/core/core.hpp"
 #define pi 3.14159265358979323846264338327950288
+
+
+
+/*TODO
+	tie grid position to pose
+	take pose into account when verifying pings:
+		in addition to checking   fit in grid, check:
+			range < max range (its published somewhere)
+			range > min range (also published somewhere)
+			verify ping occurs in forward half plane from robot
+*/
 
 const double loopRate = 10;
 
-const double gridOx = -20;	//origin y co-ordinate
-const double gridOy = -25;	//origin x co-ordinate
+const double gridOx = -7;	//origin y co-ordinate
+const double gridOy = -7;	//origin x co-ordinate
 const double gridRes = 0.05;	//5cm per pixel
 const double patchRadius = 21/39.37;//radius of fattening patch (robot radius)
 const double gridLength = 25;	//25 meter square
@@ -38,7 +51,6 @@ int** patch;			//fattening template
 	geometry_msgs::PoseStamped last_map_pose;
 	nav_msgs::Odometry last_odom;
 
-
 using namespace std;
 
 inline bool inGrid(double x, double y){
@@ -53,7 +65,7 @@ inline bool fatInGrid(double x, double y){
 
 inline int address(int x, int y)
 {
-	cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
+	//cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
 	return y * gridSize + x;
 }
 void cSpaceInit()
@@ -96,6 +108,7 @@ void patchInit()
 
 void copyPoints()	
 {
+//	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
 	cout<<"copying points:"<<endl;
 	int numPts = scanCloud.points.size();
 	for(int i = 0;i<numPts;i++)
@@ -105,19 +118,21 @@ void copyPoints()
 
 		if(fatInGrid(x,y))
 		{
-			cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
+			//cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
 			int Gx = round((x - gridOx)/gridRes) - (patchSize-1)/2;
 			int Gy = round((y - gridOy)/gridRes) - (patchSize-1)/2;
 			for(int j = 0; j < patchSize;j++)	//rows - y
 			{
 				for(int k = 0; k < patchSize;k++)//cols - x
 				{
-					
 					cSpace.data[address(Gx + k ,Gy + j)] = cSpace.data[address(Gx + k, Gy + j)] | patch[j][k];
+//					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
 				}
 			}
 		}
 	}
+//	cv::imshow("cSpace",image);
+//	waitKey(50);
 	cout<<"copied points"<<endl;
 }
 
@@ -156,20 +171,22 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 
 void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	if (init == true)
-	{
+//	if (init == true)
+//	{
 		//cout<<"2callback\n";
 		scanCloud = *scan_cloud; 
 		ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
 		copyPoints();
 		//cout<<"yo\n";
-	}
+//	}
 }
 
 int main(int argc,char **argv)
 {
 	cout<<"2\n";
 	patchInit();
+	cSpaceInit();
+	init=true;
 	cout<<"2\n";
 	ros::init(argc,argv,"lidar_mappa");//name of this node
 	tfl = new tf::TransformListener();
@@ -182,10 +199,12 @@ int main(int argc,char **argv)
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 10, odomCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
+//	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
 		//cout<<"2\n";
 		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
+		cout<<"grid dimensions "<<cSpace.info.width<<" by "<< cSpace.info.height<<endl;
 		P.publish(cSpace);
 		//cout<<"2\n";
 		loopTimer.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
