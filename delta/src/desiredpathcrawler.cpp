@@ -102,18 +102,18 @@ cout<<endl;
                     break;
                 case 2: // arc: speedNominal is the tangential velocity (v = w R)
                 {   // lsegdes is distance s traveled along the arc: s = R * theta
-                    cout << "ARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
+                    //cout << "ARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     double theta = 0.0; // angle from center of curvature
                     if (desState.des_rho >= 0)
                         theta = psiDes - pi/2;
                     else
                         theta = psiDes + pi/2;
                     
-                    if (pathlist.path_list[desState.seg_number].seg_length < 0) {  // right-hand turn
+                    if (desState.des_rho < 0) {  // right-hand turn
                         cout << "RHT";
                         theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                    } else {
+                    } else {    // left-hand turn
                         cout << "LHT";
                         theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
@@ -125,7 +125,10 @@ cout<<endl;
                 }
                 case 3: // rotate about point
                     // "distance" is actually the angle rotated, x and y do not change
-                    psiDes += desState.des_speed * REFRESH_RATE;
+                    if (desState.des_rho < 0) // right-hand
+                        psiDes -= desState.des_speed * REFRESH_RATE;
+                    else // left-hand
+                        psiDes += desState.des_speed * REFRESH_RATE;
                     break;
             }
             
