@@ -55,7 +55,9 @@ int main(int argc,char **argv)
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
     while(!pathListInit){ros::spinOnce();naptime.sleep();}
-
+cout<<"got a path with types:\t";
+for(int i = 0;i<pathlist.path_list.size();i++)	{cout<<(int) pathlist.path_list[i].seg_type<<",";}
+cout<<endl;
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
     desState.seg_number = 0;
