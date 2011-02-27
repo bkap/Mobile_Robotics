@@ -82,8 +82,8 @@ int main(int argc,char **argv)
             // update total distance traveled
             double olddist = desState.des_lseg;
             //ros::Duration elapsed_time = ros::Time::now() - refTime;
-            desState.des_lseg = desState.des_lseg + desState.des_speed / REFRESH_RATE;
-            //desState.des_lseg = desState.des_lseg + desState.des_speed / elapsed_time.toSec();
+            desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
+            //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
             //cout << elapsed_time.toSec();
             //refTime = ros::Time::now();
             cout << "\ndpc: now traveled " << desState.des_lseg << " = " << olddist << " + " << desState.des_speed << "*" << REFRESH_RATE;
