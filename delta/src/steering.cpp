@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const double LOOP_RATE = 25;
+const double LOOP_RATE = 10;
 const double kV = 1;
 const double kD = .75;
 const double kP = .75;
@@ -29,11 +29,13 @@ tf::TransformListener *tfl;
 
 geometry_msgs::PoseStamped temp;
 void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom) 
-{
+{	
+	cout<<"steering odom callback: "<<odom->pose.pose;
 	last_odom = *odom;
+
         temp.pose = last_odom.pose.pose;
-        temp.header = last_odom.header;
-        //cout<<"temp "<<odom.pose.position.x<<" , "<<odom.pose.position.y<<endl;
+	temp.header = last_odom.header;
+        //cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
         try 
 	{
           tfl->transformPose("map", temp, poseActual);
@@ -43,11 +45,13 @@ void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom)
 	  cout << "We caught an error!" << endl;
           ROS_ERROR("%s", ex.what());
         }
+	/////////cout<<"finished"<<endl;
 	stalePos = false;
 }
 
 void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed) 
 {
+	cout<< "steering speed callback happened"<<endl;
 	desired = *newSpeed;
         //desired.header = newSpeed.header;
 	//desired.des_pose = newSpeed.des_pose;
@@ -86,20 +90,23 @@ int main(int argc,char **argv)
 	ros::NodeHandle n;
 
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-
+	tfl = new tf::TransformListener();
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::Odometry>("odom", 1, PSOCallback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("NominalSpeed", 1, speedCallback);
 
 	geometry_msgs::Twist vel_object;
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate loopTimer(LOOP_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	cout<<"Starting steering"<<endl;
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now()
 	ros::Time birthday = ros::Time::now();
-
+	
 	double v, w;
 
 	while(ros::ok()){
+		cout<<"STEERING\n";
 		loopTimer.sleep();
+		cout<<"STEERING AWAKE"<<endl;
 		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 
 		ros::Time current_time = ros::Time::now();
@@ -107,12 +114,12 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		//ROS_INFO("birthday is %f", birthday.toSec());
 		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
-
-		if(stalePos)	{continue;}
-
+		if(stalePos)	{cout<<"steering aborted"<<endl;continue;}
+		cout<<"Steering activate!"<<endl;
 		switch(desired.seg_type){
 			case 1:	//line
 			{
+				cout<<"STEERING IN A LINE\n";
 				double x_err = desired.des_pose.position.x - poseActual.pose.position.x;
 				double y_err = desired.des_pose.position.y - poseActual.pose.position.y;
 				double theta = tf::getYaw(desired.des_pose.orientation) - atan2(y_err,x_err);
@@ -128,6 +135,7 @@ int main(int argc,char **argv)
 
 			case 2:	//arc
 			{
+				cout<<"STEERING IN A ARC"<<endl;
 				double r = 1.f / desired.des_rho;
 				double theta = tf::getYaw(desired.des_pose.orientation) + pi/2 * (r>0?1:-1);			//heading to arc center from desired
 				double cX = desired.des_pose.position.x + r * cos(theta);					//x coordinate of arc center
@@ -147,6 +155,7 @@ int main(int argc,char **argv)
 
 			case 3:	//turn in place
 			{
+				cout<<"STEERING IN A CIRCLE"<<endl;
 				double s_err = tf::getYaw(desired.des_pose.orientation) - tf::getYaw(poseActual.pose.orientation);
 
 				v = 0;
@@ -155,9 +164,11 @@ int main(int argc,char **argv)
 			}
 
 			default:
+				cout<<"STEERING IN A FAIL"<<endl;
 				v = vel_object.linear.x;
 				w = vel_object.angular.z;
 		}
+			cout<<"Steering calculated"<<endl;
 				//limit velocities
 			v = max(0,min(v,1));
 			w = w<0? max(w,-1):min(w,1);
@@ -169,7 +180,7 @@ int main(int argc,char **argv)
 
 			vel_object.linear.x = v;
 			vel_object.angular.z = w;
-	
+			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<v<<" , "<<w<<endl;
 			pub.publish(vel_object);
 	}
 }
