@@ -57,7 +57,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
 	P.curvature = 1337;
 	
-	P.max_speeds.linear.x = MAX_LINEAR;
+	P.max_speeds.linear.x = MAX_LINEAR*.5;
 	P.max_speeds.linear.y = 0;
 	P.max_speeds.linear.z = 0;
 	P.min_speeds.linear.x = 0;
@@ -66,7 +66,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	
 	P.max_speeds.angular.x = 0;
 	P.max_speeds.angular.y = 0;
-	P.max_speeds.angular.z = MAX_ANGULAR;
+	P.max_speeds.angular.z = MAX_ANGULAR*2.0;
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
@@ -87,7 +87,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
 	P.curvature = 1337;
 	
-	P.max_speeds.linear.x = MAX_LINEAR;
+	P.max_speeds.linear.x = 0;
 	P.max_speeds.linear.y = 0;
 	P.max_speeds.linear.z = 0;
 	P.min_speeds.linear.x = 0;
