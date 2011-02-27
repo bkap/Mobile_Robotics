@@ -102,13 +102,22 @@ cout<<endl;
                     break;
                 case 2: // arc: speedNominal is the tangential velocity (v = w R)
                 {   // lsegdes is distance s traveled along the arc: s = R * theta
+                    cout << "ARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     double theta = 0.0; // angle from center of curvature
                     if (desState.des_rho >= 0)
                         theta = psiDes - pi/2;
                     else
                         theta = psiDes + pi/2;
-                    theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                    psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                    
+                    if (pathlist.path_list[desState.seg_number].seg_length < 0) {  // right-hand turn
+                        cout << "RHT";
+                        theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                    } else {
+                        cout << "LHT";
+                        theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                    }
                     
                     desState.des_pose.position.x += cos(theta) / desState.des_rho;
                     desState.des_pose.position.y += sin(theta) / desState.des_rho;
@@ -129,7 +138,7 @@ cout<<endl;
             desState.des_pose.orientation = tf::createQuaternionMsgFromYaw(psiDes);
             
             // figure out if we are at a new segment
-            if (desState.des_lseg >= pathlist.path_list[desState.seg_number].seg_length) {
+            if (desState.des_lseg >= fabs(pathlist.path_list[desState.seg_number].seg_length)) {
                 // if this is not the last segment, increment
                 if (desState.seg_number < pathlist.path_list.size()-1) {
                     // reset the desState
@@ -153,7 +162,7 @@ cout<<endl;
         }
         cout << "\ndpc: s"<< desState.seg_number << " x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
         cout << ", psi=" << tf::getYaw(desState.des_pose.orientation) << ", des_speed=" << desState.des_speed;
-        cout << " (traveled " << desState.des_lseg << " which is " << pathlist.path_list[desState.seg_number].seg_length;
+        cout << " (traveled " << desState.des_lseg << " out of " << pathlist.path_list[desState.seg_number].seg_length;
         cout << ") of type " << (int)desState.seg_type << "\n";
         
         pub.publish(desState); // publish the CrawlerDesiredState (if the path is over, doesn't change)

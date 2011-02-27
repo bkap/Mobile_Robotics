@@ -97,8 +97,8 @@ bool clearPath(double brakingDist)
                 break;
         }
         
-        if (dist >= pathlist.path_list[curSeg].seg_length) { // end of path segment, update
-            brakingDist -= pathlist.path_list[curSeg].seg_length;
+        if (dist >= fabs(pathlist.path_list[curSeg].seg_length)) { // end of path segment, update
+            brakingDist -= fabs(pathlist.path_list[curSeg].seg_length);
             dist = 0.0;
             curSeg++;
         }
@@ -249,7 +249,7 @@ int main(int argc,char **argv)
             	//cout << " BRAKINGGGGG";
             	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
         	}
-            cout << "\npro: des_speed = " << curState.des_speed;
+            //cout << "\npro: des_speed = " << curState.des_speed;
         	pub.publish(curState); // publish the CrawlerDesiredState
 	    }
 	    naptime.sleep(); // enforce desired update rate
