@@ -80,7 +80,7 @@ int main(int argc,char **argv)
         if (!finishedPath)
         {
             // update total distance traveled
-            double olddist = desState.des_lseg;
+            //double olddist = desState.des_lseg;
             //ros::Duration elapsed_time = ros::Time::now() - refTime;
             desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
             //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
