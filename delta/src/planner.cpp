@@ -276,6 +276,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			Point3 start_line;
 			start_line.X = old_x;
 			start_line.Y = old_y;
+			start_line.Z = 0.0;
 			Point3 curve_start;
 			curve_start.X = curve_start_x;
 			curve_start.Y = curve_start_y;
