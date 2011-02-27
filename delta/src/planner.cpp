@@ -108,7 +108,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 {
 	Point3 M = (A+B)/2.0;  //midpoint
 	Point3 MA = M-A;  //vector from midpoint to A
-	Point3 Center = M + Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point
+	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point
 	double Radius = Distance3(A, M);
 
 	PathSegment P;
@@ -257,7 +257,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	int segnum = 0;
 	//head forward until you can turn or until you hit the entrance
 	//also, stop at 200 points (10 meters) so we don't take too long
-	double distances[] = {3.3,12.2,4,-1};
+	double distances[] = {3.3,12.4,4,-1};
 	int i = 0;
 	double distance = distances[0];
 	double old_x, old_y;
@@ -271,11 +271,12 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			}
 
 			//create our lines and curve, then update x, y, and old vals
-			int curve_start_x = x - cos(heading) * STD_TURN_RAD;
-			int curve_start_y = y - sin(heading) * STD_TURN_RAD;
+			double curve_start_x = x - cos(heading) * STD_TURN_RAD;
+			double curve_start_y = y - sin(heading) * STD_TURN_RAD;
 			Point3 start_line;
 			start_line.X = old_x;
 			start_line.Y = old_y;
+			start_line.Z = 0.0;
 			Point3 curve_start;
 			curve_start.X = curve_start_x;
 			curve_start.Y = curve_start_y;
@@ -303,7 +304,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			y = curve_end.Y;
 			old_x = x;
 			old_y = y;
-			distance = distances[i];
+			distance = distances[i]-STD_TURN_RAD;
 		}
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
