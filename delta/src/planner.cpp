@@ -48,10 +48,10 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
-	cout << "makeline" << endl;
-	cout << A.X << "," << A.Y << ":" << B.X << "," << B.Y << endl;
+	//cout << "makeline" << endl;
+	//cout << A.X << "," << A.Y << ":" << B.X << "," << B.Y << endl;
 	P.seg_length = Distance3(A,B);
-	cout<< P.seg_length << endl;
+	//cout<< P.seg_length << endl;
 	P.ref_point = Point3toGeoPoint(A);
 	Point3 Vec = B-A;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
@@ -406,7 +406,7 @@ bool goalPosecalled = false;
 bool poseActualcalled = false;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
-	cout << "recieved width: " <<  (*LIDAR_Map).info.width<< endl;
+	//cout << "recieved width: " <<  (*LIDAR_Map).info.width<< endl;
 	lastLIDAR_Map = getMap(*LIDAR_Map);
 	mapOrigin = (*LIDAR_Map).info.origin;
 	LIDARcalled = true;
@@ -479,12 +479,12 @@ int main(int argc,char **argv)
 	//cout<<"3\n";
 		if(LIDARcalled && goalPosecalled) {
 			if(!poseDescalled) {
-				cout<<"yo1\n";
+				//cout<<"yo1\n";
 				//this means we haven't used yet, so use our actual pose
 				poseDes.pose.position.x = 7.57;
 				poseDes.pose.position.y = 14.26;
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
-				cout<<"yo2\n";
+				//cout<<"yo2\n";
 			}
 			//list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 			//for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {/
@@ -492,9 +492,9 @@ int main(int argc,char **argv)
 			//}
 			//PathList turns = insertTurns(points);
 			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			cout<<"publishing\n";
+			//cout<<"publishing\n";
 			path_pub.publish(turns);
-			cout<<"3published"<<"\n";	
+			//cout<<"3published"<<"\n";	
 		}
 		else
 		{

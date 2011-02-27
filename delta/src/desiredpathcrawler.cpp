@@ -69,7 +69,9 @@ int main(int argc,char **argv)
     
     // ref
     bool finishedPath = false;
-    
+
+    //ros::Time refTime = ros::Time::now();
+
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
@@ -78,7 +80,13 @@ int main(int argc,char **argv)
         if (!finishedPath)
         {
             // update total distance traveled
-            desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
+            double olddist = desState.des_lseg;
+            //ros::Duration elapsed_time = ros::Time::now() - refTime;
+            desState.des_lseg = desState.des_lseg + desState.des_speed / REFRESH_RATE;
+            //desState.des_lseg = desState.des_lseg + desState.des_speed / elapsed_time.toSec();
+            //cout << elapsed_time.toSec();
+            //refTime = ros::Time::now();
+            cout << "\ndpc: now traveled " << desState.des_lseg << " = " << olddist << " + " << desState.des_speed << "*" << REFRESH_RATE;
             
             // compute the x, y, psi
             double psiDes = tf::getYaw(desState.des_pose.orientation);
@@ -86,6 +94,7 @@ int main(int argc,char **argv)
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
+                    cout << "\nx = " << desState.des_pose.position.x << " + " << desState.des_lseg << " * " << cos(psiDes);
                     desState.des_pose.position.x += desState.des_lseg * cos(psiDes);
                     desState.des_pose.position.y += desState.des_lseg * sin(psiDes);
                     break;
@@ -132,13 +141,19 @@ int main(int argc,char **argv)
                     des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
                     desState.des_pose = des_pose;
                 } else {
+                    cout << "\ndpc: LAST segment";
                     // desState.seg_number == pathlist.size() - 1 (last element of array)
                     finishedPath = true;
                 }
                 desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
+                cout << "\n\ndpc: NEW SEGMENT type " << (int)desState.seg_type;
             }
         }
-         
+        cout << "\ndpc: x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
+        cout << ", psi=" << tf::getYaw(desState.des_pose.orientation) << ", des_speed=" << desState.des_speed;
+        cout << " (traveled " << desState.des_lseg << " which is " << pathlist.path_list[desState.seg_number].seg_length;
+        cout << ") of type " << (int)desState.seg_type << "\n";
+        
         pub.publish(desState); // publish the CrawlerDesiredState (if the path is over, doesn't change)
 	    naptime.sleep(); // enforce desired update rate
     }
