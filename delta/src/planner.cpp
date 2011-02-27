@@ -304,7 +304,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			y = curve_end.Y;
 			old_x = x;
 			old_y = y;
-			distance = distances[i];
+			distance = distances[i]-STD_TURN_RAD;
 		}
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
