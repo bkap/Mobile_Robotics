@@ -213,7 +213,7 @@ int main(int argc,char **argv)
         bool end_of_path = false;
         if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
 			if (curState.seg_number == pathlist.path_list.size() - 1) {
-                cout << "\npro: End of path";
+                //cout << "\npro: End of path";
             	end_of_path = true;
         	}
         	vGoal = 0.0;
@@ -236,18 +236,18 @@ int main(int argc,char **argv)
  
         	// Ramp velocity, set des_speed
         	if (clearPath(brakingDistance)) {
-        	    cout << "\npro: clearpath woo";
+        	    //cout << "\npro: clearpath woo";
             	if (slowingDistance < distToGo) {   // go to maximum velocity
-                    cout << " TO THE MAX which is " << vGoal;
-                	curState.des_speed = min(curState.des_speed + aMax * REFRESH_RATE, vGoal);
+                    //cout << " TO THE MAX which is " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
+                	curState.des_speed = min(curState.des_speed + aMax / REFRESH_RATE, vGoal);
             	} else {    // ramp speed down to goal speed
-            	    cout << " goal speed is slowsauce " << vGoal;
-                	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, vGoal);
+            	    //cout << " goal speed is slowsauce " << vGoal;
+                	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, vGoal);
             	}
         	} else {
             	// go to zero
-            	cout << " BRAKINGGGGG";
-            	curState.des_speed = max(curState.des_speed - aMax * REFRESH_RATE, 0.0);
+            	//cout << " BRAKINGGGGG";
+            	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
         	}
             cout << "\npro: des_speed = " << curState.des_speed;
         	pub.publish(curState); // publish the CrawlerDesiredState

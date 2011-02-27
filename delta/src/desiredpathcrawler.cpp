@@ -55,7 +55,9 @@ int main(int argc,char **argv)
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
     while(!pathListInit){ros::spinOnce();naptime.sleep();}
-
+cout<<"got a path with types:\t";
+for(int i = 0;i<pathlist.path_list.size();i++)	{cout<<(int) pathlist.path_list[i].seg_type<<",";}
+cout<<endl;
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
     desState.seg_number = 0;
@@ -80,13 +82,14 @@ int main(int argc,char **argv)
         if (!finishedPath)
         {
             // update total distance traveled
-            double olddist = desState.des_lseg;
+            //double olddist = desState.des_lseg;
             //ros::Duration elapsed_time = ros::Time::now() - refTime;
             desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
             //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
             //cout << elapsed_time.toSec();
             //refTime = ros::Time::now();
-            cout << "\ndpc: now traveled " << desState.des_lseg << " = " << olddist << " + " << desState.des_speed << "*" << REFRESH_RATE;
+            //cout << "\ndpc: s" << desState.seg_number << " now traveled " << desState.des_lseg;
+            //cout << " = " << olddist << " + " << desState.des_speed << "*" << REFRESH_RATE;
             
             // compute the x, y, psi
             double psiDes = tf::getYaw(desState.des_pose.orientation);
@@ -94,9 +97,8 @@ int main(int argc,char **argv)
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
-                    cout << "\nx = " << desState.des_pose.position.x << " + " << desState.des_lseg << " * " << cos(psiDes);
-                    desState.des_pose.position.x += desState.des_lseg * cos(psiDes);
-                    desState.des_pose.position.y += desState.des_lseg * sin(psiDes);
+                    desState.des_pose.position.x += desState.des_speed * REFRESH_RATE * cos(psiDes);
+                    desState.des_pose.position.y += desState.des_speed * REFRESH_RATE * sin(psiDes);
                     break;
                 case 2: // arc: speedNominal is the tangential velocity (v = w R)
                 {   // lsegdes is distance s traveled along the arc: s = R * theta
@@ -105,8 +107,8 @@ int main(int argc,char **argv)
                         theta = psiDes - pi/2;
                     else
                         theta = psiDes + pi/2;
-                    theta = theta + desState.des_lseg * fabs(desState.des_rho);
-                    psiDes = psiDes + desState.des_lseg * fabs(desState.des_rho);
+                    theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                    psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     
                     desState.des_pose.position.x += cos(theta) / desState.des_rho;
                     desState.des_pose.position.y += sin(theta) / desState.des_rho;
@@ -114,7 +116,7 @@ int main(int argc,char **argv)
                 }
                 case 3: // rotate about point
                     // "distance" is actually the angle rotated, x and y do not change
-                    psiDes += desState.des_lseg;
+                    psiDes += desState.des_speed * REFRESH_RATE;
                     break;
             }
             
@@ -141,7 +143,7 @@ int main(int argc,char **argv)
                     des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
                     desState.des_pose = des_pose;
                 } else {
-                    cout << "\ndpc: LAST segment";
+                    cout << "\n\ndpc: LAST segment\n";
                     // desState.seg_number == pathlist.size() - 1 (last element of array)
                     finishedPath = true;
                 }
@@ -149,7 +151,7 @@ int main(int argc,char **argv)
                 cout << "\n\ndpc: NEW SEGMENT type " << (int)desState.seg_type;
             }
         }
-        cout << "\ndpc: x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
+        cout << "\ndpc: s"<< desState.seg_number << " x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
         cout << ", psi=" << tf::getYaw(desState.des_pose.orientation) << ", des_speed=" << desState.des_speed;
         cout << " (traveled " << desState.des_lseg << " which is " << pathlist.path_list[desState.seg_number].seg_length;
         cout << ") of type " << (int)desState.seg_type << "\n";
