@@ -10,120 +10,120 @@
 #include <nav_msgs/Odometry.h>
 #include <vector>
 #include <math.h>
-
+#include <iostream>		
 #include "CSpaceFuncs.h"
 
-#define REFRESH_RATE 10 //hz
 
-#define GRID_RES .05 // 10 cm grid
-#define GRID_WIDTH 100// meters wide
-#define GRID_HEIGHT 100 // meters tall... should be plenty of space
-//#define GRID_PADDING 1 //meters of padding to try to avoid buffer overflows.
-#define NUM_WIDTH ceil(GRID_WIDTH/GRID_RES)  //number of squares wide and tall for occupancy grid.
-#define NUM_HEIGHT ceil(GRID_HEIGHT/GRID_RES)
+#define pi 3.14159265358979323846264338327950288
 
-#define DONUT_RADIUS 2.54*.210/2.0 //the radius of the donut in m
-#define DONUT_LENGTH ((DONUT_RADIUS)*2.0) //the size length of the side of a square to make to contain the donut rounded up to the nearest m.
-#define NUM_DONUT ((int)2*ceil(DONUT_LENGTH/(2.0*GRID_RES)))
+const double loopRate = 10;
 
-sensor_msgs::PointCloud last_map_cloud;
-nav_msgs::OccupancyGrid Output;
-int** JellyDonut;
-tf::TransformListener *tfl;
-double PoseX;
-double PoseY;
-double InitX;
-double InitY;
-geometry_msgs::PoseStamped last_map_pose;
-nav_msgs::Odometry last_odom;
+const double gridOx = -20;	//origin y co-ordinate
+const double gridOy = -25;	//origin x co-ordinate
+const double gridRes = 0.05;	//5cm per pixel
+const double patchRadius = 21/39.37;//radius of fattening patch (robot radius)
+const double gridLength = 25;	//25 meter square
+const int gridSize = ceil(gridLength / gridRes);	//pixel width of grid
+const int patchSize = 2*ceil(patchRadius/gridRes) + 1;	//pixel width of patch
+
+sensor_msgs::PointCloud scanCloud;
+nav_msgs::OccupancyGrid cSpace;
+int** patch;			//fattening template
+
+/*presently unused, will implement later*/
+	double PoseX;			
+	double PoseY;
+	double InitX;
+	double InitY;
+	geometry_msgs::PoseStamped last_map_pose;
+	nav_msgs::Odometry last_odom;
+
 
 using namespace std;
 
-int Address(int i, int j)
-{
-	return i*NUM_WIDTH+j;
+inline bool inGrid(double x, double y){
+	return x>=gridOx && x<= gridOx+gridLength
+		&&y>=gridOy && y<=gridOy+gridLength;
 }
 
-int Address(double X, double Y)
-{
-	X -=Output.info.origin.position.x;
-	Y -=Output.info.origin.position.y;
-	int x = X/GRID_RES;
-	int y = Y/GRID_RES;
-	return Address(y,x);
+inline bool fatInGrid(double x, double y){
+	return inGrid(x+patchRadius+gridRes,y)&&inGrid(x-patchRadius-gridRes,y)
+		&&inGrid(x,y+patchRadius+gridRes)&&inGrid(x,y-patchRadius-gridRes);
 }
 
-void CopyPoints()
+inline int address(int x, int y)
 {
+	cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
+	return y * gridSize + x;
+}
+void cSpaceInit()
+{
+	cout<<"creating cSpace grid:"<<endl;
+	cSpace.header.seq = 0;
+	cSpace.header.frame_id = "map";
+	//Output.header.stamp = time(NULL);
+	cSpace.info.resolution = gridRes;
+	//Output.info.map_load_time = time(NULL);
+	cSpace.info.width = gridSize;//NUM_WIDTH;
+	cSpace.info.height = gridSize;//NUM_HEIGHT;
+	cSpace.info.origin.position.x = gridOx;//InitX-GRID_WIDTH/2.0;
+	cSpace.info.origin.position.y = gridOy;//InitY-GRID_HEIGHT/2.0;
+	cSpace.info.origin.position.z = 0;
+	cSpace.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
+	vector<char>* data = new vector<char>((cSpace.info.width) * (cSpace.info.height));
+	cSpace.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
+	cout<<"\tcreated cSpace grid with "<<cSpace.info.width*cSpace.info.width<<" elements"<<endl;
+}
 
-	int numPts = last_map_cloud.points.size();
-	for(int i = 0; i<numPts; i++)
+void patchInit()
+{
+	patch = (int **)calloc(patchSize, sizeof(int));
+	//cout<<"creating patch of size "<<patchSize<<endl;
+	int center = (patchSize-1)/2;	//center pixel coordinate
+	int rsquared = center*center;
+	for (int i = 0; i< patchSize; i++)
 	{
-		double X = last_map_cloud.points[i].x;
-		double Y = last_map_cloud.points[i].y;
-		if (Y>InitY-GRID_WIDTH/2.0+DONUT_LENGTH/2.0&&Y<InitY+GRID_WIDTH/2.0-DONUT_LENGTH/2.0
-		&&X>InitX-GRID_HEIGHT/2.0+DONUT_LENGTH/2.0&&X<InitX+GRID_HEIGHT/2.0-DONUT_LENGTH/2.0)
+		patch[i] = (int*) calloc(patchSize, sizeof(int));
+		for(int j=0;j<patchSize;j++)
 		{
-			for (int j =1; j<DONUT_LENGTH; j++)
+			if((i-center)*(i-center) + (j-center)*(j-center) < rsquared)
 			{
-				double x = X-DONUT_LENGTH/2.0+j*GRID_RES;
-				double y = Y-DONUT_LENGTH/2.0+i*GRID_RES;
-				for (int k = 1; k<DONUT_LENGTH; k++)
+				patch[i][j] = 100;
+			}
+		}
+	}
+}
+
+void copyPoints()	
+{
+	cout<<"copying points:"<<endl;
+	int numPts = scanCloud.points.size();
+	for(int i = 0;i<numPts;i++)
+	{
+		double x = scanCloud.points[i].x;
+		double y = scanCloud.points[i].y;
+
+		if(fatInGrid(x,y))
+		{
+			cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
+			int Gx = round((x - gridOx)/gridRes) - (patchSize-1)/2;
+			int Gy = round((y - gridOy)/gridRes) - (patchSize-1)/2;
+			for(int j = 0; j < patchSize;j++)	//rows - y
+			{
+				for(int k = 0; k < patchSize;k++)//cols - x
 				{
-					Output.data[Address(x,y)]=Output.data[Address(x,y)]||JellyDonut[j][k];
+					
+					cSpace.data[address(Gx + k ,Gy + j)] = cSpace.data[address(Gx + k, Gy + j)] | patch[j][k];
 				}
 			}
 		}
-		
 	}
-}
-
-// [i,j] = i*width+j
-
-void GridInit()
-{
-	Output.header.seq = 0;
-	Output.header.frame_id = "map";
-	//Output.header.stamp = time(NULL);
-	Output.info.resolution = .05;
-	//Output.info.map_load_time = time(NULL);
-	Output.info.width = NUM_WIDTH;
-	Output.info.height = NUM_HEIGHT;
-	Output.info.origin.position.x = InitX-GRID_WIDTH/2.0;
-	Output.info.origin.position.y = InitY-GRID_HEIGHT/2.0;
-	Output.info.origin.position.z = 0;
-	Output.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	vector<char>* data = new vector<char>((NUM_WIDTH) * (NUM_HEIGHT));
-	Output.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
-}
-
-void DonutInit()
-{
-	JellyDonut = (int **)calloc(NUM_DONUT, sizeof(int));
-	for (int i = 0; i< NUM_DONUT; i++)
-	{
-		JellyDonut[i] = (int*) calloc(NUM_DONUT, sizeof(int));
-	}
-	
-	double x =0;
-	double y =0;
-	for (int i =0;  i <NUM_DONUT; i++)
-	{
-		for(int j = 0; j<NUM_DONUT; j++)
-		{
-			x = (i - DONUT_LENGTH/(2.0))/GRID_RES;
-			y = (j - DONUT_LENGTH/(2.0))/GRID_RES;
-			if (x*x+y*y<DONUT_LENGTH)
-			{
-				JellyDonut[i][j] = 100;
-			}
-		}
-	}
-	
+	cout<<"copied points"<<endl;
 }
 
 bool init = false;
 geometry_msgs::PoseStamped temp;
+tf::TransformListener *tfl;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
 		last_odom = *odom;
@@ -145,22 +145,23 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 	
 	if(init == false)
 	{
+		cout<<"odom callback initialized"<<endl;
 		InitX = PoseX;
 		InitY = PoseY;
-		GridInit();
+		cSpaceInit();
+		init = true;
 	}
 	
-	init = true;
 }
 
 void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	if (init == false)
+	if (init == true)
 	{
 		//cout<<"2callback\n";
-		last_map_cloud = *scan_cloud; 
-		//ROS_INFO("I got a scan cloud of size %lu", last_map_cloud.points.size());
-		CopyPoints();
+		scanCloud = *scan_cloud; 
+		ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
+		copyPoints();
 		//cout<<"yo\n";
 	}
 }
@@ -168,12 +169,12 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 int main(int argc,char **argv)
 {
 	cout<<"2\n";
-	DonutInit();
+	patchInit();
 	cout<<"2\n";
 	ros::init(argc,argv,"lidar_mappa");//name of this node
 	tfl = new tf::TransformListener();
 	cout<<"2\n";
-	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Rate loopTimer(loopRate); //will perform sleeps to enforce loop rate of "10" Hz
 	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout<<"2\n";
 	ros::NodeHandle n;
@@ -181,16 +182,17 @@ int main(int argc,char **argv)
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 10, odomCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
-	while(true)
+	while(ros::ok())
 	{
 		//cout<<"2\n";
 		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
-		P.publish(Output);
+		P.publish(cSpace);
 		//cout<<"2\n";
-		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+		loopTimer.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
 		//thus enforcing that we achieve the desired update rate (10Hz)
 	}
 	
 	return 0; // this code will only get here if this node was told to shut down, which is
 	// reflected in ros::ok() is false 
 }
+

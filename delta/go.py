@@ -14,12 +14,13 @@ def Run (Job):
 
 JobList = ["lidar", "goalpublisher", "lidarmapper", "planner", "desiredpathcrawler", "profiler", "steering"]#os.listdir("bin")
 pidlist = []
-for Job in JobList:
-	pidlist.append(subprocess.Popen('rosrun delta ' + Job, shell=True))
-	time.sleep(2)
-try :
+try:
+	for Job in JobList:
+		pidlist.append(subprocess.Popen('rosrun delta ' + Job, shell=True))
+		time.sleep(2)
 	while 1:
 		time.sleep(1)
+
 except KeyboardInterrupt, e:
 	for p in pidlist[::-1] :
 		p.send_signal(signal.SIGTERM)
