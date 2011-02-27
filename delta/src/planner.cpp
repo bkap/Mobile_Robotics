@@ -48,7 +48,10 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
+	cout << "makeline" << endl;
+	cout << A.X << "," << A.Y << ":" << B.X << "," << B.Y << endl;
 	P.seg_length = Distance3(A,B);
+	cout<< P.seg_length << endl;
 	P.ref_point = Point3toGeoPoint(A);
 	Point3 Vec = B-A;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
@@ -111,6 +114,11 @@ PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs::Quater
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
 	P.seg_length = theta2-theta1;
+	if(P.seg_length > 3.14159) {
+		P.seg_length -= 2 * 3.14159;
+	} else if(P.seg_length < -3.14159) {
+		P.seg_length += 2 * 3.14159;
+	}
 	P.ref_point = ref_point;
 	P.init_tan_angle = InitAngle;
 	P.curvature = 1/STD_TURN_RAD;
@@ -135,8 +143,8 @@ PathSegment MakeCurve(geometry_msgs::Quaternion InitAngle, geometry_msgs::Quater
 void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
 {
 	A = (A-B)/2.0; //just want the distance from A to the midpoint
-	Segment->ref_point.x -= A.X;
-	Segment->ref_point.y -= A.Y;
+	Segment->ref_point.x += A.X;
+	Segment->ref_point.y += A.Y;
 	Segment->seg_length +=Magnitude3(A);
 }
 
@@ -149,12 +157,12 @@ void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, Pat
 {
 	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
-	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/tan(Theta/2.0));
+	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
 	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-	Point3 Bdoubleprime = C+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
-	Point3 Midpoint2 = C+(C-B)/2.0;
-	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
+	Point3 Bdoubleprime = B+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3 Midpoint1 = A-(A-B)/2.0;  //midpoints are used in a sec
+	Point3 Midpoint2 = C-(C-B)/2.0;
+	if (Dot3(Midpoint1, B-A)>Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)>Dot3(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
