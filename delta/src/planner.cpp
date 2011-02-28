@@ -120,9 +120,10 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	} else if(P.seg_length < -3.14159) {
 		P.seg_length += 2 * 3.14159;
 	}
-	P.seg_length = fabs(P.seg_length);
+
 	P.curvature = 1/Radius;
-	P.curvature *= (FinalAngle>InitAngle)?1:-1;
+	P.curvature *= (P.seg_length>0)?1:-1;
+	P.seg_length = fabs(P.seg_length);
 
 	geometry_msgs::Point gmPoint;
 	gmPoint.x = Center.X;
