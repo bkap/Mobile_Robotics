@@ -55,9 +55,7 @@ int main(int argc,char **argv)
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
     while(!pathListInit){ros::spinOnce();naptime.sleep();}
-cout<<"got a path with types:\t";
-for(int i = 0;i<pathlist.path_list.size();i++)	{cout<<(int) pathlist.path_list[i].seg_type<<",";}
-cout<<endl;
+    
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
     desState.seg_number = 0;
@@ -84,7 +82,7 @@ cout<<endl;
             // update total distance traveled
             //double olddist = desState.des_lseg;
             //ros::Duration elapsed_time = ros::Time::now() - refTime;
-            desState.des_lseg = desState.des_lseg + desState.des_speed * REFRESH_RATE;
+            desState.des_lseg += desState.des_speed * REFRESH_RATE; // speed = distance * time -> for arcs this is v_tan
             //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
             //cout << elapsed_time.toSec();
             //refTime = ros::Time::now();
@@ -97,12 +95,22 @@ cout<<endl;
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
+                    desState.des_lseg += desState.des_speed * REFRESH_RATE; // v_linear
                     desState.des_pose.position.x += desState.des_speed * REFRESH_RATE * cos(psiDes);
                     desState.des_pose.position.y += desState.des_speed * REFRESH_RATE * sin(psiDes);
                     break;
                 case 2: // arc: speedNominal is the tangential velocity (v = w R)
-                {   // lsegdes is distance s traveled along the arc: s = R * theta
+                {
+                    double arcLength = desState.des_speed * REFRESH_RATE; // v_tangential
+                    //this is the distance that the robot has traveled in the past dt along the arc
+                    
+                    // s = R*theta or theta = s/R where R is the radius = s * rho
+                    desState.des_lseg += arcLength * fabs(desState.des_rho); // des_lseg for arcs is the angle rotated
+                    
+                    // distance traveled along the arc: s = R * theta
+                    
                     //cout << "ARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
+                    
                     double theta = 0.0; // angle from center of curvature
                     if (desState.des_rho >= 0)
                         theta = psiDes - pi/2;
@@ -119,11 +127,15 @@ cout<<endl;
                         psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     }
                     
-                    desState.des_pose.position.x += cos(theta) / desState.des_rho;
-                    desState.des_pose.position.y += sin(theta) / desState.des_rho;
+                    double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
+                    double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
+                    
+                    desState.des_pose.position.x = xCenter + cos(theta) / desState.des_rho;
+                    desState.des_pose.position.y = yCenter + sin(theta) / desState.des_rho;
                     break;
                 }
                 case 3: // rotate about point
+                    desState.des_lseg += desState.des_speed * REFRESH_RATE; // v_angular
                     // "distance" is actually the angle rotated, x and y do not change
                     if (desState.des_rho < 0) // right-hand
                         psiDes -= desState.des_speed * REFRESH_RATE;
