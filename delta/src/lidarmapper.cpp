@@ -13,29 +13,24 @@
 #include <iostream>		
 #include "CSpaceFuncs.h"
 
-//#include "opencv2/imgproc/imgproc.hpp"
-//#include "opencv2/highgui/highgui.hpp"
-//#include "opencv2/core/core.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/core/core.hpp"
 #define pi 3.14159265358979323846264338327950288
 
 
 
 /*TODO
 	tie grid position to pose
-	take pose into account when verifying pings:
-		in addition to checking   fit in grid, check:
-			range < max range (its published somewhere)
-			range > min range (also published somewhere)
-			verify ping occurs in forward half plane from robot
 */
 
 const double loopRate = 10;
 
-const double gridOx = -7;	//origin y co-ordinate
-const double gridOy = -7;	//origin x co-ordinate
+const double gridOx = -10;	//origin y co-ordinate
+const double gridOy = -10;	//origin x co-ordinate
 const double gridRes = 0.05;	//5cm per pixel
 const double patchRadius = 21/39.37;//radius of fattening patch (robot radius)
-const double gridLength = 25;	//25 meter square
+const double gridLength = 45;	//25 meter square
 const int gridSize = ceil(gridLength / gridRes);	//pixel width of grid
 const int patchSize = 2*ceil(patchRadius/gridRes) + 1;	//pixel width of patch
 
@@ -108,16 +103,22 @@ void patchInit()
 
 void copyPoints()	
 {
-//	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
+	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
 	//cout<<"copying points:"<<endl;
 	int numPts = scanCloud.points.size();
+	cv::Vec2d r;
+	double theta;
 	for(int i = 0;i<numPts;i++)
 	{
 		double x = scanCloud.points[i].x;
 		double y = scanCloud.points[i].y;
 
+		r = cv::Vec2d(x - last_map_pose.pose.position.x,y-last_map_pose.pose.position.y);
+		theta=  tf::getYaw(last_map_pose.pose.orientation) - atan2(r[1],r[0]);
+		if(theta < - pi/2 || theta > pi/2  || r.dot(r) > 100)	{continue;}	//only accept points from within 10m in the correct directions in case a transform broke
 		if(fatInGrid(x,y))
 		{
+			
 			//cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
 			int Gx = round((x - gridOx)/gridRes) - (patchSize-1)/2;
 			int Gy = round((y - gridOy)/gridRes) - (patchSize-1)/2;
@@ -126,13 +127,13 @@ void copyPoints()
 				for(int k = 0; k < patchSize;k++)//cols - x
 				{
 					cSpace.data[address(Gx + k ,Gy + j)] = cSpace.data[address(Gx + k, Gy + j)] | patch[j][k];
-//					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
+					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
 				}
 			}
 		}
 	}
-//	cv::imshow("cSpace",image);
-//	waitKey(50);
+	cv::imshow("cSpace",image);
+	waitKey(5);
 	//cout<<"copied points"<<endl;
 }
 
@@ -141,7 +142,8 @@ geometry_msgs::PoseStamped temp;
 tf::TransformListener *tfl;
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
-		last_odom = *odom;
+//	cout<<"lidarmapper odom callback occured\n";
+	last_odom = *odom;
         temp.pose = last_odom.pose.pose;
         temp.header = last_odom.header;
 	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
@@ -171,22 +173,22 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 
 void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-//	if (init == true)
-//	{
+	if (init == true)
+	{
 		//cout<<"2callback\n";
 		scanCloud = *scan_cloud; 
 		//ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
 		copyPoints();
 		//cout<<"yo\n";
-//	}
+	}
 }
 
 int main(int argc,char **argv)
 {
 	cout<<"2\n";
 	patchInit();
-	cSpaceInit();
-	init=true;
+//	cSpaceInit();
+//	init=true;
 	cout<<"2\n";
 	ros::init(argc,argv,"lidar_mapper");//name of this node
 	tfl = new tf::TransformListener();
@@ -196,10 +198,10 @@ int main(int argc,char **argv)
 	cout<<"2\n";
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
-	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("Pose_Actual", 10, odomCallback);
+	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
-//	namedWindow("cSpace",CV_WINDOW_NORMAL);
+	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
 		//cout<<"2\n";

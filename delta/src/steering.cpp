@@ -15,12 +15,12 @@
 using namespace std;
 
 const double LOOP_RATE = 10;
-const double kS = .1;
-const double kD = .75;
-const double kP = .75;
+const double kS = -.1;
+const double kD = -.75;
+const double kP = -.75;
 
 const double maxSteerV = .3;
-const double maxSteerW = .3;
+const double maxSteerW = .5;
 
 bool stalePos = true,
      staleDes = true;
@@ -102,18 +102,17 @@ cv::Vec2d calculateSteeringCorrections(cv::Vec3d sdp,eecs376_msgs::CrawlerDesire
 			{
 				cout<<"STEERING IN A LINE\n";
 
-				vw[0] = - kS * sdp[0];
-				vw[1] = -kD*sdp[1]-kP*sdp[2];
+				vw[0] = kS * sdp[0];
+				vw[1] = kD*sdp[1]+kP*sdp[2];
 				break;
 			}
 
 			case 2:	//arc
 			{
 				cout<<"STEERING IN A ARC"<<endl;
-				double r = 1.f / goal->des_rho;
 
-				vw[0] =  - kS * sdp[0];
-				vw[1] = vw[0] / r + (kD*sdp[1]+kP*sdp[1])*(r>0?1:-1);
+				vw[0] =  kS * sdp[0];
+				vw[1] = vw[0] * goal->des_rho + kD*sdp[1]+kP*sdp[1];
 				break;
 			}
 
@@ -122,7 +121,7 @@ cv::Vec2d calculateSteeringCorrections(cv::Vec3d sdp,eecs376_msgs::CrawlerDesire
 				cout<<"STEERING IN A CIRCLE"<<endl;	
 
 				vw[0] = 0;
-				vw[1] = - kS * sdp[0];
+				vw[1] = kS * sdp[0];
 				break;
 			}
 
@@ -139,8 +138,9 @@ cv::Vec2d getNominalVelocities(eecs376_msgs::CrawlerDesiredState* goal)
 {
 	switch(goal->seg_type){
 			case 1:	//line
-			case 2:	//arc
 				return cv::Vec2d(goal->des_speed,0);
+			case 2:	//arc
+				return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
 			case 3:	//turn
 				return cv::Vec2d(0,goal->des_speed);
 			default:
@@ -180,9 +180,10 @@ int main(int argc,char **argv)
 		//ROS_INFO("birthday is %f", birthday.toSec());
 		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
 		if(stalePos)	{continue;}
-		cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
+//		cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
-		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);			
+		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
+		cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
 		vw= getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		
