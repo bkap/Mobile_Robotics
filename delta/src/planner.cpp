@@ -114,20 +114,23 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	PathSegment P;
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
-	P.seg_length = fabs(FinalAngle-InitAngle);
+	P.seg_length = FinalAngle-InitAngle;
 		if(P.seg_length > 3.14159) {
 		P.seg_length -= 2 * 3.14159;
 	} else if(P.seg_length < -3.14159) {
 		P.seg_length += 2 * 3.14159;
 	}
+	P.seg_length = fabs(P.seg_length);
+	P.curvature = 1/Radius;
+	P.curvature *= (FinalAngle>InitAngle)?1:-1;
+
 	geometry_msgs::Point gmPoint;
 	gmPoint.x = Center.X;
 	gmPoint.y = Center.Y;
 	gmPoint.z = 0.0f;
 	P.ref_point = gmPoint;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
-	P.curvature = 1/Radius;
-	P.curvature *= (FinalAngle>InitAngle)?1:-1;
+	
 	
 	P.max_speeds.linear.x = MAX_LINEAR;
 	P.max_speeds.linear.y = 0;
