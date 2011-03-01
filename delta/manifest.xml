@@ -12,6 +12,7 @@
   <depend package="cwru_sim_stage"/>
   <depend package="opencv2"/>
   <depend package="eecs376_msgs"/>
+  <depend package="visualization_msgs"/>
 </package>
 
 
