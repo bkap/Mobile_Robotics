@@ -248,34 +248,40 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		heading = -heading + change_in_heading;
 		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
 }
+//this isn't really a bug algorithm. It just goes forward, turns right, goes
+//forward, and turns right at the distances given.
 PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
 	vector<PathSegment> path;
 	Mat_<bool> map = *map_p;
-	//go forward until the space 75 cm to the right of the robot is clear. FInd
-	//location
+	
+	//figure out where we're starting
 	double heading = tf::getYaw(start.pose.orientation);
 	double x = start.pose.position.x;
 	double y = start.pose.position.y;
 	double wallx, wally;
 	bool avoiding = false;
-	int points = 0;
 	int segnum = 0;
-	//head forward until you can turn or until you hit the entrance
-	//also, stop at 200 points (10 meters) so we don't take too long
+	//the distances we need to travel
 	double distances[] = {3.3,12.4,4,-1};
 	int i = 0;
 	double distance = distances[0];
+	//this is the location of the last point we were at according to the
+	//current path
 	double old_x, old_y;
 	old_x = x;
 	old_y = y;
+	//keep going until we get close to the destination
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
 		if(distance < 0.001) {
 			i++;
 			if(i >= 3) {
+			//if we finish the path, let's leave
 				break;
 			}
 
-			//create our lines and curve, then update x, y, and old vals
+			//we've finished going one segment. Let's turn
+			//first, we get the start point of the curve, which is 1 turn
+			//radius behind the current point
 			double curve_start_x = x - cos(heading) * STD_TURN_RAD;
 			double curve_start_y = y - sin(heading) * STD_TURN_RAD;
 			Point3 start_line;
@@ -286,12 +292,15 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			curve_start.X = curve_start_x;
 			curve_start.Y = curve_start_y;
 			curve_start.Z = 0.0;
+			//now we make a line from the previous location to the current
+			//location
 			path.push_back(MakeLine(start_line,curve_start,segnum++));
 			//make a line from the previous point to the start of the curve
-			//TODO: this header is probably going to be wrong
-
 			Point3 curve_end;
 			double oldheading = heading;
+
+			//turn right 90º. If that puts us out of the range ±π, then
+			//add or subtract 2π to bring it back within range.
 			heading -= 3.14159/2;
 			if(heading < -3.14159) {
 				heading += 2 * 3.14159;
@@ -307,16 +316,21 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_end));
 			x = curve_end.X;
 			y = curve_end.Y;
+			//update the distance we need to travel
 			old_x = x;
 			old_y = y;
 			distance = distances[i]-STD_TURN_RAD;
 		}
+		//move forward one map square 
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
-		distance -= CSPACE_RESOLUTION;	
+		distance -= CSPACE_RESOLUTION;
+		//if we're avoiding, check stuff 0.6 meters over.
+		//the 0.75 is left over from previous wall-crawling
 		double distance_to_check = avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading - 3.14159/2);
 		wally = y + distance_to_check * sin(heading - 3.14159/2);
+		//get the grid cells of the location to check and the possible wall
 		int grid_wall_x = (int)((wallx-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
@@ -334,7 +348,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			*/
 			} else {
 				//this means we need to readjust to go back 2 feet
-				
+				//we have been avoiding, but we no longer need to	
 				//first make the straight line to this point
 				Point3 start = Point3(old_x,old_y,0.0);
 				Point3 endline;
@@ -362,15 +376,18 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				distance -= 1.5;
 			}
 		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1)) {
+
+				//oh noes! There's something in the way
+				//Evasive Maneuvers!!!!!
 				Point3 start = Point3(old_x,old_y,0.0);
 				Point3 endline;
 
-				endline.X = x;
-				endline.Y = y;
+				endline.X = x - 1.5 * cos(heading);
+				endline.Y = y - 1.5 * sin(heading);
 				endline.Z = 0.0;
+				//now make a line up to this poing
 				path.push_back(MakeLine(start,endline, segnum++));
-				//path.push_back(Point(x,y));
-				
+					
 				//now we need to make a curve that does a 45 degree arc
 				//we should get halfway to wall
 				Point3 midcurve = findPointAlongCircle(endline, heading,  3.14159/4.0, STD_TURN_RAD);
