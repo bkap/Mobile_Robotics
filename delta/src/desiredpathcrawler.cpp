@@ -107,8 +107,6 @@ int main(int argc,char **argv)
                     // s = R*theta or theta = s/R where R is the radius = s * rho
                     desState.des_lseg += arcLength * fabs(desState.des_rho); // des_lseg for arcs is the angle rotated
                     
-                    // distance traveled along the arc: s = R * theta
-                    
                     cout << "\nARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     
                     double theta = 0.0; // angle from center of curvature

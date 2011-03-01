@@ -262,7 +262,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	bool avoiding = false;
 	int segnum = 0;
 	//the distances we need to travel
-	double distances[] = {3.3,12.4,4};
+	double distances[] = {3.1,12.4,4};
 	int i = 0;
 	double distance = distances[0];
 	//this is the location of the last point we were at according to the
@@ -336,7 +336,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
 		if(!map(grid_wall_x, grid_wall_y)) {
-			
+			cout << "\nPLANNER: CLEAR\n";
 			if(!avoiding) {
 				//this means that we need to turn
 			/*	path.push_back(Point(x,y));
@@ -377,7 +377,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			}
 		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1)) {
 
-				//oh noes! There's something in the way
+				cout << "\nPLANNER: oh noes! There's something in the way\n";
 				//Evasive Maneuvers!!!!!
 				Point3 start = Point3(old_x,old_y,0.0);
 				Point3 endline;

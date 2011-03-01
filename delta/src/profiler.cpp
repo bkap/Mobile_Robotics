@@ -31,6 +31,7 @@ const double pi = 3.141592;
 PathList pathlist;
 CrawlerDesiredState curState;
 cv::Mat_<bool> *lidarMap;
+geometry_msgs::Pose mapOrigin;
 
 bool crawlerDesStateCalled = false;
 void crawlerDesStateCallback(const CrawlerDesiredState::ConstPtr& desState)
@@ -53,6 +54,7 @@ void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& n
 {
     // get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)
     lidarMap = getMap(*newLidarMap);
+    mapOrigin = (*newLidarMap).info.origin;
 	lidarMapCalled = true;
 }
 
@@ -62,9 +64,10 @@ bool clearPath(double brakingDist)
 {
     double dist = 0.0;
     int curSeg = curState.seg_number;
-    int curX = curState.des_pose.position.x;
-    int curY = curState.des_pose.position.y;
     double psiCur = tf::getYaw(curState.des_pose.orientation);
+    
+    int curX = (curState.des_pose.position.x - mapOrigin.position.x)/CSPACE_RESOLUTION;
+    int curY = (curState.des_pose.position.y - mapOrigin.position.y)/CSPACE_RESOLUTION;
     
     while (dist < brakingDist) {    // move forward one block in the grid
         dist += CSPACE_RESOLUTION;
@@ -98,16 +101,18 @@ bool clearPath(double brakingDist)
         }
         
         if (dist >= fabs(pathlist.path_list[curSeg].seg_length)) { // end of path segment, update
-            brakingDist -= fabs(pathlist.path_list[curSeg].seg_length);
+            brakingDist -= dist;//fabs(pathlist.path_list[curSeg].seg_length);
             dist = 0.0;
             curSeg++;
         }
         
         // check map
-        if ((*lidarMap)[curX][curY] == 1)  // occupied
+        if ((*lidarMap)(curX,curY) == 1)  {// occupied
+            cout << "pro: clearPath OCCUPIED\n";
             return false;
+        }
     }
-    
+    cout << "pro: clearPath CLEAR\n";
     return true;
 }
 
@@ -128,6 +133,7 @@ double distanceToGoalSpeed(double goal_speed)
             brakingDistance = curState.des_speed * (curState.des_speed - goal_speed) / aAngMax - pow(curState.des_speed - goal_speed, 2) / (2 * aAngMax);
             break;
     }
+    cout << "distToGoalSpeed " << goal_speed << " is " << brakingDistance << "\n";
     return brakingDistance;
 }
 
@@ -161,7 +167,7 @@ double distanceRemaining()
         yDes = pathlist.path_list[nextSeg].ref_point.y;
         psiDes = tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle);
     }
-    
+    cout << "pro: return distRem\n";
     switch (curState.seg_type) {
         case 1: // distance along line
             return pow(pow(xDes-xCur, 2) + pow(yDes-yCur, 2), 0.5);
@@ -211,9 +217,10 @@ int main(int argc,char **argv)
         
         // ramp to zero if you're on the last path segment
         bool end_of_path = false;
+        cout << "\nPROFILER\n";
         if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
 			if (curState.seg_number == pathlist.path_list.size() - 1) {
-                //cout << "\npro: End of path";
+                cout << "\npro: End of path\n";
             	end_of_path = true;
         	}
         	vGoal = 0.0;
@@ -229,27 +236,29 @@ int main(int argc,char **argv)
             	if (!end_of_path)
                 	vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
         	}
-        
+            
         	double brakingDistance = distanceToGoalSpeed(0.0);
         	double slowingDistance = distanceToGoalSpeed(vMax);
         	double distToGo = distanceRemaining();
+        	
+        	cout << "pro: brakingdist=" << brakingDistance << ", slowingDist=" << slowingDistance << ", distToGo=" << distToGo << "\n";
  
         	// Ramp velocity, set des_speed
         	if (clearPath(brakingDistance)) {
-        	    //cout << "\npro: clearpath woo";
+        	    cout << "\npro: clearpath woo";
             	if (slowingDistance < distToGo) {   // go to maximum velocity
-                    //cout << " TO THE MAX which is " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
+                    cout << " TO THE MAX which is " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
                 	curState.des_speed = min(curState.des_speed + aMax / REFRESH_RATE, vGoal);
             	} else {    // ramp speed down to goal speed
-            	    //cout << " goal speed is slowsauce " << vGoal;
+            	    cout << " goal speed is slowsauce " << vGoal;
                 	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, vGoal);
             	}
         	} else {
             	// go to zero
-            	//cout << " BRAKINGGGGG";
+            	cout << " BRAKINGGGGG";
             	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
         	}
-            //cout << "\npro: des_speed = " << curState.des_speed;
+            cout << "\npro: des_speed = " << curState.des_speed;
         	pub.publish(curState); // publish the CrawlerDesiredState
 	    }
 	    naptime.sleep(); // enforce desired update rate
