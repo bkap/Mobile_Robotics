@@ -109,20 +109,22 @@ int main(int argc,char **argv)
                     
                     // distance traveled along the arc: s = R * theta
                     
-                    //cout << "ARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
+                    cout << "\nARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     
                     double theta = 0.0; // angle from center of curvature
+                    ///*
                     if (desState.des_rho >= 0)
                         theta = psiDes - pi/2;
                     else
                         theta = psiDes + pi/2;
-                    
+                    //*/
+                    //theta = psiDes + pi/2;
                     if (desState.des_rho < 0) {  // right-hand turn
-                        cout << "RHT";
+                        cout << "\nRHT theta = "<<theta;
                         theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     } else {    // left-hand turn
-                        cout << "LHT";
+                        cout << "\nLHT theta = "<<theta;
                         theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     }
@@ -163,8 +165,47 @@ int main(int argc,char **argv)
                     desState.des_rho = pathlist.path_list[desState.seg_number].curvature;
                     desState.des_lseg = 0.0;
                     geometry_msgs::Pose des_pose;
-                    des_pose.position = pathlist.path_list[desState.seg_number].ref_point;
                     des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
+                    
+                    if (desState.seg_type == 2) { // arc
+                        double theta = 0.0; // angle from center of curvature
+                        
+                        if (desState.des_rho >= 0)
+                            theta = psiDes - pi/2;
+                        else
+                            theta = psiDes + pi/2;
+                        
+                        /*if (desState.des_rho < 0) {  // right-hand turn
+                            cout << "\nRHT theta = "<<theta;
+                            theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                            psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        } else {    // left-hand turn
+                            cout << "\nLHT theta = "<<theta;
+                            theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                            psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        }*/
+                        
+                        double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
+                        double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
+                    
+                        geometry_msgs::Point arcStartPt;
+                        arcStartPt.x = xCenter + cos(theta) / desState.des_rho;
+                        arcStartPt.y = yCenter + sin(theta) / desState.des_rho;
+                        
+                        double x2 = xCenter + cos(psiDes + pi/2) / desState.des_rho;
+                        double y2 = yCenter + sin(psiDes + pi/2) / desState.des_rho;
+
+                        double x3 = xCenter + cos(psiDes - pi/2) / desState.des_rho;
+                        double y3 = yCenter + sin(psiDes - pi/2) / desState.des_rho;
+                        
+                        cout << "\nARCING around " << xCenter <<","<<yCenter << " with rho=" << desState.des_rho << " ie radius=" << (1/desState.des_rho) << " psi="<<psiDes<<" theta="<<theta;
+                        cout << "\nplus pi/2: " << x2 << ", " << y2;
+                        cout << "\nminus pi/2: " << x3<<", "<<y3;
+                        des_pose.position = arcStartPt;
+                    } else { // line or point
+                        des_pose.position = pathlist.path_list[desState.seg_number].ref_point;                    
+                    }
+                    
                     desState.des_pose = des_pose;
                 } else {
                     cout << "\n\ndpc: LAST segment\n";
