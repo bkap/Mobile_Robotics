@@ -82,7 +82,7 @@ int main(int argc,char **argv)
             // update total distance traveled
             //double olddist = desState.des_lseg;
             //ros::Duration elapsed_time = ros::Time::now() - refTime;
-            desState.des_lseg += desState.des_speed * REFRESH_RATE; // speed = distance * time -> for arcs this is v_tan
+            //desState.des_lseg += desState.des_speed * REFRESH_RATE; // speed = distance * time -> for arcs this is v_tan
             //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
             //cout << elapsed_time.toSec();
             //refTime = ros::Time::now();
@@ -134,6 +134,13 @@ int main(int argc,char **argv)
                     
                     desState.des_pose.position.x = xCenter + cos(theta) / desState.des_rho;
                     desState.des_pose.position.y = yCenter + sin(theta) / desState.des_rho;
+                    
+                    // TODO: blehhhh
+                    double x3 = xCenter + cos(theta - pi) / desState.des_rho;
+                    double y3 = yCenter + sin(theta - pi) / desState.des_rho;
+                    desState.des_pose.position.x = x3;
+                    desState.des_pose.position.y = y3;
+                    
                     break;
                 }
                 case 3: // rotate about point
@@ -192,15 +199,27 @@ int main(int argc,char **argv)
                         arcStartPt.x = xCenter + cos(theta) / desState.des_rho;
                         arcStartPt.y = yCenter + sin(theta) / desState.des_rho;
                         
-                        double x2 = xCenter + cos(psiDes + pi/2) / desState.des_rho;
-                        double y2 = yCenter + sin(psiDes + pi/2) / desState.des_rho;
+                        double x2 = xCenter + cos(psiDes - pi) / desState.des_rho;
+                        double y2 = yCenter + sin(psiDes - pi) / desState.des_rho;
 
-                        double x3 = xCenter + cos(psiDes - pi/2) / desState.des_rho;
-                        double y3 = yCenter + sin(psiDes - pi/2) / desState.des_rho;
+                        double x3 = xCenter + cos(theta - pi) / desState.des_rho;
+                        double y3 = yCenter + sin(theta - pi) / desState.des_rho;
                         
+                        double x4 = xCenter + cos(theta - pi*3/4) / desState.des_rho;
+                        double y4 = yCenter + sin(theta - pi*3/4) / desState.des_rho;
+
+                        double x5 = xCenter + cos(psiDes) / desState.des_rho;
+                        double y5 = yCenter + sin(psiDes) / desState.des_rho;
+                        
+                        // let's try theta + pi
+                        arcStartPt.x = x3;
+                        arcStartPt.y = y3;
+
                         cout << "\nARCING around " << xCenter <<","<<yCenter << " with rho=" << desState.des_rho << " ie radius=" << (1/desState.des_rho) << " psi="<<psiDes<<" theta="<<theta;
-                        cout << "\nplus pi/2: " << x2 << ", " << y2;
-                        cout << "\nminus pi/2: " << x3<<", "<<y3;
+                        cout << "\npsiDes-pi: " << x2 << ", " << y2;
+                        cout << "\ntheta+pi: " << x3<<", "<<y3;
+                        cout << "\ntheta+3pi/4: " << x4<<", "<<y4;
+                        cout << "\npsiDes: " << x5<<", "<<y5;
                         des_pose.position = arcStartPt;
                     } else { // line or point
                         des_pose.position = pathlist.path_list[desState.seg_number].ref_point;                    
