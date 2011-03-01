@@ -23,7 +23,7 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 	Mat_<bool>* m = new Mat_<bool>(grid.info.width, grid.info.height);
 	for(unsigned int i = 0; i < grid.info.height; i ++) {
 		for(unsigned int j = 0; j < grid.info.width; j++) {
-			(*m)(i,j) = (grid.data[i * grid.info.width + j] > 10);
+			(*m)(j,i) = (grid.data[i * grid.info.width + j] > 10);
 			if((*m)(i,j)) {
 				//cout << "stuff happens"<< endl;
 			}
