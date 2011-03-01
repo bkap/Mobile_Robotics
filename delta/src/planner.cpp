@@ -274,7 +274,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
 		if(distance < 0.001) {
 			i++;
-			if(i >= 3) {
+			if(i > 3) {
 			//if we finish the path, let's leave
 				break;
 			}
