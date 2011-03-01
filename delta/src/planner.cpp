@@ -262,7 +262,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	bool avoiding = false;
 	int segnum = 0;
 	//the distances we need to travel
-	double distances[] = {3.3,12.4,4,-1};
+	double distances[] = {3.3,12.4,4};
 	int i = 0;
 	double distance = distances[0];
 	//this is the location of the last point we were at according to the
@@ -406,7 +406,8 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			
 		} 
 	}
-	path.push_back(MakeLine(Point3(old_x,old_y,0.0),Point3(x,y,0.0),segnum++));
+	//path.push_back(MakeLine(Point3(old_x,old_y,0.0),Point3(x,y,0.0),segnum++));
+	path.pop_back();
 	PathList pathList;
 	pathList.path_list = path;
 	return pathList;
