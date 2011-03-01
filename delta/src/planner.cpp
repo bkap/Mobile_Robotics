@@ -375,7 +375,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				avoiding=false;
 				distance -= 1.5;
 			}
-		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1)) {
+		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1) || map(grid_x-1,grid_y-1) || map(grid_x-2,grid_y-1 || map(grid_x +2, grid_y -1) || map(grid_x+2,grid_y+1))) {
 
 				cout << "\nPLANNER: oh noes! There's something in the way\n";
 				//Evasive Maneuvers!!!!!
