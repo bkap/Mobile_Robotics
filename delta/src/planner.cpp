@@ -13,7 +13,7 @@
 #include <iostream>
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
-//#include <visualization_msgs/Marker>
+#include <visualization_msgs/Marker.h>
 #include "MathyStuff.h"
 #include "CSpaceFuncs.h"
 
@@ -474,7 +474,7 @@ int main(int argc,char **argv)
 	ros::NodeHandle n;
 	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
-	//ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
+	ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 10, LIDAR_Callback); 
 	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
 	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
@@ -511,24 +511,26 @@ int main(int argc,char **argv)
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
 				//cout<<"yo2\n";
 			}
-			//list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			//for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {/
-			///	cout << (*it).x << "," << (*it).y << endl;
-			//}
+		//	list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+		//	for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
+		//		cout << (*it).x << "," << (*it).y << endl;
+		//	}
 			//PathList turns = insertTurns(points);
-			/*list<geometry_msgs::Point> points;
+			list<geometry_msgs::Point> points;
 			geometry_msgs::Point p;
-			for(int i=0;i<lastLIDAR_Map.size.height; i++)
+			for(int i=0;i<lastLIDAR_Map->size().height; i++)
 			{
-				for(int j =0; j<lastLIDAR_Map.size.width; j++)
+				for(int j =0; j<lastLIDAR_Map->size().width; j++)
 				{
-					p.x = origin.position.x+.05*j;
-					p.y = origin.position.y*.05*i;
-					points.push_back(p); 
+					if((*lastLIDAR_Map)(i,j)) {
+						p.x = mapOrigin.position.x+.05*j;
+						p.y = mapOrigin.position.y*.05*i;
+						points.push_back(p); 
+					}
 				}
-			}*/
+			}
 			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			//PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
+			PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
 			//cout<<"publishing\n";
 			path_pub.publish(turns);
 			//cout<<"3published"<<"\n";	
