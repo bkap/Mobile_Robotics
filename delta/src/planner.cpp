@@ -335,7 +335,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
 		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
-		if(!map(grid_wall_x, grid_wall_y)) {
+		if(avoiding && !map(grid_wall_x, grid_wall_y)) {
 			cout << "\nPLANNER: CLEAR\n";
 			if(!avoiding) {
 				//this means that we need to turn
