@@ -23,7 +23,7 @@
 #define CURVE 2
 #define POINT_TURN 3
 
-#define STD_TURN_RAD 1.04 //given in the assignment
+#define STD_TURN_RAD .75 //given in the assignment
 
 #define MAX_LINEAR .5
 #define MAX_ANGULAR .5
@@ -110,7 +110,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	Point3 M = (A+B)/2.0;  //midpoint
 	Point3 MA = M-A;  //vector from midpoint to A
 	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point
-	double Radius = Distance3(A, M);
+	double Radius = Distance3(A, Center);
 
 	PathSegment P;
 	P.seg_type = CURVE;
@@ -122,7 +122,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 		P.seg_length += 2 * 3.14159;
 	}
 
-	P.curvature = 1/Radius;
+	P.curvature = 1/STD_TURN_RAD;
 	P.curvature *= (P.seg_length>0)?1:-1;
 	P.seg_length = fabs(P.seg_length);
 
@@ -246,7 +246,7 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		}
 		Point3 center = Point3(startPoint.X + cos(heading) * radius, startPoint.Y + sin(heading) * radius,0.0);
 		//now invert heading and adjust it by by change_in_heading
-		heading = -heading + change_in_heading;
+		heading = heading - 3.14159 + change_in_heading;
 		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
 }
 //this isn't really a bug algorithm. It just goes forward, turns right, goes
@@ -263,7 +263,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	bool avoiding = false;
 	int segnum = 0;
 	//the distances we need to travel
-	double distances[] = {3.1,12.4,4};
+	double distances[] = {3.15,12.4,4};
 	int i = 0;
 	double distance = distances[0];
 	//this is the location of the last point we were at according to the
@@ -329,8 +329,8 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		//if we're avoiding, check stuff 0.6 meters over.
 		//the 0.75 is left over from previous wall-crawling
 		double distance_to_check = avoiding ? 0.6 : 0.75;
-		wallx = x + distance_to_check * cos(heading - 3.14159/2);
-		wally = y + distance_to_check * sin(heading - 3.14159/2);
+		wallx = x + distance_to_check * cos(heading + 3.14159/2);
+		wally = y + distance_to_check * sin(heading + 3.14159/2);
 		//get the grid cells of the location to check and the possible wall
 		int grid_wall_x = (int)((wallx-origin.position.x)/CSPACE_RESOLUTION);
 		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
@@ -367,36 +367,36 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				//now make the first curve
 				
 				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,3.14159/4.0,STD_TURN_RAD);	
+				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,+3.14159/4.0,STD_TURN_RAD);	
 				path.push_back(MakeCurve(heading - 3.14159/4.0, heading, segnum++, midcurve, endcurve));
 				x = endcurve.X;
 				y = endcurve.Y;
 				old_x = x;
 				old_y = y;
 				avoiding=false;
-				distance -= 1.5;
+				distance -= 1.0;
 			}
-		} else if(map(grid_x, grid_y) || map(grid_x+1,grid_y) || map(grid_x-1,grid_y+1) || map(grid_x+1,grid_y+1) || map(grid_x-1,grid_y-1) || map(grid_x-2,grid_y-1 || map(grid_x +2, grid_y -1) || map(grid_x+2,grid_y+1))) {
+		} else if(map(grid_x, grid_y) &&!avoiding) {
 
 				cout << "\nPLANNER: oh noes! There's something in the way\n";
 				//Evasive Maneuvers!!!!!
 				Point3 start = Point3(old_x,old_y,0.0);
 				Point3 endline;
 
-				endline.X = x - 1.5 * cos(heading);
-				endline.Y = y - 1.5 * sin(heading);
+				endline.X = x - 1.0 * cos(heading);
+				endline.Y = y - 1.0 * sin(heading);
 				endline.Z = 0.0;
 				//now make a line up to this poing
 				path.push_back(MakeLine(start,endline, segnum++));
 					
 				//now we need to make a curve that does a 45 degree arc
 				//we should get halfway to wall
-				Point3 midcurve = findPointAlongCircle(endline, heading,  3.14159/4.0, STD_TURN_RAD);
+				Point3 midcurve = findPointAlongCircle(endline, heading,  +3.14159/4.0, STD_TURN_RAD);
 
 				//now make the first curve
 				
-				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,3.14159/4,STD_TURN_RAD);	
+				path.push_back(MakeCurve(heading, heading + 3.14159/4.0,segnum++, endline, midcurve));
+				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,-3.14159/4,STD_TURN_RAD);	
 				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
 				x = endcurve.X;
 				y = endcurve.Y;
@@ -508,7 +508,7 @@ int main(int argc,char **argv)
 				//this means we haven't used yet, so use our actual pose
 				poseDes.pose.position.x = 7.57;
 				poseDes.pose.position.y = 14.26;
-				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.354);
+				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
 				//cout<<"yo2\n";
 			}
 		//	list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);

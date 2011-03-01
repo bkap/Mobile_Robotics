@@ -21,7 +21,7 @@ class RosRunner:
 			for job in self.jobList:
 				if self.options.verbose:	print "Running %s" % job
 				pidlist.append(subprocess.Popen('rosrun delta ' + job, shell=True))
-				time.sleep(2)
+				time.sleep(.5)
 			while 1:
 				time.sleep(1)
 
