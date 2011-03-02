@@ -107,7 +107,7 @@ bool clearPath(double brakingDist)
         }
         
         // check map
-        if ((*lidarMap)(curX,curY) == 1)  {// occupied
+        if (false && (*lidarMap)(curX,curY) == 1)  {// occupied
             cout << "pro: clearPath OCCUPIED\n";
             return false;
         }

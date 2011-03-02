@@ -67,7 +67,7 @@ void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed)
 	desired.seg_type = newSpeed->seg_type;
 	desired.seg_number = newSpeed->seg_number;
 	staleDes = false;
-	cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose=", desired.des_pose;
+	cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose="<< desired.des_pose;
 }
 
 inline double coerceAngle(double angle){
@@ -112,9 +112,9 @@ cv::Vec2d calculateSteeringCorrections(cv::Vec3d sdp,eecs376_msgs::CrawlerDesire
 			{
 				cout<<"STEERING IN A ARC"<<endl;
 
-				vw[0] =  kS * sdp[0];
+			/*	vw[0] =  kS * sdp[0];
 				vw[1] = vw[0] * goal->des_rho + kD*sdp[1] + kP*sdp[2];
-				break;
+			*/	break;
 			}
 
 			case 3:	//turn in place
