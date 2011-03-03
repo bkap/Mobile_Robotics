@@ -23,7 +23,7 @@
 #define CURVE 2
 #define POINT_TURN 3
 
-#define STD_TURN_RAD .75 //given in the assignment
+#define STD_TURN_RAD .6 //given in the assignment
 
 #define MAX_LINEAR .5
 #define MAX_ANGULAR .5
@@ -255,6 +255,8 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	vector<PathSegment> path;
 	Mat_<bool> map = *map_p;
 	
+	//cout << "\nBUGGY BUGGY goes to " << dest.x << ", " << dest.y;
+	
 	//figure out where we're starting
 	double heading = tf::getYaw(start.pose.orientation);
 	double x = start.pose.position.x;
@@ -263,7 +265,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	bool avoiding = false;
 	int segnum = 0;
 	//the distances we need to travel
-	double distances[] = {3.15,12.3,4};
+	double distances[] = {3.15,12.0,-1.0}; // changed last distance from 4.0 to 5.0 to allow for estop hax during demo
 	int i = 0;
 	double distance = distances[0];
 	//this is the location of the last point we were at according to the
@@ -273,7 +275,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	old_y = y;
 	//keep going until we get close to the destination
 	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
-		if(distance < 0.001) {
+		if(distance < 0.001 && distance > -0.5) { //this way, we keep going ad the end
 			i++;
 			if(i > 3) {
 			//if we finish the path, let's leave
@@ -312,8 +314,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			curve_end.Y = y + sin(heading) * STD_TURN_RAD;
 			curve_end.Z = 0.0;
 
-	
-			//make the curve now
+	        //make the curve now
 			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_end));
 			x = curve_end.X;
 			y = curve_end.Y;
@@ -322,13 +323,17 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 			old_y = y;
 			distance = distances[i]-STD_TURN_RAD;
 		}
+		
 		//move forward one map square 
 		x = x + CSPACE_RESOLUTION * cos(heading);
 		y = y + CSPACE_RESOLUTION * sin(heading);
 		distance -= CSPACE_RESOLUTION;
+		if(distance < -1) {
+			continue;
+		}
 		//if we're avoiding, check stuff 0.6 meters over.
 		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = 0.4; //avoiding ? 0.6 : 0.75;
+		double distance_to_check = 0.25; //avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading + 3.14159/2);
 		wally = y + distance_to_check * sin(heading + 3.14159/2);
 		//get the grid cells of the location to check and the possible wall
@@ -404,11 +409,36 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				old_y = y;
 
 			avoiding = true;
-			
 		} 
 	}
-	//path.push_back(MakeLine(Point3(old_x,old_y,0.0),Point3(x,y,0.0),segnum++));
-	path.pop_back();
+	PathSegment p = path[path.size()-1];
+	path.pop_back(); // remove the final curve
+	/*
+	// hax
+	int haxCount = 0;
+	while (p.seg_type == 2) { // REMOVE ALL ARCS
+        cout << "\nBUGGY BUGGLE removing arcs";
+	    p = path[path.size()-1];
+	    path.pop_back();
+	    haxCount++;
+	}
+    
+	if (haxCount == 2) {
+	// check for planner adding swerves at end and delete
+	    if (path[path.size()-1].seg_type == 1 && path[path.size()-2].seg_type == 2 && path[path.size()-3].seg_type == 3) {
+	        path.pop_back();
+	        path.pop_back();
+	        path.pop_back();
+	        cout << "\nBUGGY BUGFAIL removed a swerve";
+	    }
+	}
+	path.push_back(p);
+	*/
+	cout << "\nBUGGY BUG last curve is type " << (int)path[path.size()-1].seg_type << " and before that is ";
+	cout << (int)path[path.size()-2].seg_type << ", then " << (int)path[path.size()-3].seg_type;
+	
+	// add really short line at end?
+	path.push_back(MakeLine(Point3(old_x,old_y,heading),Point3(x,y,heading),segnum++));
 	PathList pathList;
 	pathList.path_list = path;
 	return pathList;
@@ -431,6 +461,9 @@ bool poseActualcalled = false;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
 {
 	//cout << "recieved width: " <<  (*LIDAR_Map).info.width<< endl;
+	if(lastLIDAR_Map != NULL) {
+		delete lastLIDAR_Map;
+	}
 	lastLIDAR_Map = getMap(*LIDAR_Map);
 	mapOrigin = (*LIDAR_Map).info.origin;
 	LIDARcalled = true;

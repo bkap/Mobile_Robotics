@@ -62,15 +62,15 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::Publisher *vis_pub, f
 	geometry_msgs::Point* RetVal = (*geometry_msgs::Point)malloc(PointsToPlot.size() * sizeof(geometry_msgs::Point));
 	*/
 	
-	vector<geometry_msgs::Point>* RetVal = new vector<geometry_msgs::Point>();
+	vector<geometry_msgs::Point> RetVal = vector<geometry_msgs::Point>();
 	while(!PointsToPlot.empty())
 	{
 		geometry_msgs::Point P = PointsToPlot.back();
 		PointsToPlot.pop_back();
-		RetVal->push_back(P);
+		RetVal.push_back(P);
 		
 	}
-	marker.points = *RetVal;
+	marker.points = RetVal;
 	//marker.colors = NULL;  //the wiki says that this should 
 	
 	vis_pub->publish( marker );

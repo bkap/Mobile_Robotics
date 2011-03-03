@@ -22,6 +22,8 @@
 
 /*TODO
 	tie grid position to pose
+	use more openCV:
+		dilate a sparse matrix by a disk to fatten pings
 */
 
 const double loopRate = 10;
@@ -48,21 +50,23 @@ int** patch;			//fattening template
 
 using namespace std;
 
+//checks whether a given map-frame co-ordinate is within the bounds of the CSpace grid
 inline bool inGrid(double x, double y){
 	return x>=gridOx && x<= gridOx+gridLength
 		&&y>=gridOy && y<=gridOy+gridLength;
 }
-
+//checks whether the entirety of the fattened representation of the given point in map-frame co-ordinates is witin the bounds of the CSpace grid
 inline bool fatInGrid(double x, double y){
 	return inGrid(x+patchRadius+gridRes,y)&&inGrid(x-patchRadius-gridRes,y)
 		&&inGrid(x,y+patchRadius+gridRes)&&inGrid(x,y-patchRadius-gridRes);
 }
-
+//converts from a row, col index format to the coresponding index in the 1D representation
 inline int address(int x, int y)
 {
 	//cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
 	return y * gridSize + x;
 }
+//initializes the CSpace grid.
 void cSpaceInit()
 {
 	cout<<"creating cSpace grid:"<<endl;
@@ -81,7 +85,7 @@ void cSpaceInit()
 	cSpace.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
 	cout<<"\tcreated cSpace grid with "<<cSpace.info.width*cSpace.info.width<<" elements"<<endl;
 }
-
+//one-time generation of patch for fattening
 void patchInit()
 {
 	patch = (int **)calloc(patchSize, sizeof(int));

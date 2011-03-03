@@ -32,11 +32,11 @@ int main(int argc,char **argv)
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
         // set x, y, and heading
-     	goal_pose.position.x = -0.44;
-      	goal_pose.position.y = 23.40;
-      	goal_pose.orientation = tf::createQuaternionMsgFromYaw(0.75);
-        pub.publish(goal_pose);
-	   // cout<<"hey hey listen\n";
+     	goal_pose.position.x = 0.0;
+      	goal_pose.position.y = 24.0;
+      	goal_pose.orientation = tf::createQuaternionMsgFromYaw(47.83);
+        //cout<<"\nhey hey listen " << goal_pose.position.x << ", " << goal_pose.position.y;
+	    pub.publish(goal_pose);
 	    naptime.sleep(); // enforce desired update rate
     }
     return 0;   // this code will only get here if this node was told to shut down, which is
