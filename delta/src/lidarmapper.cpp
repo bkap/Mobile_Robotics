@@ -205,7 +205,7 @@ int main(int argc,char **argv)
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
-	namedWindow("cSpace",CV_WINDOW_NORMAL);
+//	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
 		//cout<<"2\n";
