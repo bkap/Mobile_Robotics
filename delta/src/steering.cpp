@@ -203,7 +203,7 @@ int main(int argc,char **argv)
 			stalePos = true,
 		     	staleDes = true;
 
-			//cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
 			pub.publish(vel_object);
 	}
 }
