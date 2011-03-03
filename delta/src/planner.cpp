@@ -338,7 +338,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		}
 		//if we're avoiding, check stuff 0.6 meters over.
 		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = 0.25; //avoiding ? 0.6 : 0.75;
+		double distance_to_check = 0.6; //avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading + 3.14159/2);
 		wally = y + distance_to_check * sin(heading + 3.14159/2);
 		//get the grid cells of the location to check and the possible wall
