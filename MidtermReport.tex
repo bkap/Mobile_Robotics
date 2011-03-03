@@ -3,7 +3,7 @@
 \title{EECS 476 Midterm Report}
 \date{3 March 2011}
 \usepackage{fullpage}
-
+\usepackage{url}
 \begin{document}
 \maketitle
 
@@ -29,6 +29,9 @@ The LIDARmapper subscribes to LIDARCloud and publishes LIDARMap, the fattened CS
 The CSPace is returned as an OccupancyGrid with an origin at -10,-10 and height and width 35 in the map frame to contain the entire area of interest for this assignment.
 The points in the point cloud are fattened by ORing a pre-generated template containing a disk of radius 15cm with the pixel containing the ping and its' neighbors.
 Only pings within 10m of the robot are considered and only points for which the entirety of the fattened area would lie within the grid are added to the map.
+These constraints are imposed to improve the accuracy of the CSpace map, and to prevent overflowing the array respectively.
+For future improvements, we are considering methods of clearing places on the CSpace map which are no longer occupied.
+In general the procedure for clearing old points would be to assume that any point between the LIDAR sensor and a nearby ping (within 10 m) is now clear because it would be impossible for an object to occupy a space near the LIDAR sensor and not get hit by a ping.
 
 \subsection{Path Planner}
 
@@ -38,12 +41,22 @@ At present, the response to an obstruction in the path is a hardcoded pattern co
 The swerve is always a fixed distance, and no further attempt to find obstacles is made during curves or swerves, so the current algorithm would likely crash if there were multiple nearby obstacles or if there were an obstacle in a curve or swerve.
 In general, the Speed Profiler is still attmepting to search the current path for obstacles, so the robot should not hit any obstacles, but it may get stuck.
 After generating the path, the Path Planner publishes the path as a PathList.
+One possible algorithm to be considered was published by Valve, a video game company, in a whitepaper, \url{http://www.valvesoftware.com/publications/2009/ai_systems_of_l4d_mike_booth.pdf}.
+In general the algorithm could work quite well, but there are concerns about the re-pathing speed.
+Also, we will need to impose a boundry around the world so that the pathfinding algorithm will run in finite time.
+
 
 \subsection{Desired Path Crawler}
 
 The Desired Path Crawler listens to the current speed put out by the Speed Profiler, and the PathList published by the Path Planner.
 The Crawler moves a breadcrumb along the path published by the Path Planner at the speed that the Speed Profiler aledges we are moving.
 It leaves the current speed blank so that the Speed Profiler can fill in what speed it would like to go.
+Each type of path segment is a special case.
+Lines are the easiest, the reference point given is the start point, the heading does not vary throughout the segment, and the position can just be incremented by the velocity vector each iteration.
+Turning in place is also easy because the linear velocity is zero and the reference point is the point that the robot stops at, and distance is measured in terms of the number of radians turned.
+Curves are the most difficult. 
+For curves, the profiler needs to compute a position that moves along the curve. 
+The heading is incremented or decremented by the angular velocity of the robot, and basic trigonometry is then used to find the current point along the curve.
 After deciding a desired pose, the Desired Path Crawler publishes the desied path.
 
 \subsection{Speed Profiler}
@@ -56,7 +69,7 @@ The path planner is then expected to repath around obstacles.
 
 \subsection{Steering Module}
 
-The Steering Module subscribes to NominalSpeed and odom and publishes cmd_vel.
+The Steering Module subscribes to NominalSpeed and odom and publishes $cmd_vel$.
 From NominalSpeed, the desired speed and pose are extracted for comparison with the actual pose from odom to generate steering corrections to return the robot to the desired path and schedule.
 The corrections are performed by projecting the vector from desired pose to actual pose onto both the desired heading and a leftward normal to the desired heading to calculate following and lateral errors respectively.
 This calculation is the same for both arcs and line segments, so the allowable path errors for good operation are less on an arc than for a line segment.
@@ -66,12 +79,12 @@ The corrections above nominal velocity are capped to .3 m / s for linear velocit
 \section{Discussion}
 \subsection{Observation of Performance}
 
+At present, the robot is able to navigate down an empty hallway, or a hallway with 1 obstacle.
+The Path Planner does not attempt to see if a swerve is clear because it operates under the assumption that swerving a fixed amount to the left will clear an obstacle.  
+This assumption will not necessarily always be true, and if it isn't, the robot could crash into obstacles while attempting to swerve.
 
 
 \subsection{Bug Report}
-
-We sometimes turn too early when attempting to swerve back after dodging an obstacle.
-Planner tends to insert extra turns at the end of the path. We hope to fix this soon.
 
 \subsection{Group Policies and Ideas for Improvement}
 

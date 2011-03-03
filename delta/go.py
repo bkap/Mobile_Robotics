@@ -1,3 +1,5 @@
+#a simple script for calling all of our various programs in a known order in one command line call
+
 import os
 import csv
 import time
@@ -15,20 +17,21 @@ class RosRunner:
 		self.options = options
 		self.jobList = options.jobList.split(",")
 	
+	#runs a series of jobs until it recieves a keyboard interrupt (ctrl+c), and then kills them all nicely
 	def runJobs(self):
 		pidlist = []
 		try:
-			for job in self.jobList:
-				if self.options.verbose:	print "Running %s" % job
-				pidlist.append(subprocess.Popen('rosrun delta ' + job, shell=True))
-				time.sleep(.5)
+			for job in self.jobList:  #for each job in the joblist
+				if self.options.verbose:	print "Running %s" % job 
+				pidlist.append(subprocess.Popen('rosrun delta ' + job, shell=True))  #run a job
+				time.sleep(.5) #half second delay to allow things to boot up one at a time
 			while 1:
-				time.sleep(1)
+				time.sleep(1) #we are waiting to be killed, so sleep
 
-		except KeyboardInterrupt, e:
-			for p in pidlist[::-1] :
+		except KeyboardInterrupt, e:   #if we get a ctrl+c
+			for p in pidlist[::-1] :   #for each process
 				if self.options.verbose:    print "oskilling %s, %s" % (p.pid, signal.SIGTERM)
-				os.kill(p.pid, signal.SIGTERM)
+				os.kill(p.pid, signal.SIGTERM) #send a kill signal
 			for job in self.jobList:
 				if self.options.verbose:	print "Killing %s" % job
 				subprocess.call('killall %s -q' % job, shell=True)
