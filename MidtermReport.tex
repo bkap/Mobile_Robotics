@@ -79,12 +79,17 @@ The corrections above nominal velocity are capped to .3 m / s for linear velocit
 \section{Discussion}
 \subsection{Observation of Performance}
 
-At present, the robot is able to navigate down an empty hallway, or a hallway with 1 obstacle.
+At present, the robot is able to navigate down an empty hallway, or a hallway with 1 obstacle.  There were bugs that occured if it was allowed to do multiple swerves, so that feature was disabled for the demo.
 The Path Planner does not attempt to see if a swerve is clear because it operates under the assumption that swerving a fixed amount to the left will clear an obstacle.  
 This assumption will not necessarily always be true, and if it isn't, the robot could crash into obstacles while attempting to swerve.
-
+The robot does not follow as close to the wall as it should.  This comes from it not actually pathfinding.  The path is just harcoded.
 
 \subsection{Bug Report}
+
+There were a number of hacks that were done at the last minute to get the demo working.  We can only do 1 swerve currently. 
+The size of the patch on the CSpace map was reduced because the robot somtimes got confused while going down the hallway.
+the sizes of the turns were reduced because the robot was hitting the walls.
+In general, there were a number of issues that resulted from planner just being a dumb planner, and many of our hacks will not be needed in future tests.
 
 \subsection{Group Policies and Ideas for Improvement}
 
