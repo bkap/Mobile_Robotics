@@ -19,22 +19,26 @@
 
 #define REFRESH_RATE 10
 
+//define the 3 types of segments, these need to be consistent with dpcrawler
 #define LINE 1
 #define CURVE 2
 #define POINT_TURN 3
 
-#define STD_TURN_RAD .6 //given in the assignment
+#define STD_TURN_RAD .6 //given in the assignment but changed because it seemed to work better
 
+//define maximum speeds and accelerations
 #define MAX_LINEAR .5
 #define MAX_ANGULAR .5
 #define MAX_LINEAR_ACC .1
 #define MAX_ANGULAR_ACC .1
 
+//uses some namespaces
 using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
-tf::TransformListener *tfl;
+tf::TransformListener *tfl; //transforms crap into better frames
 
+//converts between the Point3 class and a geometry point for use in messages
 geometry_msgs::Point Point3toGeoPoint (Point3 A)
 {
 	geometry_msgs::Point Ref_Point;
@@ -44,6 +48,7 @@ geometry_msgs::Point Point3toGeoPoint (Point3 A)
 	return Ref_Point;
 }
 
+//makes a line from A to B of a given SegNum
 PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 {
 	PathSegment P;

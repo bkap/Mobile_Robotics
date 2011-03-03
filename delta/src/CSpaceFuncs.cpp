@@ -18,6 +18,8 @@
 using namespace std;
 using namespace cv;
 using namespace std;
+
+//converts the OccupancyGrid to a openCV matrix in a consitent way for all programs that need it.
 /**assume orientation and resolution are the same*/
 Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 	Mat_<bool>* m = new Mat_<bool>(grid.info.width, grid.info.height);
@@ -33,6 +35,8 @@ Mat_<bool>* getMap(const nav_msgs::OccupancyGrid& grid) {
 
 }
 
+
+//plotmap should try to plot visualization messages to rviz so they can be seen.  This is just a generic wrapper around the boilerplate so that we could visualize pathlists and such with fewer calls.  TODO: make the publisher static
 void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::Publisher *vis_pub, float r, float g, float b, float cubesize)
 {
 	//some code taken directly from the wiki and then modified
