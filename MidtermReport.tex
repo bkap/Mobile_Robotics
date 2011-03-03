@@ -11,10 +11,10 @@
 
 \subsection{Goal Publisher}
 
-The goal publisher's sole purpose in existing is to publish a goal pose of x, y, and heading.
-It does not subscribe to anything, and at present the goal pose will never change.
+The goal publisher's sole purpose is to publish goalPose.
+It does not subscribe to anything, and at present the goal pose never changes.
 Also, at present, even though the Path Planner listens to the Goal Publisher, it does not take its output into consideration except for deciding where on the path to stop.
-It is hoped that in the future we will impliment a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.
+It is hoped that in the future we will implement a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.
 When that happens, Goal Publisher's information will become more relevant.
 
 \subsection{LIDAR Driver}
@@ -32,10 +32,9 @@ Only pings within 10m of the robot are considered and only points for which the 
 
 \subsection{Path Planner}
 
-The path planner subscribes to the LIDAR Mapper, which it uses to check for obstacles in the path.
-It also subscribes to the Goal Publisher, the PoseDes.  It was not clear which node published PoseDes, and it was not needed in planner for this assignment, so PoseDes is generally ignored.
-The planner has been pre-programmed for this demo with a path that it should be following unless it sees an obstacle.
-Also, the response to an obstacle is always the same, a swerve to the left before an obstacle, follwed by a swerve to the right when there is room in the normal driving lane again.
+The path planner subscribes to LIDARMap,PoseDes and goalPose and publishes pathList.
+The planner has been pre-programmed for this demo with a path that it should be following unless it sees an obstacle with an A* search on the map hopefully forthcoming over break.
+At present, the response to an obstruction in the path is a hardcoded pattern consisting of a swerve left followed by a swerve right once the path to the right is clear.
 The swerve is always a fixed distance, and no further attempt to find obstacles is made during curves or swerves, so the current algorithm would likely crash if there were multiple nearby obstacles or if there were an obstacle in a curve or swerve.
 In general, the Speed Profiler is still attmepting to search the current path for obstacles, so the robot should not hit any obstacles, but it may get stuck.
 After generating the path, the Path Planner publishes the path as a PathList.
@@ -60,7 +59,7 @@ The path planner is then expected to repath around obstacles.
 The Steering Module subscribes to NominalSpeed and odom and publishes cmd_vel.
 From NominalSpeed, the desired speed and pose are extracted for comparison with the actual pose from odom to generate steering corrections to return the robot to the desired path and schedule.
 The corrections are performed by projecting the vector from desired pose to actual pose onto both the desired heading and a leftward normal to the desired heading to calculate following and lateral errors respectively.
-This calculation is the same for both arcs and line segments, so the allowable path errors for good operation is less on an arc than for a line segment.
+This calculation is the same for both arcs and line segments, so the allowable path errors for good operation are less on an arc than for a line segment.
 The steering correction on the arcs additionally feeds-forward the linear voloctiy correction to the angular velocity corrretion.
 The corrections above nominal velocity are capped to .3 m / s for linear velocity and .5 rad / s for angular velocity and the total commanded linear velocity is constrained to be non-negative.
 
