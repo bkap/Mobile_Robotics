@@ -127,12 +127,12 @@ void copyPoints()
 				for(int k = 0; k < patchSize;k++)//cols - x
 				{
 					cSpace.data[address(Gx + k ,Gy + j)] = cSpace.data[address(Gx + k, Gy + j)] | patch[j][k];
-					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
+//					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
 				}
 			}
 		}
 	}
-	cv::imshow("cSpace",image);
+//	cv::imshow("cSpace",image);
 	waitKey(5);
 	//cout<<"copied points"<<endl;
 }
