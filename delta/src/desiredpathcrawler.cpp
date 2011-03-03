@@ -23,7 +23,11 @@ bool speedProfilerInit = false;
 void pathListCallback(const PathList::ConstPtr& newPathList)
 {
     pathlist = *newPathList;
-    pathListInit = true;
+    // hax to make it turn 1/2 the desired angle on arcs because this is probably wrong elsewhere
+    /*for (int i=0; i<pathlist.path_list.size(); i++)
+        if (pathlist.path_list[i].seg_type == 2)
+            pathlist.path_list[i].seg_length = pathlist.path_list[i].seg_length / 2;
+    */pathListInit = true;
 }
 
 void speedProfilerCallback(const CrawlerDesiredState::ConstPtr& oldDesState)
@@ -79,19 +83,9 @@ int main(int argc,char **argv)
         // only update if it still has path segments left...
         if (!finishedPath)
         {
-            // update total distance traveled
-            //double olddist = desState.des_lseg;
-            //ros::Duration elapsed_time = ros::Time::now() - refTime;
-            //desState.des_lseg += desState.des_speed * REFRESH_RATE; // speed = distance * time -> for arcs this is v_tan
-            //desState.des_lseg = desState.des_lseg + desState.des_speed * elapsed_time.toSec();
-            //cout << elapsed_time.toSec();
-            //refTime = ros::Time::now();
-            //cout << "\ndpc: s" << desState.seg_number << " now traveled " << desState.des_lseg;
-            //cout << " = " << olddist << " + " << desState.des_speed << "*" << REFRESH_RATE;
-            
-            // compute the x, y, psi
-            double psiDes = tf::getYaw(desState.des_pose.orientation);
-            
+            // update total distance traveled and compute the x, y, psi
+
+            double psiDes = tf::getYaw(desState.des_pose.orientation);            
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
@@ -99,45 +93,44 @@ int main(int argc,char **argv)
                     desState.des_pose.position.x += desState.des_speed * REFRESH_RATE * cos(psiDes);
                     desState.des_pose.position.y += desState.des_speed * REFRESH_RATE * sin(psiDes);
                     break;
-                case 2: // arc: speedNominal is the tangential velocity (v = w R)
+                case 2: // arc: speedNominal is the tangential velocity (v = w R), des_lseg is angle
                 {
-                    double arcLength = desState.des_speed * REFRESH_RATE; // v_tangential
-                    //this is the distance that the robot has traveled in the past dt along the arc
-                    
-                    // s = R*theta or theta = s/R where R is the radius = s * rho
-                    desState.des_lseg += arcLength * fabs(desState.des_rho); // des_lseg for arcs is the angle rotated
+                    //distance the robot traveled in the past dt along the arc.  s = R*theta
+                    desState.des_lseg += desState.des_speed * fabs(desState.des_rho) * REFRESH_RATE;
                     
                     cout << "\nARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     
                     double theta = 0.0; // angle from center of curvature
                     ///*
-                    if (desState.des_rho >= 0)
+                    if (desState.des_rho >= 0) {
+                        cout << "\nLEFT TURN";
                         theta = psiDes - pi/2;
-                    else
+                    } else { // right hand
+                        cout << "\nRIGHT TURN";
                         theta = psiDes + pi/2;
+                    }
                     //*/
                     //theta = psiDes + pi/2;
                     if (desState.des_rho < 0) {  // right-hand turn
-                        cout << "\nRHT theta = "<<theta;
+                        //cout << "\nRHT theta = "<<theta;
                         theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     } else {    // left-hand turn
-                        cout << "\nLHT theta = "<<theta;
+                        //cout << "\nLHT theta = "<<theta;
                         theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                         psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
                     }
                     
+                    // merely for reference
                     double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
                     double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
                     
-                    desState.des_pose.position.x = xCenter + cos(theta) / desState.des_rho;
-                    desState.des_pose.position.y = yCenter + sin(theta) / desState.des_rho;
+                    // this was the old stuff that didn't work
+                    //desState.des_pose.position.x = xCenter + cos(theta) / desState.des_rho;
+                    //desState.des_pose.position.y = yCenter + sin(theta) / desState.des_rho;
                     
-                    // TODO: blehhhh
-                    double x3 = xCenter + cos(theta - pi) / desState.des_rho;
-                    double y3 = yCenter + sin(theta - pi) / desState.des_rho;
-                    desState.des_pose.position.x = x3;
-                    desState.des_pose.position.y = y3;
+                    desState.des_pose.position.x = xCenter + cos(theta - pi) / desState.des_rho;
+                    desState.des_pose.position.y = yCenter + sin(theta - pi) / desState.des_rho;
                     
                     break;
                 }
@@ -193,31 +186,17 @@ int main(int argc,char **argv)
                         double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
                         double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
                     
+                        // this isn't really necessary
                         geometry_msgs::Point arcStartPt;
-                        arcStartPt.x = xCenter + cos(theta) / desState.des_rho;
-                        arcStartPt.y = yCenter + sin(theta) / desState.des_rho;
-                        
-                        double x2 = xCenter + cos(psiDes - pi) / desState.des_rho;
-                        double y2 = yCenter + sin(psiDes - pi) / desState.des_rho;
+                        arcStartPt.x = xCenter + cos(theta - pi) / desState.des_rho;    // need to correct by pi
+                        arcStartPt.y = yCenter + sin(theta - pi) / desState.des_rho;
 
-                        double x3 = xCenter + cos(theta - pi) / desState.des_rho;
-                        double y3 = yCenter + sin(theta - pi) / desState.des_rho;
-                        
-                        double x4 = xCenter + cos(theta - pi*3/4) / desState.des_rho;
-                        double y4 = yCenter + sin(theta - pi*3/4) / desState.des_rho;
-
-                        double x5 = xCenter + cos(psiDes) / desState.des_rho;
-                        double y5 = yCenter + sin(psiDes) / desState.des_rho;
-                        
-                        // let's try theta + pi
-                        arcStartPt.x = x3;
-                        arcStartPt.y = y3;
-
-                        cout << "\nARCING around " << xCenter <<","<<yCenter << " with rho=" << desState.des_rho << " ie radius=" << (1/desState.des_rho) << " psi="<<psiDes<<" theta="<<theta;
+                        /*cout << "\nARCING around " << xCenter <<","<<yCenter << " with rho=" << desState.des_rho << " ie radius=" << (1/desState.des_rho) << " psi="<<psiDes<<" theta="<<theta;
                         cout << "\npsiDes-pi: " << x2 << ", " << y2;
                         cout << "\ntheta+pi: " << x3<<", "<<y3;
                         cout << "\ntheta+3pi/4: " << x4<<", "<<y4;
                         cout << "\npsiDes: " << x5<<", "<<y5;
+                        */
                         des_pose.position = arcStartPt;
                     } else { // line or point
                         des_pose.position = pathlist.path_list[desState.seg_number].ref_point;                    
@@ -233,11 +212,11 @@ int main(int argc,char **argv)
                 cout << "\n\ndpc: NEW SEGMENT type " << (int)desState.seg_type;
             }
         }
-        cout << "\ndpc: s"<< desState.seg_number << " x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
+        /*cout << "\ndpc: s"<< desState.seg_number << " x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;
         cout << ", psi=" << tf::getYaw(desState.des_pose.orientation) << ", des_speed=" << desState.des_speed;
         cout << " (traveled " << desState.des_lseg << " out of " << pathlist.path_list[desState.seg_number].seg_length;
         cout << ") of type " << (int)desState.seg_type << "\n";
-        
+        */
         pub.publish(desState); // publish the CrawlerDesiredState (if the path is over, doesn't change)
 	    naptime.sleep(); // enforce desired update rate
     }

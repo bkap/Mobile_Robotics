@@ -263,7 +263,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	bool avoiding = false;
 	int segnum = 0;
 	//the distances we need to travel
-	double distances[] = {3.15,12.4,4};
+	double distances[] = {3.15,12.3,4};
 	int i = 0;
 	double distance = distances[0];
 	//this is the location of the last point we were at according to the
@@ -328,7 +328,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		distance -= CSPACE_RESOLUTION;
 		//if we're avoiding, check stuff 0.6 meters over.
 		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = avoiding ? 0.6 : 0.75;
+		double distance_to_check = 0.4; //avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading + 3.14159/2);
 		wally = y + distance_to_check * sin(heading + 3.14159/2);
 		//get the grid cells of the location to check and the possible wall

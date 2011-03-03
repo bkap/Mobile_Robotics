@@ -133,7 +133,7 @@ double distanceToGoalSpeed(double goal_speed)
             brakingDistance = curState.des_speed * (curState.des_speed - goal_speed) / aAngMax - pow(curState.des_speed - goal_speed, 2) / (2 * aAngMax);
             break;
     }
-    cout << "distToGoalSpeed " << goal_speed << " is " << brakingDistance << "\n";
+    //cout << "distToGoalSpeed " << goal_speed << " is " << brakingDistance << "\n";
     return brakingDistance;
 }
 
@@ -167,7 +167,7 @@ double distanceRemaining()
         yDes = pathlist.path_list[nextSeg].ref_point.y;
         psiDes = tf::getYaw(pathlist.path_list[nextSeg].init_tan_angle);
     }
-    cout << "pro: return distRem\n";
+    //cout << "pro: return distRem\n";
     switch (curState.seg_type) {
         case 1: // distance along line
             return pow(pow(xDes-xCur, 2) + pow(yDes-yCur, 2), 0.5);
@@ -217,11 +217,12 @@ int main(int argc,char **argv)
         
         // ramp to zero if you're on the last path segment
         bool end_of_path = false;
-        cout << "\nPROFILER\n";
+        //cout << "\nPROFILER\n";
         if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
-			if (curState.seg_number == pathlist.path_list.size() - 1) {
-                cout << "\npro: End of path\n";
+			if (curState.seg_number == pathlist.path_list.size() - 1) { // && no distance left) { // stops it one early fail
+                //cout << "\npro: End of path\n";
             	end_of_path = true;
+            	curState.seg_type = 4; // hax to tell steering to not go anywhere
         	}
         	vGoal = 0.0;
  
@@ -241,21 +242,21 @@ int main(int argc,char **argv)
         	double slowingDistance = distanceToGoalSpeed(vMax);
         	double distToGo = distanceRemaining();
         	
-        	cout << "pro: brakingdist=" << brakingDistance << ", slowingDist=" << slowingDistance << ", distToGo=" << distToGo << "\n";
+        	//cout << "pro: brakingdist=" << brakingDistance << ", slowingDist=" << slowingDistance << ", distToGo=" << distToGo << "\n";
  
         	// Ramp velocity, set des_speed
         	if (clearPath(brakingDistance)) {
-        	    cout << "\npro: clearpath woo";
+        	    //cout << "\npro: clearpath woo";
             	if (slowingDistance < distToGo) {   // go to maximum velocity
-                    cout << " TO THE MAX which is " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
+                    //cout << " TO THE MAX which is " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
                 	curState.des_speed = min(curState.des_speed + aMax / REFRESH_RATE, vGoal);
             	} else {    // ramp speed down to goal speed
-            	    cout << " goal speed is slowsauce " << vGoal;
+            	    //cout << " goal speed is slowsauce " << vGoal;
                 	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, vGoal);
             	}
         	} else {
             	// go to zero
-            	cout << " BRAKINGGGGG";
+            	//cout << " BRAKINGGGGG";
             	curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
         	}
             cout << "\npro: des_speed = " << curState.des_speed;
