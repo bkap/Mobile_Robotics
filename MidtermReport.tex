@@ -31,13 +31,24 @@ The Desired Path Crawler listens to the current speed put out by the Speed Profi
 
 \subsection{Speed Profiler}
 
-The Speed Profiler subscribes to the pose put out by the Desired Path Crawler, CSpace map published by the LIDAR Mapper, as well as the Path List put out by the Path Planner.  The Speed Profiler just fills in the linear speed at each point and republishes it with a different name, Speed Nominal.  It attempts to choose accelerate at the maximum allowed rate until it matches speed with what the Path Planner recommends in its PathList.  It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.  The path planner is then expected to repath around obstacles. T
+The Speed Profiler subscribes to the pose put out by the Desired Path Crawler, CSpace map published by the LIDAR Mapper, as well as the Path List put out by the Path Planner.  The Speed Profiler just fills in the linear speed at each point and republishes it with a different name, Speed Nominal.  It attempts to choose accelerate at the maximum allowed rate until it matches speed with what the Path Planner recommends in its PathList.  It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.  The path planner is then expected to repath around obstacles. 
 
 \subsection{Steering Module}
 
 The Steering Module subscribes to the nominal speed and desired pose as put out by the Speed Profiler.  It also subscribes to to the actual pose of the robot.  The Steering Module attempts to modify the nominal speed such that it will correct for error in the pose of the robot.  It implements a linear control algorithm and makes corrections proportional to the error.  As a general observation, it would be most unfortunate if the error in position ever became large because the Steering Module does not necessarily know about maximum safe speeds.  As a general observation, an improvement could be made in the future to prevent this, by simply placing a cap on the corrections made by the Steering Module.  If this cap were not chosen carefully, the steering module could have trouble correcting quickly enough to function correctly.  After deciding what speed it needs to publish, it sends commands directly to the motors to control the speed.
 
-\section{Discussion of Functionality}
+\section{Discussion}
+\subsection{Observation of Performance}
+\subsection{Bug Report}
+
+We sometimes turn too early when attempting to swerve back after dodging an obstacle.
+Planner tends to insert extra turns at the end of the path.
+
+\subsection{Group Policies and Ideas for Improvement}
+
+In general, our group has found it very useful to make use of version control systems and online backup, in particular, github.
+We decided as a group that all positions will be in the map frame with the same origin across all nodes to reduce possible transform erros.
+In addition, we found that OpenCV is rather convienent to use, and it is our opinion that we should replace all of the CSpace message types with 
 
 
 \end{document}
