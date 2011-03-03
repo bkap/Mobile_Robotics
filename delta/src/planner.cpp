@@ -58,7 +58,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
 	P.curvature = 1337;
 	
-	P.max_speeds.linear.x = MAX_LINEAR*.5;
+	P.max_speeds.linear.x = MAX_LINEAR*0.5;
 	P.max_speeds.linear.y = 0;
 	P.max_speeds.linear.z = 0;
 	P.min_speeds.linear.x = 0;
@@ -403,16 +403,17 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				path.push_back(MakeCurve(heading, heading + 3.14159/4.0,segnum++, endline, midcurve));
 				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,-3.14159/4,STD_TURN_RAD);	
 				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = endcurve.X;
-				y = endcurve.Y;
+				x = x + 0.3 * cos(heading);
+				y += 0.3 * sin(heading);
+				path.push_back(MakeLine(endcurve, Point3(x,y,0.0),segnum++));
 				old_x = x;
 				old_y = y;
-
+				distance -= 0.3;
 			avoiding = true;
 		} 
 	}
 	PathSegment p = path[path.size()-1];
-	path.pop_back(); // remove the final curve
+	//path.pop_back(); // remove the final curve
 	/*
 	// hax
 	int haxCount = 0;

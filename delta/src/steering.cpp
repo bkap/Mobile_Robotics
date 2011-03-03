@@ -14,7 +14,7 @@
 
 using namespace std;
 
-const double LOOP_RATE = 10;	//loop rate in Hz
+const double LOOP_RATE = 20;	//loop rate in Hz
 const double kS = -1.0;		//proportional gain on following error correction
 const double kD = -.75;		//proportional gain on lateral error correction
 const double kP = -.75;		//proportional gain on heading error correction

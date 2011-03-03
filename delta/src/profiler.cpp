@@ -25,7 +25,7 @@
 using namespace cv;
 using namespace eecs376_msgs;
 using namespace std;
-const double REFRESH_RATE = 10;
+const double REFRESH_RATE = 20;
 const double pi = 3.141592;
 
 PathList pathlist;

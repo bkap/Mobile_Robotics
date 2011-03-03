@@ -11,7 +11,7 @@
 
 using namespace eecs376_msgs;
 using namespace std;
-const double REFRESH_RATE = 0.1;
+const double REFRESH_RATE = 0.05;
 const double pi = 3.141592;
 
 PathList pathlist;
