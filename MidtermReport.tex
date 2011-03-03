@@ -11,31 +11,58 @@
 
 \subsection{Goal Publisher}
 
-The goal publisher's sole purpose in existing is to publish a goal pose of x, y, and heading.   It does not subscribe to anything, and at present the goal pose will never change.  Also, at present even though the Path Planner listens to the Goal Publisher, it does not take its output into consideration except for deciding where on the path to stop.  It is hoped that in the future we will impliment a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.  When that happens, Goal Publisher's information will become more relavent.
+The goal publisher's sole purpose in existing is to publish a goal pose of x, y, and heading.
+It does not subscribe to anything, and at present the goal pose will never change.
+Also, at present, even though the Path Planner listens to the Goal Publisher, it does not take its output into consideration except for deciding where on the path to stop.
+It is hoped that in the future we will impliment a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.
+When that happens, Goal Publisher's information will become more relevant.
 
 \subsection{LIDAR Driver}
 
-The LIDAR Driver was provided for us by the TA's.  It pulls LIDAR pings from the LIDAR sensor at a frequency of 75hz, transforms them into map coordinates and sends them to the LIDAR Mapper.  When it was given to us, it initially used the odom frame, but we decided that we would consistently use the map frame for all of our other nodes, so that we would be working in a consistent frame which could be debugged easily by looking at the map in stage.
+The LIDAR Driver was provided for us by the TA's.
+It pulls LIDAR pings from the LIDAR sensor at a frequency of 75hz, transforms them into map coordinates and sends them to the LIDAR Mapper.
+When it was given to us, it initially used the odom frame, but we decided that we would consistently use the map frame for all of our other nodes, so that we would be working in a consistent frame which could be debugged easily by looking at the map in stage.
 
 \subsection{LIDAR Mapper}
 
-The LIDAR mapper recieves pings from the LIDAR Driver and generates and publishes a fattened CSpace map, which the Path Planner can just read as an array with known orientation, origin and resolution.  The orientation is set to 0 in map coordinates because it made the most sense to orient the map parallel to the x an y axes.  The origin is set as (-10,-10) because that seemed like a reasonable lower left corner to use.  It transmits the map to the Path Planner and also to the Speed Profiler.  Because we use the openCV matrices in the other nodes, it would be more efficient to generate and transmit the CSpace map as an openCV matrix, but that is not what the architecture document called for.
+The LIDARmapper subscribes to LIDARCloud and publishes LIDARMap, the fattened CSpace map.
+The CSPace is returned as an OccupancyGrid with an origin at -10,-10 and height and width 35 in the map frame to contain the entire area of interest for this assignment.
+The points in the point cloud are fattened by ORing a pre-generated template containing a disk of radius 15cm with the pixel containing the ping and its' neighbors.
+Only pings within 10m of the robot are considered and only points for which the entirety of the fattened area would lie within the grid are added to the map.
 
 \subsection{Path Planner}
 
-The path planner subscribes to the LIDAR Mapper, which it uses to check for obstacles in the path. It also subscribes to the Goal Publisher, the PoseDes.  It was not clear which node published PoseDes, and it was not needed in planner for this assignment, so PoseDes is generally ignored.  The planner has been pre-programmed for this demo with a path that it should be following unless it sees an obstacle.  Also, the response to an obstacle is always the same, a swerve to the left before an obstacle, follwed by a swerve to the right when there is room in the normal driving lane again.  The swerve is always a fixed distance, and no further attempt to find obstacles is made during curves or swerves, so the current algorithm would likely crash if there were multiple nearby obstacles or if there were an obstacle in a curve or swerve.  In general, the Speed Profiler is still attmepting to search the current path for obstacles, so the robot should not hit any obstacles, but it may get stuck.  After generating the path, the Path Planner publishes the path as a PathList.
+The path planner subscribes to the LIDAR Mapper, which it uses to check for obstacles in the path.
+It also subscribes to the Goal Publisher, the PoseDes.  It was not clear which node published PoseDes, and it was not needed in planner for this assignment, so PoseDes is generally ignored.
+The planner has been pre-programmed for this demo with a path that it should be following unless it sees an obstacle.
+Also, the response to an obstacle is always the same, a swerve to the left before an obstacle, follwed by a swerve to the right when there is room in the normal driving lane again.
+The swerve is always a fixed distance, and no further attempt to find obstacles is made during curves or swerves, so the current algorithm would likely crash if there were multiple nearby obstacles or if there were an obstacle in a curve or swerve.
+In general, the Speed Profiler is still attmepting to search the current path for obstacles, so the robot should not hit any obstacles, but it may get stuck.
+After generating the path, the Path Planner publishes the path as a PathList.
 
 \subsection{Desired Path Crawler}
 
-The Desired Path Crawler listens to the current speed put out by the Speed Profiler, and the PathList published by the Path Planner. The Crawler moves a breadcrumb along the path published by the Path Planner at the speed that the Speed Profiler aledges we are moving.  It leaves the current speed blank so that the Speed Profiler can fill in what speed it would like to go.  After deciding a desired pose, the Desired Path Crawler publishes the desied path.
+The Desired Path Crawler listens to the current speed put out by the Speed Profiler, and the PathList published by the Path Planner.
+The Crawler moves a breadcrumb along the path published by the Path Planner at the speed that the Speed Profiler aledges we are moving.
+It leaves the current speed blank so that the Speed Profiler can fill in what speed it would like to go.
+After deciding a desired pose, the Desired Path Crawler publishes the desied path.
 
 \subsection{Speed Profiler}
 
-The Speed Profiler subscribes to the pose put out by the Desired Path Crawler, CSpace map published by the LIDAR Mapper, as well as the Path List put out by the Path Planner.  The Speed Profiler just fills in the linear speed at each point and republishes it with a different name, Speed Nominal.  It attempts to choose accelerate at the maximum allowed rate until it matches speed with what the Path Planner recommends in its PathList.  It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.  The path planner is then expected to repath around obstacles. T
+The Speed Profiler subscribes to the pose put out by the Desired Path Crawler, CSpace map published by the LIDAR Mapper, as well as the Path List put out by the Path Planner.
+The Speed Profiler just fills in the linear speed at each point and republishes it with a different name, Speed Nominal.
+It attempts to choose accelerate at the maximum allowed rate until it matches speed with what the Path Planner recommends in its PathList.
+It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.
+The path planner is then expected to repath around obstacles.
 
 \subsection{Steering Module}
 
-The Steering Module subscribes to the nominal speed and desired pose as put out by the Speed Profiler.  It also subscribes to to the actual pose of the robot.  The Steering Module attempts to modify the nominal speed such that it will correct for error in the pose of the robot.  It implements a linear control algorithm and makes corrections proportional to the error.  As a general observation, it would be most unfortunate if the error in position ever became large because the Steering Module does not necessarily know about maximum safe speeds.  As a general observation, an improvement could be made in the future to prevent this, by simply placing a cap on the corrections made by the Steering Module.  If this cap were not chosen carefully, the steering module could have trouble correcting quickly enough to function correctly.  After deciding what speed it needs to publish, it sends commands directly to the motors to control the speed.
+The Steering Module subscribes to NominalSpeed and odom and publishes cmd_vel.
+From NominalSpeed, the desired speed and pose are extracted for comparison with the actual pose from odom to generate steering corrections to return the robot to the desired path and schedule.
+The corrections are performed by projecting the vector from desired pose to actual pose onto both the desired heading and a leftward normal to the desired heading to calculate following and lateral errors respectively.
+This calculation is the same for both arcs and line segments, so the allowable path errors for good operation is less on an arc than for a line segment.
+The steering correction on the arcs additionally feeds-forward the linear voloctiy correction to the angular velocity corrretion.
+The corrections above nominal velocity are capped to .3 m / s for linear velocity and .5 rad / s for angular velocity and the total commanded linear velocity is constrained to be non-negative.
 
 \section{Discussion of Functionality}
 
