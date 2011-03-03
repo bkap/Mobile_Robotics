@@ -66,16 +66,19 @@ The corrections above nominal velocity are capped to .3 m / s for linear velocit
 
 \section{Discussion}
 \subsection{Observation of Performance}
+
+
+
 \subsection{Bug Report}
 
 We sometimes turn too early when attempting to swerve back after dodging an obstacle.
-Planner tends to insert extra turns at the end of the path.
+Planner tends to insert extra turns at the end of the path. We hope to fix this soon.
 
 \subsection{Group Policies and Ideas for Improvement}
 
 In general, our group has found it very useful to make use of version control systems and online backup, in particular, github.
 We decided as a group that all positions will be in the map frame with the same origin across all nodes to reduce possible transform erros.
-In addition, we found that OpenCV is rather convienent to use, and it is our opinion that we should replace all of the CSpace message types with 
+In addition, we found that OpenCV is rather convienent to use, and it is our opinion that we should replace all of the CSpace message types with OpenCV matrices or sparse matrices due to their convienence of use.
 
 
 \end{document}
