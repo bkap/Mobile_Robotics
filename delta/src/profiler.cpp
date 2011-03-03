@@ -53,6 +53,9 @@ bool lidarMapCalled = false;
 void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& newLidarMap)
 {
     // get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)
+    if(lidarMap != NULL) {
+		delete lidarMap;
+	}
     lidarMap = getMap(*newLidarMap);
     mapOrigin = (*newLidarMap).info.origin;
 	lidarMapCalled = true;
