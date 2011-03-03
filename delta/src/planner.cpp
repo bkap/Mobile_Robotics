@@ -268,7 +268,9 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 	double y = start.pose.position.y;
 	double wallx, wally;
 	bool avoiding = false;
+	bool swerved = false;
 	int segnum = 0;
+
 	//the distances we need to travel
 	double distances[] = {3.15,12.0,-1.0}; // changed last distance from 4.0 to 5.0 to allow for estop hax during demo
 	int i = 0;
@@ -338,7 +340,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 		}
 		//if we're avoiding, check stuff 0.6 meters over.
 		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = 0.6; //avoiding ? 0.6 : 0.75;
+		double distance_to_check = 0.25; //avoiding ? 0.6 : 0.75;
 		wallx = x + distance_to_check * cos(heading + 3.14159/2);
 		wally = y + distance_to_check * sin(heading + 3.14159/2);
 		//get the grid cells of the location to check and the possible wall
@@ -384,10 +386,10 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				old_x = x;
 				old_y = y;
 				avoiding=false;
-				distance -= 1.0;
+				distance -= 0.6;
 			}
-		} else if(map(grid_x, grid_y) &&!avoiding) {
-
+		} else if(map(grid_x, grid_y) &&!avoiding && !swerved) {
+				swerved = true;
 				cout << "\nPLANNER: oh noes! There's something in the way\n";
 				//Evasive Maneuvers!!!!!
 				Point3 start = Point3(old_x,old_y,0.0);
@@ -408,12 +410,12 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 				path.push_back(MakeCurve(heading, heading + 3.14159/4.0,segnum++, endline, midcurve));
 				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,-3.14159/4,STD_TURN_RAD);	
 				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = x + 0.3 * cos(heading);
-				y += 0.3 * sin(heading);
+				x = endcurve.X + 0.7 * cos(heading);
+				y = endcurve.Y +0.7 * sin(heading);
 				path.push_back(MakeLine(endcurve, Point3(x,y,0.0),segnum++));
 				old_x = x;
 				old_y = y;
-				distance -= 0.3;
+				distance -= 0.7;
 			avoiding = true;
 		} 
 	}
