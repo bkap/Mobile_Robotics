@@ -3,7 +3,7 @@ import roslib.message
 import struct
 
 import geometry_msgs.msg
-import roslib.msg
+import std_msgs.msg
 
 class CrawlerDesiredState(roslib.message.Message):
   _md5sum = "8a022665b62e846aae599403b4b5aab1"
@@ -31,7 +31,7 @@ float64 des_rho
 float64 des_lseg
 
 ================================================================================
-MSG: roslib/Header
+MSG: std_msgs/Header
 # Standard metadata for higher-level stamped data types.
 # This is generally used to communicate timestamped data 
 # in a particular coordinate frame.
@@ -92,7 +92,7 @@ float64 w
       super(CrawlerDesiredState, self).__init__(*args, **kwds)
       #message fields cannot be None, assign default values for those that are
       if self.header is None:
-        self.header = roslib.msg._Header.Header()
+        self.header = std_msgs.msg._Header.Header()
       if self.seg_type is None:
         self.seg_type = 0
       if self.seg_number is None:
@@ -106,7 +106,7 @@ float64 w
       if self.des_lseg is None:
         self.des_lseg = 0.
     else:
-      self.header = roslib.msg._Header.Header()
+      self.header = std_msgs.msg._Header.Header()
       self.seg_type = 0
       self.seg_number = 0
       self.des_pose = geometry_msgs.msg.Pose()
@@ -145,7 +145,7 @@ float64 w
     """
     try:
       if self.header is None:
-        self.header = roslib.msg._Header.Header()
+        self.header = std_msgs.msg._Header.Header()
       if self.des_pose is None:
         self.des_pose = geometry_msgs.msg.Pose()
       end = 0
@@ -197,7 +197,7 @@ float64 w
     """
     try:
       if self.header is None:
-        self.header = roslib.msg._Header.Header()
+        self.header = std_msgs.msg._Header.Header()
       if self.des_pose is None:
         self.des_pose = geometry_msgs.msg.Pose()
       end = 0
