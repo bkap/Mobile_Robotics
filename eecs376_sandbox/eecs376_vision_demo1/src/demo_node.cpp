@@ -4,17 +4,21 @@
 #include <opencv/highgui.h>
 #include <cv_bridge/CvBridge.h>
 #include <geometry_msgs/Twist.h>
+#include <sensor_msgs/LaserScan.h>
 
 #include <eecs376_vision_demo1/lib_demo.h>
 
 using namespace cv;
 
+bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
+// Also declare a point datatype here to hold the location of the rod as detected by LIDAR
+
 class DemoNode {
   public:
     DemoNode();
     void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+    ros::NodeHandle nh_; // Made this public to access it and subscribe to the LIDAR
   private:
-    ros::NodeHandle nh_;
     image_transport::ImageTransport it_;
     image_transport::Subscriber sub_;
     image_transport::Publisher image_pub_;
@@ -25,6 +29,39 @@ DemoNode::DemoNode():
 {
   sub_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
   image_pub_ = it_.advertise("demo_image", 1);
+}
+
+// Callback triggered whenever you receive a laser scan
+void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+  sensor_msgs::LaserScan scan = *msg;
+
+  // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
+  int num_points = scan.ranges.size();
+  int num_filtered = 0;
+
+  for( int i=1; i<num_points-1; i++ )
+  {
+    // This pixel is a candidate for filtering iff it is at max range
+    if( scan.ranges[i]>=scan.range_max-1.5 )
+    {
+      scan.ranges[i] = 0.5*(scan.ranges[i-1]+scan.ranges[i+1]);
+      num_filtered++;
+    }
+  }
+  // Special cases for first/last pixels
+  if( (scan.ranges[0]<scan.range_max) && (scan.ranges[1]>=scan.range_max-1.5) )
+  {
+    scan.ranges[0] = scan.ranges[1];
+    num_filtered++;
+  }
+  if( (scan.ranges[num_points-2]<scan.range_max) && (scan.ranges[num_points-1]>=scan.range_max-1.5) )
+  {
+    scan.ranges[num_points-1] = scan.ranges[num_points-2];
+    num_filtered++;
+  }
+
+  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
+
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -50,8 +87,8 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     IplImage temp = output;
     image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
   }
-  catch (sensor_msgs::CvBridgeException& e) {
-
+  catch (sensor_msgs::CvBridgeException& e)
+  {
     ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
   }
 }
@@ -60,8 +97,10 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
   DemoNode motion_tracker;
+  ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("base_laser1_scan", 1, laserCallback); // Subscribe to the LIDAR scan
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
+  ROS_INFO("Calibration procedure started");
   ros::spin();
   cvDestroyWindow("view");
 }
