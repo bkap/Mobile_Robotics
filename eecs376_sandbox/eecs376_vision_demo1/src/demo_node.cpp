@@ -31,6 +31,8 @@ DemoNode::DemoNode():
   image_pub_ = it_.advertise("demo_image", 1);
 }
 
+int PeakLocation = 0;
+
 // Callback triggered whenever you receive a laser scan
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
@@ -60,8 +62,20 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
+  double MaxVal = -DBL_MAX;//set to an arbitrarily low value  
 
+  //convolution of lidar ranges with [1/2, -1, 1/2]
+  //we don't need to store the convolution long term, just each individual value.
+  double Val = 0;
+  for(int i =1; i<num_points-1; i++)
+  {
+      Val = (scan.ranges[i-1]*.5+scan.ranges[i]+scan.ranges[i+1]*.5)/scan.ranges[i];
+      if(Val>MaxVal)
+      {
+           MaxVal = Val;
+           PeakLocation = i;
+      }
+  }
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
