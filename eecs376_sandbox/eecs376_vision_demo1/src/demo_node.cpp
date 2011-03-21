@@ -31,7 +31,7 @@ DemoNode::DemoNode():
   image_pub_ = it_.advertise("demo_image", 1);
 }
 
-int PeakLocation = 0;
+int peakIndex = 0;
 
 // Callback triggered whenever you receive a laser scan
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -73,7 +73,7 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
       if(Val>MaxVal)
       {
            MaxVal = Val;
-           PeakLocation = i;
+           peakIndex = i;
       }
   }
 }
