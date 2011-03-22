@@ -1,0 +1,19 @@
+<package>
+  <description brief="eecs376_vision_demo1">
+
+     eecs376_vision_demo1
+
+  </description>
+  <author>Eric Perko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/eecs376_vision_demo1</url>
+  <depend package="image_transport"/>
+  <depend package="roscpp"/>
+  <depend package="sensor_msgs"/>
+  <depend package="opencv2" />
+  <depend package="cv_bridge" />
+
+</package>
+
+
