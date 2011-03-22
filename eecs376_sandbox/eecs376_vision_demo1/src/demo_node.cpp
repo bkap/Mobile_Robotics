@@ -10,6 +10,8 @@
 
 using namespace cv;
 
+Point2f lastValidLIDARPoint;
+
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
 
@@ -30,8 +32,6 @@ DemoNode::DemoNode():
   sub_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
   image_pub_ = it_.advertise("demo_image", 1);
 }
-
-int peakIndex = 0;
 
 // Callback triggered whenever you receive a laser scan
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -62,11 +62,14 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
+  int peakIndex;
   double MaxVal = -DBL_MAX;//set to an arbitrarily low value  
 
   //convolution of lidar ranges with [1/2, -1, 1/2]
   //we don't need to store the convolution long term, just each individual value.
+  
   double Val = 0;
+  
   for(int i =1; i<num_points-1; i++)
   {
       Val = (scan.ranges[i-1]*.5+scan.ranges[i]+scan.ranges[i+1]*.5)/scan.ranges[i];
@@ -76,6 +79,12 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
            peakIndex = i;
       }
   }
+
+  double theta = (double)(i-90);
+  double dist = scan.ranges[i];
+
+  lastValidLIDARPoint.x = dist*cos(theta);
+  lastValidLIDARPoint.y = dist*sin(theta);
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
