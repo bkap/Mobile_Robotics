@@ -5,10 +5,16 @@
 #include <cv_bridge/CvBridge.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/LaserScan.h>
-
+#include <iostream>
+#include <fstream>
 #include <eecs376_vision_demo1/lib_demo.h>
 
+FILE* scanRanges = fopen("scanRanges", "w");
+
 using namespace cv;
+
+Point2f lastValidLIDARPoint;
+bool LIDAR_IsValid = false;
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
@@ -60,8 +66,40 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
+  int peakIndex;
+  double MaxVal = -DBL_MAX;//set to an arbitrarily low value  
 
+  //convolution of lidar ranges with [1/2, -1, 1/2]
+  //we don't need to store the convolution long term, just each individual value.
+  double Val = 0;
+   LIDAR_IsValid = true;
+  //fprintf(scanRanges, "Ranges:\t");
+  int i = 0;
+  //for(i =0; i<num_points; i++)
+  // {
+  //	fprintf(scanRanges,"%f,\t",scan.ranges[i]);
+  //}
+  //fprintf(scanRanges,"\nConvolution:\t");
+  for(i =1; i<num_points-1; i++)
+  {
+      Val = (scan.ranges[i-1]*.5-scan.ranges[i]+scan.ranges[i+1]*.5)/scan.ranges[i];
+
+  //    fprintf(scanRanges,"%f,\t",Val);
+      if(Val>MaxVal&&Val>.5)
+      {
+           MaxVal = Val;
+           peakIndex = i;
+           LIDAR_IsValid = true;
+      }
+  }
+  //fprintf(scanRanges,"\n\n");
+  //fflush(scanRanges);
+  
+  double theta = (double)(i-90);
+  double dist = scan.ranges[i];
+
+  lastValidLIDARPoint.x = dist*cos(theta);
+  lastValidLIDARPoint.y = dist*sin(theta);
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
