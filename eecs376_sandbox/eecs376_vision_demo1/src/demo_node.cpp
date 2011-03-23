@@ -10,7 +10,7 @@
 #include <eecs376_vision_demo1/lib_demo.h>
 
 using namespace cv;
-
+using namespace std;
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
@@ -148,6 +148,32 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   }
 }
 
+// from http://blog.weisu.org/2007/11/opencv-print-matrix.html
+void PrintMat(CvMat *A)
+{
+    int i, j;
+    for (i = 0; i < A->rows; i++)
+    {
+        printf("\n");
+        switch (CV_MAT_DEPTH(A->type))
+        {
+            case CV_32F:
+            case CV_64F:
+                for (j = 0; j < A->cols; j++)
+                printf ("%8.3f ", (float)cvGetReal2D(A, i, j));
+                break;
+            case CV_8U:
+            case CV_16U:
+                for(j = 0; j < A->cols; j++)
+                printf ("%6d",(int)cvGetReal2D(A, i, j));
+                break;
+            default:
+                break;
+        }
+    }
+    printf("\n");
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
@@ -183,6 +209,10 @@ int main(int argc, char **argv)
 
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
 	cout<<endl;
-	cout<<"rotations:"<<Mat(&rvec)<<"\ntranslations:"<<Mat(&tvec)<<endl;
+	cout<<"rotations:";
+	PrintMat(&rvec);
+	cout<<"\ntranslations:";
+	PrintMat(&tvec);
+	cout<<endl;
     cvDestroyWindow("view");
 }
