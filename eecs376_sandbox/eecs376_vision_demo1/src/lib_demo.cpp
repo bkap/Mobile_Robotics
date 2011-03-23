@@ -92,8 +92,8 @@ CvPoint2D64f blobfind(const cv::Mat& src, cv::Mat& out)
 
   CvLabel greatestBlob = cvGreaterBlob(blobs);
   CvPoint2D64f center;
-  center.x = src.size().width/2;
-  center.y = src.size().height/2;
+  center.x = 0;//src.size().width/2;
+  center.y = 0;//src.size().height/2;
   if (greatestBlob > 0) {
     center = cvCentroid(blobs[greatestBlob]);
   }
