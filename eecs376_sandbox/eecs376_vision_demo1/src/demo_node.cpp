@@ -1,4 +1,4 @@
-#include <camera_info_manager/camera_info_manager.h>
+//#include <camera_info_manager/camera_info_manager.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.h>
@@ -57,7 +57,7 @@ void DemoNode::info(const sensor_msgs::CameraInfo msg){
 	const double* D = (msg.D).data();
 	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
 	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
-       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+       cout<<"I GOT CAMERA INFO v2!!!!!!!!!!!!\n";
 }
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -92,22 +92,22 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   double maxVal = -DBL_MAX;
   double val = 0;
 
-for (int i=1;i<num_points-1;i++){
-	val = (0.5 * scan.ranges[i-1] - scan.ranges[i] + 0.5*scan.ranges[i+1])/scan.ranges[i];
-	if(val>maxVal){
-		maxVal = val;
-		peakIndex = i;
-	}
-}
+    for (int i=1;i<num_points-1;i++){
+	    val = (0.5 * scan.ranges[i-1] - scan.ranges[i] + 0.5*scan.ranges[i+1])/scan.ranges[i];
+	    if(val>maxVal){
+		    maxVal = val;
+		    peakIndex = i;
+	    }
+    }
 
-double theta = 3.141592653589793238462643383279 * (double)(peakIndex-90) / 180.0;
-double dist = scan.ranges[peakIndex];
+    double theta = 3.141592653589793238462643383279 * (double)(peakIndex-90) / 180.0;
+    double dist = scan.ranges[peakIndex];
 
-if(maxVal > 0.8){	//threshold
-	last_scan_valid = true;
-	lastValidLIDARPoint.x = dist*cos(theta);
-	lastValidLIDARPoint.y = dist*sin(theta);
-}
+    if(maxVal > 0.8){	//threshold
+	    last_scan_valid = true;
+	    lastValidLIDARPoint.x = dist*cos(theta);
+	    lastValidLIDARPoint.y = dist*sin(theta);
+    }
   ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
 }
 
@@ -146,6 +146,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
   }
+  cout << "END imageCallback\n";
 }
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
@@ -178,7 +179,7 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
   DemoNode motion_tracker;
-  //ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("lidar", 1, laserCallback); // Subscribe to the LIDAR scan
+  //ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("lidar", 1, lidarCallback); // Subscribe to the LIDAR scan
   //ros::Subscriber info_sub  = motion_tracker.nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,infoCallback); //Subscribe to the camera info
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
@@ -198,14 +199,14 @@ int main(int argc, char **argv)
 	CvMat tvec = Mat(3,1,CV_64F); //extrinsic parameter translation matrix
 
 	ros::NodeHandle n;
-        CameraInfoManager C (n, "front_camera");
-	DemoNode::info(C.getCameraInfo());
+    //CameraInfoManager C (n, "front_camera");
+	//DemoNode::info(C.getCameraInfo());
 
 	CvMat cvCameraMat = Mat(cameraMat);
 	CvMat cvDistMat = Mat(distMat);
         
         cout<<"CV_IS_MAT\tiPoints\twPoints\trvec\ttvec\tcvCameraMat\tcvDistMat\n";
-	cout<<"\t\t"<<CV_IS_MAT(&iPoints)<<"\t"<<CV_IS_MAT(&wPoints)<<"\t"<<CV_IS_MAT(&rvec)<<"\t"<<CV_IS_MAT(&tvec)<<"\t"<<CV_IS_MAT(&cameraMat)<<"\t\t"<<CV_IS_MAT(&cvDistMat)<<"\n";
+	cout<<"\t\t"<<CV_IS_MAT(&iPoints)<<"\t"<<CV_IS_MAT(&wPoints)<<"\t"<<CV_IS_MAT(&rvec)<<"\t"<<CV_IS_MAT(&tvec)<<"\t"<<CV_IS_MAT(&cvCameraMat)<<"\t\t"<<CV_IS_MAT(&cvDistMat)<<"\n";
 
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
 	cout<<endl;
