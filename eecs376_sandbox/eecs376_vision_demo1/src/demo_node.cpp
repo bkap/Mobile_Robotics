@@ -1,3 +1,4 @@
+#include <camera_info_manager/camera_info_manager.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.h>
@@ -21,6 +22,7 @@ Mat distMat; //distortion parameters
 class DemoNode {
   public:
     DemoNode();
+    static void info(const sensor_msgs::CameraInfo msg);
     void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
     void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
     void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
@@ -45,6 +47,14 @@ DemoNode::DemoNode():
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	const double* K = (msg->K).data();
 	const double* D = (msg->D).data();
+	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
+	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
+       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+}
+
+void DemoNode::info(const sensor_msgs::CameraInfo msg){
+	const double* K = (msg.K).data();
+	const double* D = (msg.D).data();
 	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
 	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
        cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
@@ -158,8 +168,12 @@ int main(int argc, char **argv)
 	CvMat wPoints = Mat(LIDARPoints); //matrix of points in world-space
 
 	//there's probably going to be problems since the centroids were calculated from images which had already undergone some manner of undistortion/rectification
-	CvMat rvec = Mat(4,1,CV_64FC3); //extrinsic parameter rotation matrix
-	CvMat tvec = Mat(4,1,CV_64FC3); //extrinsic parameter translation matrix
+	CvMat rvec = Mat(3,1,CV_64F); //extrinsic parameter rotation matrix
+	CvMat tvec = Mat(3,1,CV_64F); //extrinsic parameter translation matrix
+
+	ros::NodeHandle n;
+        CameraInfoManager C (n, "front_camera");
+	DemoNode::info(C.getCameraInfo());
 
 	CvMat cvCameraMat = Mat(cameraMat);
 	CvMat cvDistMat = Mat(distMat);
@@ -169,6 +183,6 @@ int main(int argc, char **argv)
 
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
 	cout<<endl;
-	//cout<<"rotations:"<<rvec<<"\ntranslations:"<<tvec<<endl;
+	cout<<"rotations:"<<Mat(&rvec)<<"\ntranslations:"<<Mat(&tvec)<<endl;
     cvDestroyWindow("view");
 }
