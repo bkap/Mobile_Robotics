@@ -2,6 +2,8 @@
 <node pkg="eecs376_vision_demo1" type="vision_demo" name="demo_node" output="screen">
     <!-- remap from="image" to="camera/image_raw" /-->
     <remap from="image" to="/front_camera/image_rect_color"/>
+    <remap from="lidar" to="/base_laser1_scan"/>
+    <remap from="camera_info" to="/front_camera/camera_info"/>
 </node>
 
 <node pkg="image_view" type="image_view" name="demo_image_viewer" output="screen">
