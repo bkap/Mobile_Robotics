@@ -37,7 +37,8 @@ DemoNode::DemoNode():
   it_(nh_)
 {
   sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
-  sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
+  sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);  
+  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("front_camera/camera_info",1,&DemoNode::infoCallback,this);
   image_pub_ = it_.advertise("demo_image", 1);
 }
 // Callback for CameraInfo (intrinsic parameters)
@@ -46,6 +47,7 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	const double* D = (msg->D).data();
 	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
 	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
+       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -145,21 +147,28 @@ int main(int argc, char **argv)
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
-  ros::spin();
-  cvDestroyWindow("view");
+  ros::Rate naptime(75);
 
-  if(imagePoints.size()>50){
+  while(imagePoints.size()<100)
+  {
+        naptime.sleep();
+  	ros::spinOnce();
+  }
 	CvMat iPoints = Mat(imagePoints); //matrix of points in image-space
 	CvMat wPoints = Mat(LIDARPoints); //matrix of points in world-space
 
 	//there's probably going to be problems since the centroids were calculated from images which had already undergone some manner of undistortion/rectification
-	CvMat rvec; //extrinsic parameter rotation matrix
-	CvMat tvec; //extrinsic parameter translation matrix
+	CvMat rvec = Mat(4,1,CV_64FC3); //extrinsic parameter rotation matrix
+	CvMat tvec = Mat(4,1,CV_64FC3); //extrinsic parameter translation matrix
 
-	CvMat cvCameraMat = cameraMat;
-	CvMat cvDistMat = distMat;
+	CvMat cvCameraMat = Mat(cameraMat);
+	CvMat cvDistMat = Mat(distMat);
+        
+        cout<<"CV_IS_MAT\tiPoints\twPoints\trvec\ttvec\tcvCameraMat\tcvDistMat\n";
+	cout<<"\t\t"<<CV_IS_MAT(&iPoints)<<"\t"<<CV_IS_MAT(&wPoints)<<"\t"<<CV_IS_MAT(&rvec)<<"\t"<<CV_IS_MAT(&tvec)<<"\t"<<CV_IS_MAT(&cameraMat)<<"\t\t"<<CV_IS_MAT(&cvDistMat)<<"\n";
+
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
 	cout<<endl;
 	//cout<<"rotations:"<<rvec<<"\ntranslations:"<<tvec<<endl;
-  }
+    cvDestroyWindow("view");
 }
