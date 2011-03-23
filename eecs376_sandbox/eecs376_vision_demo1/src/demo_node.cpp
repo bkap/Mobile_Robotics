@@ -12,42 +12,27 @@ using namespace cv;
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
-Point2f lastValidLIDARPoint; //set this the x,y coordinate of any rod found
-vector<Point3f> LIDARPoints; //aggregator for rod points
-vector<Point2f> imagePoints; //aggregator for image points
-Mat cameraMat; //intrinsic parameters
-Mat distMat; //distortion parameters
+
 class DemoNode {
   public:
     DemoNode();
-    void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
-    void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
-    void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
+    void imageCallback(const sensor_msgs::ImageConstPtr& msg);
     ros::NodeHandle nh_; // Made this public to access it and subscribe to the LIDAR
   private:
     image_transport::ImageTransport it_;
-    image_transport::Subscriber sub_image_;
-    ros::Subscriber sub_lidar_;
-    ros::Subscriber sub_info_;
+    image_transport::Subscriber sub_;
     image_transport::Publisher image_pub_;
 };
 
 DemoNode::DemoNode():
   it_(nh_)
 {
-  sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
-  sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
+  sub_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
   image_pub_ = it_.advertise("demo_image", 1);
 }
-// Callback for CameraInfo (intrinsic parameters)
-void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
-	const double* K = (msg->K).data();
-	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
-}
+
 // Callback triggered whenever you receive a laser scan
-void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
 
   // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
@@ -75,27 +60,8 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-  int peakIndex;
-  double maxVal = -DBL_MAX;
-  double val = 0;
-
-for (int i=1;i<num_points-1;i++){
-	val = (scan.ranges[i-1]*.5+scan.ranges[i+1]*.5 - scan.ranges[i])/scan.ranges[i];
-	if(val>maxVal){
-		maxVal = val;
-		peakIndex = i;
-	}
-}
-
-double theta = (double) (3.141592653589793238462643383279 * (peakIndex-90) / 180.0);
-double dist = scan.ranges[peakIndex];
-
-if(maxVal > 2.0){	//threshold
-	last_scan_valid = true;
-	lastValidLIDARPoint.x = dist*cos(theta);
-	lastValidLIDARPoint.y = dist*sin(theta);
-}
   ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
+
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -116,14 +82,6 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     normalizeColors(image, output);
     CvPoint2D64f Center = blobfind(image, output);
     cv::Point2f center (Center.x, Center.y);
-    if(center.x>0 && last_scan_valid){
-	//print id,i,j,r,theta,x,y as per assignment
-	cout<< msg->header.seq<<"\t"<<center.x<<"\t"<<center.y<<"\t"<<norm(lastValidLIDARPoint)<<"\t"<<atan2(lastValidLIDARPoint.y,lastValidLIDARPoint.x);
-	cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
-
-	imagePoints.push_back(center);
-	LIDARPoints.push_back(Point3f(lastValidLIDARPoint.x,lastValidLIDARPoint.y,0));
-    }
     cv::imshow("view", output);
     findLines(image, output);
     IplImage temp = output;
@@ -139,26 +97,10 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
   DemoNode motion_tracker;
-  //ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("lidar", 1, laserCallback); // Subscribe to the LIDAR scan
-  //ros::Subscriber info_sub  = motion_tracker.nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,infoCallback); //Subscribe to the camera info
+  ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("base_laser1_scan", 1, laserCallback); // Subscribe to the LIDAR scan
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
   ros::spin();
   cvDestroyWindow("view");
-
-  if(imagePoints.size()>50){
-	CvMat iPoints = Mat(imagePoints); //matrix of points in image-space
-	CvMat wPoints = Mat(LIDARPoints); //matrix of points in world-space
-
-	//there's probably going to be problems since the centroids were calculated from images which had already undergone some manner of undistortion/rectification
-	CvMat rvec; //extrinsic parameter rotation matrix
-	CvMat tvec; //extrinsic parameter translation matrix
-
-	CvMat cvCameraMat = cameraMat;
-	CvMat cvDistMat = distMat;
-	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
-	cout<<endl;
-	//cout<<"rotations:"<<rvec<<"\ntranslations:"<<tvec<<endl;
-  }
 }
