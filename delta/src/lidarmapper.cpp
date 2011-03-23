@@ -105,7 +105,7 @@ void patchInit()
 	}
 }
 
-void copyPoints()	
+void copyPoints(sensor_msgs::PointCloud scanCloud)	
 {
 	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
 	//cout<<"copying points:"<<endl;
@@ -182,7 +182,7 @@ void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 		//cout<<"2callback\n";
 		scanCloud = *scan_cloud; 
 		//ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
-		copyPoints();
+		copyPoints(scanCloud);
 		//cout<<"yo\n";
 	}
 }
@@ -203,6 +203,7 @@ int main(int argc,char **argv)
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
+	ros::Subscriber S3 = n.subscribe<nav_msgs::PointCloud>("Cam_Cloud",20, cloudCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);
