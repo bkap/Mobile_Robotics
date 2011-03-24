@@ -40,25 +40,19 @@ DemoNode::DemoNode():
 {
   sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
   sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);  
-  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("front_camera/camera_info",1,&DemoNode::infoCallback,this);
+  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
   image_pub_ = it_.advertise("demo_image", 1);
 }
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
-	const double* K = (msg->K).data();
-	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
-       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+//	const double* K = (msg->K).data();
+//	const double* D = (msg->D).data();
+//	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
+//	Mat(5,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
+cout<<"got camera\n";
+	
 }
 
-void DemoNode::info(const sensor_msgs::CameraInfo msg){
-	const double* K = (msg.K).data();
-	const double* D = (msg.D).data();
-	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
-       cout<<"I GOT CAMERA INFO v2!!!!!!!!!!!!\n";
-}
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
@@ -103,12 +97,12 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     double theta = 3.141592653589793238462643383279 * (double)(peakIndex-90) / 180.0;
     double dist = scan.ranges[peakIndex];
 
-    if(maxVal > 0.8){	//threshold
-	    last_scan_valid = true;
-	    lastValidLIDARPoint.x = dist*cos(theta);
-	    lastValidLIDARPoint.y = dist*sin(theta);
-    }
-  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
+if(maxVal > 0.8){	//threshold
+	last_scan_valid = true;
+	lastValidLIDARPoint.x = dist*cos(theta);
+	lastValidLIDARPoint.y = dist*sin(theta);
+}
+  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d maxVal: %f",num_filtered,num_points,maxVal);
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -137,16 +131,15 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	imagePoints.push_back(center);
 	LIDARPoints.push_back(Point3f(lastValidLIDARPoint.x,lastValidLIDARPoint.y,0));
     }
-    cv::imshow("view", output);
-    findLines(image, output);
-    IplImage temp = output;
-    image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
+ //   cv::imshow("view", output);
+ //   findLines(image, output);
+ //   IplImage temp = output;
+ //   image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
     ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
   }
-  cout << "END imageCallback\n";
 }
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
@@ -184,36 +177,62 @@ int main(int argc, char **argv)
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
-  ros::Rate naptime(75);
+ // ros::Rate naptime(75);
 
-  while(imagePoints.size()<100)
-  {
-        naptime.sleep();
-  	ros::spinOnce();
-  }
-	CvMat iPoints = Mat(imagePoints); //matrix of points in image-space
-	CvMat wPoints = Mat(LIDARPoints); //matrix of points in world-space
+  //while(imagePoints.size()<100)
+  //{
+  //      naptime.sleep();
+  //	ros::spinOnce();
+  //}
+	ros::spin();
+	Mat iPoints_ = Mat(imagePoints); //matrix of points in image-space
+	Mat wPoints_ = Mat(LIDARPoints); //matrix of points in world-space
+	iPoints_.convertTo(iPoints_,CV_64F);
+	wPoints_.convertTo(wPoints_,CV_64F);
+	
+	CvMat iPoints = iPoints_;
+	CvMat wPoints = wPoints_;
 
 	//there's probably going to be problems since the centroids were calculated from images which had already undergone some manner of undistortion/rectification
-	CvMat rvec = Mat(3,1,CV_64F); //extrinsic parameter rotation matrix
-	CvMat tvec = Mat(3,1,CV_64F); //extrinsic parameter translation matrix
+	Mat rvec_ = (Mat_<double>(3,1) << 0.0,0.0,0.0);
+	Mat tvec_ = (Mat_<double>(3,1) << 0.0,0.0,0.0);
+	CvMat rvec = rvec_;//Mat(3,1,CV_64F); //extrinsic parameter rotation matrix
+	CvMat tvec = tvec_;///Mat(3,1,CV_64F); //extrinsic parameter translation matrix
 
-	ros::NodeHandle n;
-    //CameraInfoManager C (n, "front_camera");
-	//DemoNode::info(C.getCameraInfo());
+if(imagePoints.size()<20)	return 1;
 
-	CvMat cvCameraMat = Mat(cameraMat);
-	CvMat cvDistMat = Mat(distMat);
+        cameraMat = (Mat_<double>(3,3) << 532.18899999999996, 0.0, 330.678, 0.0, 531.28700000000003, 260.733, 0.0, 0.0, 1.0);
+        distMat = (Mat_<double>(5,1) <<  -0.34610800000000003, 0.17599799999999999, 0.0013294100000000001, 0.0023169800000000002, 0.0);
+	CvMat cvCameraMat =cameraMat;
+	CvMat cvDistMat = distMat;
         
         cout<<"CV_IS_MAT\tiPoints\twPoints\trvec\ttvec\tcvCameraMat\tcvDistMat\n";
 	cout<<"\t\t"<<CV_IS_MAT(&iPoints)<<"\t"<<CV_IS_MAT(&wPoints)<<"\t"<<CV_IS_MAT(&rvec)<<"\t"<<CV_IS_MAT(&tvec)<<"\t"<<CV_IS_MAT(&cvCameraMat)<<"\t\t"<<CV_IS_MAT(&cvDistMat)<<"\n";
 
-	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,&cvDistMat,&rvec,&tvec);
+	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,NULL,&rvec,&tvec);
 	cout<<endl;
 	cout<<"rotations:";
 	PrintMat(&rvec);
 	cout<<"\ntranslations:";
 	PrintMat(&tvec);
 	cout<<endl;
+
+	rvec_ = Mat(&rvec);
+	tvec_ = Mat(&tvec);
+
+	Mat R;
+	Rodrigues(rvec_, R);
+	R.col(1) = R.col(2);
+	R.col(2) = tvec_;
+
+	Mat projector = (cameraMat * R).inv();
+	
+	/*
+	reverse projection should be robotCoordinateFramePoint = projector * imagePoint
+	(x,y,1) = projector * (u v 1)
+	still need to verify by comparison of projected blob centroids with corresponding lidar pings
+	*/
+	cout<<"got there"<<endl;
     cvDestroyWindow("view");
+return 0;
 }
