@@ -178,10 +178,10 @@ double distanceRemaining()
             return fabs(psiDes - psiCur) / curState.des_rho;
         case 3: // angle remaining
             return fabs(psiDes - psiCur);
-
+	}
 	assert(1337==0);//control shouldn't get here.
 	return 9001; //it's over 9000
-    }
+    
 }
 
 /*

@@ -203,7 +203,7 @@ int main(int argc,char **argv)
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
-	ros::Subscriber S3 = n.subscribe<nav_msgs::PointCloud>("Cam_Cloud",20, cloudCallback);
+	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud",20, cloudCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);

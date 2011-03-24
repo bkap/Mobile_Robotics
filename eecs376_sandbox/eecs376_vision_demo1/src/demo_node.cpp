@@ -47,8 +47,8 @@ DemoNode::DemoNode():
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	const double* K = (msg->K).data();
 	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
+	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
+	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
        cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
@@ -56,7 +56,7 @@ void DemoNode::info(const sensor_msgs::CameraInfo msg){
 	const double* K = (msg.K).data();
 	const double* D = (msg.D).data();
 	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(4,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
+	Mat(5,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
        cout<<"I GOT CAMERA INFO v2!!!!!!!!!!!!\n";
 }
 // Callback triggered whenever you receive a laser scan
