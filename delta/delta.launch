@@ -9,5 +9,7 @@
 	<node name="profiler" pkg="delta" type="profiler" output="screen"/>
 	<node name="steering" pkg="delta" type="steering" output="screen"/>
 
+	<!-- Load parameter file -->
+	<rosparam command="load" file="$(find delta)/delta_params.yaml" />
 </launch>
 

@@ -5,3 +5,10 @@ example:
  e: 3.4
  f: 8
 
+steering:
+ LOOP_RATE: 20
+ kS: -1.0
+ kD: -.75
+ kP: -.75
+ maxSteerV: .3
+ maxSteerW: .5
