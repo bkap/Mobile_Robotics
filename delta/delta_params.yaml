@@ -10,5 +10,8 @@ steering:
  kS: -1.0
  kD: -0.75
  kP: -0.75
- maxSteerV: .3
- maxSteerW: .5
+ maxSteerV: 0.3
+ maxSteerW: 0.5
+
+profiler:
+ REFRESH_RATE: 20
