@@ -1,0 +1,14 @@
+<launch>
+	<!-- Launch the required nodes -->
+	<node name="lidar" pkg="delta" type="lidar" output="screen"/>
+	<node name="goalpublisher" pkg="delta" type="goalpublisher" output="screen" />
+	<node name="lidarmapper" pkg="delta" type="lidarmapper" output="screen"/>
+	<node name="planner" pkg="delta" type="planner" output="screen"/>
+	<node name="desiredpathcrawler" pkg="delta" type="desiredpathcrawler" output="screen"/>
+	<node name="profiler" pkg="delta" type="profiler" output="screen"/>
+	<node name="steering" pkg="delta" type="steering" output="screen"/>
+
+	<!-- Load a parameter file -->
+	<rosparam command="load" file="$(find delta)/delta_params.yaml" />
+</launch>
+
