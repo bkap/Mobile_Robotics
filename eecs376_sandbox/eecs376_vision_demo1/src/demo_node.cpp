@@ -149,30 +149,59 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 }
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
-void PrintMat(CvMat *A)
+void SaveMat(CvMat *A, FILE* f)
 {
     int i, j;
+    fprintf(f,"%i\n",A->rows);
+    fprintf(f,"%i\n",A->cols);
+    fprintf(f,"%i\n", A->type);
     for (i = 0; i < A->rows; i++)
     {
-        printf("\n");
+        fprintf(f,"\n");
         switch (CV_MAT_DEPTH(A->type))
         {
             case CV_32F:
             case CV_64F:
                 for (j = 0; j < A->cols; j++)
-                printf ("%8.3f ", (float)cvGetReal2D(A, i, j));
+                fprintf (f,"%8.3f ", (float)cvGetReal2D(A, i, j));
                 break;
             case CV_8U:
             case CV_16U:
                 for(j = 0; j < A->cols; j++)
-                printf ("%6d",(int)cvGetReal2D(A, i, j));
+                fprintf (f,"%6d",(int)cvGetReal2D(A, i, j));
                 break;
             default:
                 break;
         }
     }
-    printf("\n");
+    fprintf(f,"\n");
 }
+
+void PrintMat(CvMat *A)
+{
+    int i, j;
+    for (i = 0; i < A->rows; i++)
+    {
+        fprintf(stdout,"\n");
+        switch (CV_MAT_DEPTH(A->type))
+        {
+            case CV_32F:
+            case CV_64F:
+                for (j = 0; j < A->cols; j++)
+                fprintf (stdout,"%8.3f ", (float)cvGetReal2D(A, i, j));
+                break;
+            case CV_8U:
+            case CV_16U:
+                for(j = 0; j < A->cols; j++)
+                fprintf (stdout,"%6d",(int)cvGetReal2D(A, i, j));
+                break;
+            default:
+                break;
+        }
+    }
+    fprintf(stdout,"\n");
+}
+
 
 int main(int argc, char **argv)
 {
@@ -218,10 +247,19 @@ if(imagePoints.size()<20)	return 1;
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,NULL,&rvec,&tvec);
 	cout<<endl;
 	cout<<"rotations:";
+     
+        FILE *R = fopen("rvec", "w");
+	FILE *T = fopen("tvec", "w");
+
 	PrintMat(&rvec);
+        SaveMat(&rvec,R);
 	cout<<"\ntranslations:";
 	PrintMat(&tvec);
+        SaveMat(&tvec,T);
 	cout<<endl;
+
+        fclose(R);
+	fclose(T);
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);
