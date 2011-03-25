@@ -37,28 +37,24 @@ void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom)
 //	cout<<"steering odom callback happened"<<endl;
 //	last_odom = *odom;
 
-        temp.pose = odom->pose.pose;
+	temp.pose = odom->pose.pose;
 	temp.header = odom->header;
-        //cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
-        try 
+	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
+	try 
 	{
 		tfl->transformPose("map", temp, poseActual);
 		stalePos = false;
-        } 
+	} 
 	catch (tf::TransformException ex) 
 	{
-	  cout << "We caught an error!" << endl;
-          ROS_ERROR("%s", ex.what());
-        }
-	
-	/////////cout<<"finished"<<endl;
-	
+		cout << "We caught an error!" << endl;
+		ROS_ERROR("%s", ex.what());
+	}
 }
 
 void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed) 
 {
 //	cout<< "steering speed callback happened"<<endl;
-	//desired = *newSpeed;
         desired.header = newSpeed->header;
 	desired.des_pose = newSpeed->des_pose;
 	desired.des_speed = newSpeed->des_speed;
@@ -162,14 +158,14 @@ For invalid segments, the nominal velocities are both 0.
 cv::Vec2d getNominalVelocities(eecs376_msgs::CrawlerDesiredState* goal)
 {
 	switch(goal->seg_type){
-			case 1:	//line
-				return cv::Vec2d(goal->des_speed,0);
-			case 2:	//arc
-				return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
-			case 3:	//turn
-				return cv::Vec2d(0,goal->des_speed);
-			default:
-				return cv::Vec2d(0,0);
+		case 1:	//line
+			return cv::Vec2d(goal->des_speed,0);
+		case 2:	//arc
+			return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
+		case 3:	//turn
+			return cv::Vec2d(0,goal->des_speed);
+		default:
+			return cv::Vec2d(0,0);
 	}
 }
 //publishes cmd_vel every time a steering correction is available at the specified lop rate
@@ -242,20 +238,20 @@ int main(int argc,char **argv)
 		
 		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
 		//cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
-		vw= getNominalVelocities(&desired);
+		vw = getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		
 		vw[0]  = max(vw[0], 0);
 
 		//	cout<<"Steering calculated"<<endl;
-				//limit velocities
+		//limit velocities
 			
-			vel_object.linear.x = vw[0];
-			vel_object.angular.z= vw[1];
-			stalePos = true,
-		     	staleDes = true;
+		vel_object.linear.x = vw[0];
+		vel_object.angular.z= vw[1];
+		stalePos = true,
+	  	staleDes = true;
 
-			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
-			pub.publish(vel_object);
+		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		pub.publish(vel_object);
 	}
 }
