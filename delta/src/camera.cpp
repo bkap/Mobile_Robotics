@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "CameraNode");
   tfl = new tf::TransformListener();
-  while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+  while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
   DemoNode motion_tracker;
   ROS_INFO("Camera Node Started");
   while(ros::ok()){ros::spinOnce();}

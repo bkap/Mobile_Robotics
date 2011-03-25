@@ -542,11 +542,11 @@ int main(int argc,char **argv)
 	cout<<"3\n";
 	ros::Duration elapsed_time; // define a variable to hold elapsed time
 	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
+	while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
       	cout<<"3\n";
 	ros::Time birthday = ros::Time::now();
 	//desired_pose.header.stamp = birthday;
-	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	cout<<"3\n";
 	ROS_INFO("birthday started as %f", birthday.toSec());
   

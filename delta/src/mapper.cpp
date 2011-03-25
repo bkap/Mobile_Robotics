@@ -198,7 +198,7 @@ int main(int argc,char **argv)
 	tfl = new tf::TransformListener();
 	cout<<"2\n";
 	ros::Rate loopTimer(loopRate); //will perform sleeps to enforce loop rate of "10" Hz
-	while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout<<"2\n";
 	ros::NodeHandle n;
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
