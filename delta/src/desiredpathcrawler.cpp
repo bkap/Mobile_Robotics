@@ -55,10 +55,10 @@ int main(int argc,char **argv)
 	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("NominalSpeed", 1, speedProfilerCallback);
 	
 	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-    while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
+    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
-    while(!pathListInit){ros::spinOnce();naptime.sleep();}
+    while(ros::ok()&&!pathListInit){ros::spinOnce();naptime.sleep();}
     
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
