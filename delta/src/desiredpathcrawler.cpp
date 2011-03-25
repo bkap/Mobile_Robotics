@@ -11,7 +11,8 @@
 
 using namespace eecs376_msgs;
 using namespace std;
-const double REFRESH_RATE = 0.05;
+double f; // frequency
+double dt = 0.05;// period
 const double pi = 3.141592;
 
 PathList pathlist;
@@ -49,12 +50,21 @@ int main(int argc,char **argv)
     
     ros::NodeHandle n;
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("crawlerDesState",1);
-    
+
+	// Load parameters    
+	if (n.getParam("/crawler/REFRESH_RATE", f)){
+		ROS_INFO("Crawler: loaded f=%f",f);
+	} else{
+		ROS_INFO("Crawler: error loading f");
+	}
+
+	dt = 1/f; // Period is inverse of reciprocal
+
     // list of subscribers
     ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
 	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("NominalSpeed", 1, speedProfilerCallback);
 	
-	ros::Rate naptime(1/REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	ros::Rate naptime(f); //will perform sleeps to enforce loop rate of "10" Hz
     while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
     
@@ -89,14 +99,14 @@ int main(int argc,char **argv)
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
-                    desState.des_lseg += desState.des_speed * REFRESH_RATE; // v_linear
-                    desState.des_pose.position.x += desState.des_speed * REFRESH_RATE * cos(psiDes);
-                    desState.des_pose.position.y += desState.des_speed * REFRESH_RATE * sin(psiDes);
+                    desState.des_lseg += desState.des_speed * dt; // v_linear
+                    desState.des_pose.position.x += desState.des_speed * dt * cos(psiDes);
+                    desState.des_pose.position.y += desState.des_speed * dt * sin(psiDes);
                     break;
                 case 2: // arc: speedNominal is the tangential velocity (v = w R), des_lseg is angle
                 {
                     //distance the robot traveled in the past dt along the arc.  s = R*theta
-                    desState.des_lseg += desState.des_speed * fabs(desState.des_rho) * REFRESH_RATE;
+                    desState.des_lseg += desState.des_speed * fabs(desState.des_rho) * dt;
                     
                     cout << "\nARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
                     
@@ -113,12 +123,12 @@ int main(int argc,char **argv)
                     //theta = psiDes + pi/2;
                     if (desState.des_rho < 0) {  // right-hand turn
                         //cout << "\nRHT theta = "<<theta;
-                        theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                        psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        theta = theta - desState.des_speed * dt * fabs(desState.des_rho);
+                        psiDes = psiDes - desState.des_speed * dt * fabs(desState.des_rho);
                     } else {    // left-hand turn
                         //cout << "\nLHT theta = "<<theta;
-                        theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                        psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                        theta = theta + desState.des_speed * dt * fabs(desState.des_rho);
+                        psiDes = psiDes + desState.des_speed * dt * fabs(desState.des_rho);
                     }
                     
                     // merely for reference
@@ -135,12 +145,12 @@ int main(int argc,char **argv)
                     break;
                 }
                 case 3: // rotate about point
-                    desState.des_lseg += desState.des_speed * REFRESH_RATE; // v_angular
+                    desState.des_lseg += desState.des_speed * dt; // v_angular
                     // "distance" is actually the angle rotated, x and y do not change
                     if (desState.des_rho < 0) // right-hand
-                        psiDes -= desState.des_speed * REFRESH_RATE;
+                        psiDes -= desState.des_speed * dt;
                     else // left-hand
-                        psiDes += desState.des_speed * REFRESH_RATE;
+                        psiDes += desState.des_speed * dt;
                     break;
             }
             
@@ -175,12 +185,12 @@ int main(int argc,char **argv)
                         
                         /*if (desState.des_rho < 0) {  // right-hand turn
                             cout << "\nRHT theta = "<<theta;
-                            theta = theta - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                            psiDes = psiDes - desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                            theta = theta - desState.des_speed * dt * fabs(desState.des_rho);
+                            psiDes = psiDes - desState.des_speed * dt * fabs(desState.des_rho);
                         } else {    // left-hand turn
                             cout << "\nLHT theta = "<<theta;
-                            theta = theta + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
-                            psiDes = psiDes + desState.des_speed * REFRESH_RATE * fabs(desState.des_rho);
+                            theta = theta + desState.des_speed * dt * fabs(desState.des_rho);
+                            psiDes = psiDes + desState.des_speed * dt * fabs(desState.des_rho);
                         }*/
                         
                         double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
