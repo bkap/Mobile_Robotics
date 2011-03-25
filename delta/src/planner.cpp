@@ -80,6 +80,7 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	return P;
 }
 
+//generate a turn in place given an initial heading, a final heading, and a point to turn on.
 PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs::Point ref_point, int SegNum)
 {
 	double theta1 = InitAngle;
@@ -88,10 +89,10 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	PathSegment P;
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
-	P.seg_length = fabs(theta2-theta1);
-	P.ref_point = ref_point;
-	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
-	P.curvature = (FinalAngle>InitAngle)?1:-1;
+	P.seg_length = fabs(theta2-theta1); //how much to turn
+	P.ref_point = ref_point; //where to turn
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle); //initial heading as a quaternion
+	P.curvature = (FinalAngle>InitAngle)?1:-1;//direction to turn
 	
 	P.max_speeds.linear.x = 0;
 	P.max_speeds.linear.y = 0;
@@ -102,7 +103,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	
 	P.max_speeds.angular.x = 0;
 	P.max_speeds.angular.y = 0;
-	P.max_speeds.angular.z = MAX_ANGULAR;
+	P.max_speeds.angular.z = MAX_ANGULAR; 
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
@@ -110,12 +111,13 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	return P;
 }
 
+//makes a curve again initial and final headings as well as start and end points
 PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A, Point3 B)
 {
 	Point3 M = (A+B)/2.0;  //midpoint
 	Point3 MA = M-A;  //vector from midpoint to A
-	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point
-	double Radius = Distance3(A, Center);
+	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point.  derived using basic trig
+	double Radius = Distance3(A, Center); //this may or may not work
 
 	PathSegment P;
 	P.seg_type = CURVE;
@@ -127,7 +129,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 		P.seg_length += 2 * 3.14159;
 	}
 
-	P.curvature = 1/STD_TURN_RAD;
+	P.curvature = 1/STD_TURN_RAD;// I know that curvature should be 1/Radius, but that didn't work for some reason so it was overriden
 	P.curvature *= (P.seg_length>0)?1:-1;
 	P.seg_length = fabs(P.seg_length);
 
@@ -156,6 +158,8 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	return P;
 }
 
+//these two functions were used in the GetCurveAndLines routine.  defunct.
+/*
 void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
 {
 	A = (A-B)/2.0; //just want the distance from A to the midpoint
@@ -167,10 +171,15 @@ void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and 
 void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
 {
 	Segment->seg_length +=Magnitude3(B-A)/2.0;
-}
+}/*
+
+
+//this was designed for use in the insertTurns function.  became defunct when insert turns was merged into planner
 
 /*void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
+
+	//find the points needed to genereate 2 lines with a curve in between
 	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
 	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
@@ -195,8 +204,13 @@ void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
 	}
 }
 
+// this was supposed to take a list of points and turn them into a series of lines and turns, following the pattern (line, turn, line, line, turn, line ...) note that any two adjacent lines are parallel and connect at start and end points to essentially make a single larger line segment.  
+
+//this function was merged with parts of the bug algorithm because we only needed the special cases of 90 and 45 degree turns. in the future, this will be included because it is much more generically written
+
 PathList insertTurns(list<Point2d> P)
 {
+	//convert from the list<Point2d> to an array of Point3's
 	Point3* PointList = (Point3*)calloc(sizeof(Point3),P.size());  //this should be the list of points that ben's algorithm puts out
 	int PointListLength = P.size();
 	
@@ -210,22 +224,25 @@ PathList insertTurns(list<Point2d> P)
 		i++;
 	}
 	
-	PathList ReturnVal;
-	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));
+	PathList ReturnVal;//the path list that we will eventually return
+	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));//3(n-2) segments are needed when using the line turn line line turn line pattern
 	ReturnVal.path_list.assign(path.begin(), path.end());
 	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
-	Point3 A, B, C;
-	PathSegment FirstLine, Curve, SecondLine;
+	Point3 A, B, C; //points A,B,C for the line turn line pattern
+	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
 
 	
 	for (int i = 0; i<PointListLength-2; i++)
 	{
-		A = PointList[i];
+		A = PointList[i];  //copy to temp variables for readability
 		B = PointList[i+1];
 		C = PointList[i+2];
 		
+		//from the points (A,B,C), generate (line, turn, line)
 		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
+		
+		//the first and last line segments need to be special cased.  the move back functions just add to their length 
 		if(i == 0)
 		{
 			MoveBack1(A,B, &FirstLine);
@@ -239,8 +256,10 @@ PathList insertTurns(list<Point2d> P)
 		ReturnVal.path_list[3*i+1] = Curve;
 		ReturnVal.path_list[3*i+2] = SecondLine;
 	}
-	return ReturnVal;
+	return ReturnVal;//return the pathlist
 }*/
+
+//finds a point along a curve given inital parameters
 Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
 		if(change_in_heading > 0) {
@@ -455,7 +474,7 @@ PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped 
 
 using namespace std;
 
-cv::Mat_<bool> *lastLIDAR_Map;
+cv::Mat_<bool> *lastCSpace_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
 geometry_msgs::PoseStamped poseDes;
@@ -466,16 +485,17 @@ bool LIDARcalled = false;
 bool poseDescalled = false;
 bool goalPosecalled = false;
 bool poseActualcalled = false;
-void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& LIDAR_Map)
+void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSpace_Map)
 {
-	//cout << "recieved width: " <<  (*LIDAR_Map).info.width<< endl;
-	if(lastLIDAR_Map != NULL) {
-		delete lastLIDAR_Map;
+	//cout << "recieved width: " <<  (*CSpace_Map).info.width<< endl;
+	if(lastCSpace_Map != NULL) {
+		delete lastCSpace_Map;
 	}
-	lastLIDAR_Map = getMap(*LIDAR_Map);
-	mapOrigin = (*LIDAR_Map).info.origin;
+	lastCSpace_Map = getMap(*CSpace_Map);
+	mapOrigin = (*CSpace_Map).info.origin;
 	LIDARcalled = true;
 }
+//MOAR CALLBACKS!!!!!!!!!!
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
 {
@@ -516,7 +536,7 @@ int main(int argc,char **argv)
 	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
-	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 10, LIDAR_Callback); 
+	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback); 
 	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
 	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
@@ -552,25 +572,25 @@ int main(int argc,char **argv)
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
 				//cout<<"yo2\n";
 			}
-		//	list<Point2d> points = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+		//	list<Point2d> points = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 		//	for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
 		//		cout << (*it).x << "," << (*it).y << endl;
 		//	}
 			//PathList turns = insertTurns(points);
 			list<geometry_msgs::Point> points;
 			geometry_msgs::Point p;
-			for(int i=0;i<lastLIDAR_Map->size().height; i++)
+			for(int i=0;i<lastCSpace_Map->size().height; i++)
 			{
-				for(int j =0; j<lastLIDAR_Map->size().width; j++)
+				for(int j =0; j<lastCSpace_Map->size().width; j++)
 				{
-					if((*lastLIDAR_Map)(i,j)) {
+					if((*lastCSpace_Map)(i,j)) {
 						p.x = mapOrigin.position.x+.05*j;
 						p.y = mapOrigin.position.y*.05*i;
 						points.push_back(p); 
 					}
 				}
 			}
-			PathList turns = bugAlgorithm(lastLIDAR_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+			PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 			PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
 			//cout<<"publishing\n";
 			path_pub.publish(turns);

@@ -1,0 +1,9 @@
+<launch>
+<node pkg="delta" type="calib_camera" name="calibration_node" output="screen">
+    <!-- remap from="image" to="camera/image_raw" /-->
+    <remap from="image" to="/front_camera/image_rect_color"/>
+    <remap from="lidar" to="/base_laser1_scan"/>
+    <remap from="camera_info" to="/front_camera/camera_info"/>
+</node>
+
+</launch>

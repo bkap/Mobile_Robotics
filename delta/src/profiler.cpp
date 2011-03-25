@@ -178,10 +178,10 @@ double distanceRemaining()
             return fabs(psiDes - psiCur) / curState.des_rho;
         case 3: // angle remaining
             return fabs(psiDes - psiCur);
-
+	}
 	assert(1337==0);//control shouldn't get here.
 	return 9001; //it's over 9000
-    }
+    
 }
 
 /*
@@ -205,7 +205,7 @@ int main(int argc,char **argv)
     // list of subscribers
 	ros::Subscriber subCrawlerDesState = n.subscribe<CrawlerDesiredState>("crawlerDesState", 1, crawlerDesStateCallback);
 	ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
-	ros::Subscriber subLidar = n.subscribe<nav_msgs::OccupancyGrid>("LIDAR_Map", 1, lidarMapCallback);
+	ros::Subscriber subLidar = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 1, lidarMapCallback);
 	
 	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of 10 Hz
     while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.

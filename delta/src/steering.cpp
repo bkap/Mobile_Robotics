@@ -14,13 +14,13 @@
 
 using namespace std;
 
-const double LOOP_RATE = 20;	//loop rate in Hz
-const double kS = -1.0;		//proportional gain on following error correction
-const double kD = -.75;		//proportional gain on lateral error correction
-const double kP = -.75;		//proportional gain on heading error correction
+double LOOP_RATE = 20;	//loop rate in Hz
+double kS = -1.0;		//proportional gain on following error correction
+double kD = -.75;		//proportional gain on lateral error correction
+double kP = -.75;		//proportional gain on heading error correction
 
-const double maxSteerV = .3;	//saturation limit for control response on linear velocity
-const double maxSteerW = .5;	//saturation limit for control response on angular velocity
+double maxSteerV = .3;	//saturation limit for control response on linear velocity
+double maxSteerW = .5;	//saturation limit for control response on angular velocity
 
 bool stalePos = true,		//flag asserted to indicate pose hasn't updated since last steering
      staleDes = true;		//flag asserted to indicate breadcrumb hasn't updated since last steering
@@ -179,6 +179,29 @@ int main(int argc,char **argv)
 
 	ros::init(argc,argv,"steering");//name of this node
 	ros::NodeHandle n;
+
+	// Load parameters from server
+	if (ros::param::get("/steering/LOOP_RATE", LOOP_RATE)){
+		ROS_INFO("Steering: loaded LOOP_RATE=%d",LOOP_RATE);
+	} else{
+		ROS_INFO("Steering: error loading parameter");
+	}
+	if (!ros::param::get("/steering/kS", kS)){
+		ROS_INFO("Steering: error loading parameter");
+	}
+	if (!ros::param::get("/steering/kD", kD)){
+		ROS_INFO("Steering: error loading parameter");
+	}
+	if (!ros::param::get("/steering/kP", kP)){
+		ROS_INFO("Steering: error loading parameter");
+	}
+	if (!ros::param::get("/steering/maxSteerV", maxSteerV)){
+		ROS_INFO("Steering: error loading parameter");
+	}
+	if (!ros::param::get("/steering/maxSteerW", maxSteerW)){
+		ROS_INFO("Steering: error loading parameter");
+	}
+
 
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
 	tfl = new tf::TransformListener();
