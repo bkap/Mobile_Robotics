@@ -71,41 +71,45 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-	sensor_msgs::CvBridge bridge;
-	cv::Mat image;
-	cv::Mat output;
-	try
-	{
-		image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
 
-	}
-	catch (sensor_msgs::CvBridgeException& e)
-	{
-		ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
-	}
-	try {
-		normalizeColors(image, output);
-		CvPoint2D64f Center = blobfind(image, output);
+  sensor_msgs::CvBridge bridge;
+  cv::Mat image;
+  cv::Mat output;
+  try
+  {
+    image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
 
-		Mat_<double> center (1, 3);
-		center(0,0) = Center.x;
-		center(0,1) = Center.y;
-		center(0,2) = 0;
-		vector<Point_<float> > projCenter (1);
+  }
+  catch (sensor_msgs::CvBridgeException& e)
+  {
+    ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
+  }
+  try {
+    normalizeColors(image, output);
+    CvPoint2D64f Center = blobfind(image, output);
+	
+  Mat_<double> center (1, 3);
+  center(0,0) = Center.x;
+  center(0,1) = Center.y;
+  center(0,2) = 0;
+  vector<Point_<float> > projCenter (1);
+  
+  projectPoints(center, rvec, tvec, cameraMat, Mat(), projCenter);  
 
-		projectPoints(center, rvec, tvec, cameraMat, Mat(), projCenter);  
+  geometry_msgs::Point32 BlobLoc;
 
-		geometry_msgs::Point32 BlobLoc;
+  BlobLoc.x = projCenter[0].x;
+  BlobLoc.y = projCenter[0].y;
+  if(Center.x>0)//Center.x should be 0 if there is no blob
+{
+  publishBlobLoc(BlobLoc);
+}
+  }
+  catch (sensor_msgs::CvBridgeException& e)
+  {
+    ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
+  }
 
-		BlobLoc.x = projCenter[0].x;
-		BlobLoc.y = projCenter[0].y;
-
-		publishBlobLoc(BlobLoc);
-	}
-	catch (sensor_msgs::CvBridgeException& e)
-	{
-		ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
-	}
 }
 
 //reads a mat from the file in ~/.ros
