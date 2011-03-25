@@ -194,7 +194,7 @@ int main(int argc,char **argv)
 //	cSpaceInit();
 //	init=true;
 	cout<<"2\n";
-	ros::init(argc,argv,"lidar_mapper");//name of this node
+	ros::init(argc,argv,"mapper");//name of this node
 	tfl = new tf::TransformListener();
 	cout<<"2\n";
 	ros::Rate loopTimer(loopRate); //will perform sleeps to enforce loop rate of "10" Hz
@@ -204,7 +204,7 @@ int main(int argc,char **argv)
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud",20, cloudCallback);
-	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("LIDAR_Map", 10);
+	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
