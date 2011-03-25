@@ -137,8 +137,9 @@ void ReadMat(Mat_<double> *mat, char* file)
 
 int main(int argc, char **argv)
 {
-  tfl = new tf::TransformListener();
   ros::init(argc, argv, "CameraNode");
+  tfl = new tf::TransformListener();
+  while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
   DemoNode motion_tracker;
   ROS_INFO("Camera Node Started");
   ros::spin();
