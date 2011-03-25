@@ -13,7 +13,7 @@
 #include <stdio.h>
 using namespace cv;
 using namespace std;
-void ReadMat(Mat *mat, char* file);
+void ReadMat(Mat_<double> *mat, char* file);
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
 Point2f lastValidLIDARPoint; //set this the x,y coordinate of any rod found
@@ -37,7 +37,7 @@ class DemoNode {
     ros::Subscriber sub_info_;
     ros::Publisher pub_blob_loc;
     sensor_msgs::PointCloud BlobLocations;
-    Mat rvec, tvec;
+    Mat_<double> rvec, tvec;
 };
 
 //call this with a point32 to publish the blob's location
@@ -144,11 +144,11 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	//cout<< msg->header.seq<<"\t"<<center.x<<"\t"<<center.y<<"\t"<<norm(lastValidLIDARPoint)<<"\t"<<atan2(lastValidLIDARPoint.y,lastValidLIDARPoint.x);
 	//cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
 	
-  Mat center (1, 3, CV_64);
+  Mat_<double> center (1, 3);
   center(0,0) = Center.x;
   center(0,1) = Center.y;
   center(0,2) = 0;
-  vector<Point3f> projCenter (1);
+  vector<Point_<float> > projCenter (1);
   
   projectPoints(center, rvec, tvec, cameraMat, distMat, projCenter);  
 
@@ -156,7 +156,6 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
   BlobLoc.x = projCenter[0].x;
   BlobLoc.y = projCenter[0].y;
-  BlobLoc.z = 0;
 
   publishBlobLoc(BlobLoc);}
  //   cv::imshow("view", output);
@@ -171,7 +170,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 }
 
 //reads a mat from the file in ~/.ros
-void ReadMat(Mat *mat, char* file)
+void ReadMat(Mat_<double> *mat, char* file)
 {
     FILE* mfile = fopen(file, "r");
     int rows, cols, type;
@@ -179,7 +178,7 @@ void ReadMat(Mat *mat, char* file)
     fscanf(mfile, "%i", &cols);
     fscanf(mfile, "%i", &type);
     
-    mat = new Mat (rows, cols, type); 
+    mat = new Mat_<double> (rows, cols); 
 
     unsigned int i, j;
     float f;
