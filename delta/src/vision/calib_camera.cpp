@@ -51,17 +51,12 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
        cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
-void DemoNode::info(const sensor_msgs::CameraInfo msg){
-	const double* K = (msg.K).data();
-	const double* D = (msg.D).data();
-	Mat(3,3,CV_64F,&K).convertTo(cameraMat,CV_32F,true);
-	Mat(5,1,CV_64F,&D).convertTo(distMat,CV_32F,true);
-       cout<<"I GOT CAMERA INFO v2!!!!!!!!!!!!\n";
-}
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
-
+  
+  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
+ 
   // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
   int num_points = scan.ranges.size();
   int num_filtered = 0;
@@ -168,6 +163,35 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 }
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
+
+void SaveMat(CvMat *A, FILE* f)
+{
+    int i, j;
+    fprintf(f,"%i\n",A->rows);
+    fprintf(f,"%i\n",A->cols);
+    fprintf(f,"%i\n", A->type);
+    for (i = 0; i < A->rows; i++)
+    {
+        fprintf(f,"\n");
+        switch (CV_MAT_DEPTH(A->type))
+        {
+            case CV_32F:
+            case CV_64F:
+                for (j = 0; j < A->cols; j++)
+                fprintf (f,"%8.6f ", (float)cvGetReal2D(A, i, j));
+                break;
+            case CV_8U:
+            case CV_16U:
+                for(j = 0; j < A->cols; j++)
+                fprintf (f,"%6d",(int)cvGetReal2D(A, i, j));
+                break;
+            default:
+                break;
+        }
+    }
+    fprintf(f,"\n");
+}
+
 void PrintMat(CvMat *A, FILE* f=stdout)
 {
     int i, j;
@@ -179,7 +203,7 @@ void PrintMat(CvMat *A, FILE* f=stdout)
             case CV_32F:
             case CV_64F:
                 for (j = 0; j < A->cols; j++)
-                fprintf (f,"%8.3f ", (float)cvGetReal2D(A, i, j));
+                fprintf (f,"%8.6f ", (float)cvGetReal2D(A, i, j));
                 break;
             case CV_8U:
             case CV_16U:
@@ -233,13 +257,21 @@ if(imagePoints.size()<20)	return 1;
 	cout<<"\t\t"<<CV_IS_MAT(&iPoints)<<"\t"<<CV_IS_MAT(&wPoints)<<"\t"<<CV_IS_MAT(&rvec)<<"\t"<<CV_IS_MAT(&tvec)<<"\t"<<CV_IS_MAT(&cvCameraMat)<<"\t\t"<<CV_IS_MAT(&cvDistMat)<<"\n";
 
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,NULL,&rvec,&tvec);
-	FILE* outFile = fopen("params.txt","w");
+
+        FILE *R = fopen("rvec", "w");
+	FILE *T = fopen("tvec", "w");
+
 	cout<<endl;
 	cout<<"rotations:";
-	PrintMat(&rvec,outFile);
+	PrintMat(&rvec);
+        SaveMat(&rvec,R);
 	cout<<"\ntranslations:";
-	PrintMat(&tvec,outFile);
+	PrintMat(&tvec);
+        SaveMat(&tvec,T);
 	cout<<endl;
+
+        fclose(R);
+	fclose(T);
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);

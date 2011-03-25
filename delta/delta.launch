@@ -1,14 +1,25 @@
 <launch>
+<<<<<<< HEAD
 	<!-- Launch the required nodes -->
 	<node name="lidar" pkg="delta" type="lidar" output="screen"/>
 	<node name="goalpublisher" pkg="delta" type="goalpublisher" output="screen" />
 	<node name="lidarmapper" pkg="delta" type="lidarmapper" output="screen"/>
+=======
+	<!-- Launch local nodes -->
+	<node name="lidar" pkg="delta" type="lidar" output="screen"/>
+	<node name="camera" pkg="delta" type="camera" output="screen"/>
+	<node name="goalpublisher" pkg="delta" type="goalpublisher" output="screen"/>
+	<node name="mapper" pkg="delta" type="mapper" output="screen"/>
+>>>>>>> 213e881b2c8f44b22a9ebe6676fb0699c4a676a7
 	<node name="planner" pkg="delta" type="planner" output="screen"/>
 	<node name="desiredpathcrawler" pkg="delta" type="desiredpathcrawler" output="screen"/>
 	<node name="profiler" pkg="delta" type="profiler" output="screen"/>
 	<node name="steering" pkg="delta" type="steering" output="screen"/>
 
+<<<<<<< HEAD
 	<!-- Load a parameter file -->
 	<rosparam command="load" file="$(find delta)/delta_params.yaml" />
+=======
+>>>>>>> 213e881b2c8f44b22a9ebe6676fb0699c4a676a7
 </launch>
 
