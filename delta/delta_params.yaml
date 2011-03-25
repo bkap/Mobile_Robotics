@@ -15,3 +15,6 @@ steering:
 
 profiler:
  REFRESH_RATE: 20
+
+mapper:
+ loopRate: 10
