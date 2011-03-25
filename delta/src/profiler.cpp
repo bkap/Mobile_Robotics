@@ -25,7 +25,7 @@
 using namespace cv;
 using namespace eecs376_msgs;
 using namespace std;
-const double REFRESH_RATE = 20;
+double REFRESH_RATE = 20;
 const double pi = 3.141592;
 
 PathList pathlist;
@@ -200,6 +200,14 @@ int main(int argc,char **argv)
 {   
     ros::init(argc,argv,"profiler");//name of this node
     ros::NodeHandle n;
+
+	// Load parameters from server
+	if (n.getParam("/profiler/REFRESH_RATE", REFRESH_RATE)){
+		ROS_INFO("Profiler: loaded REFRESH_RATE=%f",REFRESH_RATE);
+	} else{
+		ROS_INFO("Profiler: error loading REFRESH_RATE");
+	}
+
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("NominalSpeed",1);
     
     // list of subscribers
