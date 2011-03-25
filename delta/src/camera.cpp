@@ -142,6 +142,6 @@ int main(int argc, char **argv)
   while (!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
   DemoNode motion_tracker;
   ROS_INFO("Camera Node Started");
-  ros::spin();
+  while(ros::ok()){ros::spinOnce();}
 return 0;
 }
