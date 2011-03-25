@@ -87,27 +87,47 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-  int peakIndex;
-  double maxVal = -DBL_MAX;
-  double val = 0;
+float rodSepThresh  = 0.4; //min dist of rod from surrounding
+float rodDispThresh = 0.05;//max radial diff between rod points
+float rodWidthThresh= 3;   //max pings of a rod
+float rodDistThresh = 2;   //max distance to rod
+bool maybeRod = false;
+int rodStart = -1;
+float minr = 1000;
+float maxr = 0;
 
-    for (int i=1;i<num_points-1;i++){
-	    val = (0.5 * scan.ranges[i-1] - scan.ranges[i] + 0.5*scan.ranges[i+1])/scan.ranges[i];
-	    if(val>maxVal){
-		    maxVal = val;
-		    peakIndex = i;
+last_scan_valid = false;
+
+for(int i=1;i<num_points-1;i++){
+        if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh){
+            maybeRod = true;
+            rodStart = i;
+            minr = scan.ranges[i];
+            maxr = scan.ranges[i];
+        }
+        if(maybeRod){
+            minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
+            maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
+ 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh){
+	         if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh){
+        	     maybeRod = false;
+            	 }
+	         else{
+                    float r = (maxr + minr) / 2;
+		    float t = 3.1415926535 * ( ((float) (rodStart+i))/360.0 -0.5);
+                    last_scan_valid = true;
+                    lastValidLIDARPoint.x = r*cos(t);
+                    lastValidLIDARPoint.y = r*sin(t);
+                    maybeRod = false;
+                    maxr = 0;
+                    minr = 1000;
+		    break;
+            	}
 	    }
-    }
+	}
+ }
 
-    double theta = 3.141592653589793238462643383279 * (double)(peakIndex-90) / 180.0;
-    double dist = scan.ranges[peakIndex];
-
-if(maxVal > 0.8){	//threshold
-	last_scan_valid = true;
-	lastValidLIDARPoint.x = dist*cos(theta);
-	lastValidLIDARPoint.y = dist*sin(theta);
-}
-  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d maxVal: %f",num_filtered,num_points,maxVal);
+ ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -130,8 +150,8 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     cv::Point2f center (Center.x, Center.y);
     if(center.x>0 && last_scan_valid){
 	//print id,i,j,r,theta,x,y as per assignment
-	cout<< msg->header.seq<<"\t"<<center.x<<"\t"<<center.y<<"\t"<<norm(lastValidLIDARPoint)<<"\t"<<atan2(lastValidLIDARPoint.y,lastValidLIDARPoint.x);
-	cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
+//	cout<< msg->header.seq<<"\t"<<center.x<<"\t"<<center.y<<"\t"<<norm(lastValidLIDARPoint)<<"\t"<<atan2(lastValidLIDARPoint.y,lastValidLIDARPoint.x);
+//	cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
 
 	imagePoints.push_back(center);
 	LIDARPoints.push_back(Point3f(lastValidLIDARPoint.x,lastValidLIDARPoint.y,0));
@@ -177,8 +197,6 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
   DemoNode motion_tracker;
-  //ros::Subscriber lidar_sub = motion_tracker.nh_.subscribe<sensor_msgs::LaserScan>("lidar", 1, lidarCallback); // Subscribe to the LIDAR scan
-  //ros::Subscriber info_sub  = motion_tracker.nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,infoCallback); //Subscribe to the camera info
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
@@ -206,8 +224,8 @@ int main(int argc, char **argv)
 
 if(imagePoints.size()<20)	return 1;
 
-//        cameraMat = (Mat_<double>(3,3) << 532.18899999999996, 0.0, 330.678, 0.0, 531.28700000000003, 260.733, 0.0, 0.0, 1.0);
- //       distMat = (Mat_<double>(5,1) <<  -0.34610800000000003, 0.17599799999999999, 0.0013294100000000001, 0.0023169800000000002, 0.0);
+        //cameraMat = (Mat_<double>(3,3) << 532.18899999999996, 0.0, 330.678, 0.0, 531.28700000000003, 260.733, 0.0, 0.0, 1.0);
+        //distMat = (Mat_<double>(5,1) <<  -0.34610800000000003, 0.17599799999999999, 0.0013294100000000001, 0.0023169800000000002, 0.0);
 	CvMat cvCameraMat =cameraMat;
 	CvMat cvDistMat = distMat;
         
