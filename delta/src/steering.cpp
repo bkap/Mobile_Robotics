@@ -181,25 +181,35 @@ int main(int argc,char **argv)
 	ros::NodeHandle n;
 
 	// Load parameters from server
-	if (ros::param::get("/steering/LOOP_RATE", LOOP_RATE)){
-		ROS_INFO("Steering: loaded LOOP_RATE=%d",LOOP_RATE);
+	if (n.getParam("/steering/LOOP_RATE", LOOP_RATE)){
+		ROS_INFO("Steering: loaded LOOP_RATE=%f",LOOP_RATE);
 	} else{
-		ROS_INFO("Steering: error loading parameter");
+		ROS_INFO("Steering: error loading LOOP_RATE");
 	}
-	if (!ros::param::get("/steering/kS", kS)){
-		ROS_INFO("Steering: error loading parameter");
+	if (n.getParam("/steering/kD", kD)){
+		ROS_INFO("Steering: loaded kD=%f",kD);
+	} else{
+		ROS_INFO("Steering: error loading kD");
 	}
-	if (!ros::param::get("/steering/kD", kD)){
-		ROS_INFO("Steering: error loading parameter");
+	if (n.getParam("/steering/kS", kS)){
+		ROS_INFO("Steering: loaded kS=%f",kS);
+	} else{
+		ROS_INFO("Steering: error loading kS");
 	}
-	if (!ros::param::get("/steering/kP", kP)){
-		ROS_INFO("Steering: error loading parameter");
+	if (n.getParam("/steering/kP", kP)){
+		ROS_INFO("Steering: loaded kP=%f",kP);
+	} else{
+		ROS_INFO("Steering: error loading kP");
 	}
-	if (!ros::param::get("/steering/maxSteerV", maxSteerV)){
-		ROS_INFO("Steering: error loading parameter");
+	if (n.getParam("/steering/maxSteerV", maxSteerV)){
+		ROS_INFO("Steering: loaded maxSteerV=%f",maxSteerV);
+	} else{
+		ROS_INFO("Steering: error loading maxSteerV");
 	}
-	if (!ros::param::get("/steering/maxSteerW", maxSteerW)){
-		ROS_INFO("Steering: error loading parameter");
+	if (n.getParam("/steering/maxSteerW", maxSteerW)){
+		ROS_INFO("Steering: loaded maxSteerW=%f",maxSteerW);
+	} else{
+		ROS_INFO("Steering: error loading maxSteerW");
 	}
 
 
