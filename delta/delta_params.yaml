@@ -1,7 +1,16 @@
-example:
- a: 4.5
- b: 6
- d: 2.3
- e: 3.4
- f: 8
+steering:
+ LOOP_RATE: 20
+ kS: -1.0
+ kD: -0.75
+ kP: -0.75
+ maxSteerV: 0.3
+ maxSteerW: 0.5
 
+profiler:
+ REFRESH_RATE: 20
+
+mapper:
+ loopRate: 10
+
+crawler:
+ REFRESH_RATE: 20

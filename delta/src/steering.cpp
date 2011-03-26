@@ -14,13 +14,13 @@
 
 using namespace std;
 
-const double LOOP_RATE = 20;	//loop rate in Hz
-const double kS = -1.0;		//proportional gain on following error correction
-const double kD = -.75;		//proportional gain on lateral error correction
-const double kP = -.75;		//proportional gain on heading error correction
+double LOOP_RATE = 20;	//loop rate in Hz
+double kS = -1.0;		//proportional gain on following error correction
+double kD = -.75;		//proportional gain on lateral error correction
+double kP = -.75;		//proportional gain on heading error correction
 
-const double maxSteerV = .3;	//saturation limit for control response on linear velocity
-const double maxSteerW = .5;	//saturation limit for control response on angular velocity
+double maxSteerV = .3;	//saturation limit for control response on linear velocity
+double maxSteerW = .5;	//saturation limit for control response on angular velocity
 
 bool stalePos = true,		//flag asserted to indicate pose hasn't updated since last steering
      staleDes = true;		//flag asserted to indicate breadcrumb hasn't updated since last steering
@@ -37,28 +37,24 @@ void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom)
 //	cout<<"steering odom callback happened"<<endl;
 //	last_odom = *odom;
 
-        temp.pose = odom->pose.pose;
+	temp.pose = odom->pose.pose;
 	temp.header = odom->header;
-        //cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
-        try 
+	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
+	try 
 	{
 		tfl->transformPose("map", temp, poseActual);
 		stalePos = false;
-        } 
+	} 
 	catch (tf::TransformException ex) 
 	{
-	  cout << "We caught an error!" << endl;
-          ROS_ERROR("%s", ex.what());
-        }
-	
-	/////////cout<<"finished"<<endl;
-	
+		cout << "We caught an error!" << endl;
+		ROS_ERROR("%s", ex.what());
+	}
 }
 
 void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed) 
 {
 //	cout<< "steering speed callback happened"<<endl;
-	//desired = *newSpeed;
         desired.header = newSpeed->header;
 	desired.des_pose = newSpeed->des_pose;
 	desired.des_speed = newSpeed->des_speed;
@@ -162,14 +158,14 @@ For invalid segments, the nominal velocities are both 0.
 cv::Vec2d getNominalVelocities(eecs376_msgs::CrawlerDesiredState* goal)
 {
 	switch(goal->seg_type){
-			case 1:	//line
-				return cv::Vec2d(goal->des_speed,0);
-			case 2:	//arc
-				return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
-			case 3:	//turn
-				return cv::Vec2d(0,goal->des_speed);
-			default:
-				return cv::Vec2d(0,0);
+		case 1:	//line
+			return cv::Vec2d(goal->des_speed,0);
+		case 2:	//arc
+			return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
+		case 3:	//turn
+			return cv::Vec2d(0,goal->des_speed);
+		default:
+			return cv::Vec2d(0,0);
 	}
 }
 //publishes cmd_vel every time a steering correction is available at the specified lop rate
@@ -179,6 +175,39 @@ int main(int argc,char **argv)
 
 	ros::init(argc,argv,"steering");//name of this node
 	ros::NodeHandle n;
+
+	// Load parameters from server
+	if (n.getParam("/steering/LOOP_RATE", LOOP_RATE)){
+		ROS_INFO("Steering: loaded LOOP_RATE=%f",LOOP_RATE);
+	} else{
+		ROS_INFO("Steering: error loading LOOP_RATE");
+	}
+	if (n.getParam("/steering/kD", kD)){
+		ROS_INFO("Steering: loaded kD=%f",kD);
+	} else{
+		ROS_INFO("Steering: error loading kD");
+	}
+	if (n.getParam("/steering/kS", kS)){
+		ROS_INFO("Steering: loaded kS=%f",kS);
+	} else{
+		ROS_INFO("Steering: error loading kS");
+	}
+	if (n.getParam("/steering/kP", kP)){
+		ROS_INFO("Steering: loaded kP=%f",kP);
+	} else{
+		ROS_INFO("Steering: error loading kP");
+	}
+	if (n.getParam("/steering/maxSteerV", maxSteerV)){
+		ROS_INFO("Steering: loaded maxSteerV=%f",maxSteerV);
+	} else{
+		ROS_INFO("Steering: error loading maxSteerV");
+	}
+	if (n.getParam("/steering/maxSteerW", maxSteerW)){
+		ROS_INFO("Steering: loaded maxSteerW=%f",maxSteerW);
+	} else{
+		ROS_INFO("Steering: error loading maxSteerW");
+	}
+
 
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
 	tfl = new tf::TransformListener();
@@ -209,20 +238,20 @@ int main(int argc,char **argv)
 		
 		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
 		//cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
-		vw= getNominalVelocities(&desired);
+		vw = getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		
 		vw[0]  = max(vw[0], 0);
 
 		//	cout<<"Steering calculated"<<endl;
-				//limit velocities
+		//limit velocities
 			
-			vel_object.linear.x = vw[0];
-			vel_object.angular.z= vw[1];
-			stalePos = true,
-		     	staleDes = true;
+		vel_object.linear.x = vw[0];
+		vel_object.angular.z= vw[1];
+		stalePos = true,
+	  	staleDes = true;
 
-			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
-			pub.publish(vel_object);
+		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		pub.publish(vel_object);
 	}
 }

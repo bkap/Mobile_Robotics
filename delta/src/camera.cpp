@@ -23,42 +23,42 @@ Mat distMat; //distortion parameters
 tf::TransformListener *tfl;
 
 class DemoNode {
-  public:
-    DemoNode();
-    //static void info(const sensor_msgs::CameraInfo msg);
-    void publishBlobLoc(geometry_msgs::Point32 BlobLoc);
-    void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
-    void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
-    void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
-    ros::NodeHandle nh_; // Made this public to access it and subscribe to the LIDAR
-  private:
-     image_transport::ImageTransport it_;
-    image_transport::Subscriber sub_image_;
-    ros::Subscriber sub_info_;
-    ros::Publisher pub_blob_loc;
-    sensor_msgs::PointCloud BlobLocations;
-    Mat_<double> rvec, tvec;
+	public:
+		DemoNode();
+		//static void info(const sensor_msgs::CameraInfo msg);
+		void publishBlobLoc(geometry_msgs::Point32 BlobLoc);
+		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
+		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
+		void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
+		ros::NodeHandle nh_; // Made this public to access it and subscribe to the LIDAR
+	private:
+		image_transport::ImageTransport it_;
+		image_transport::Subscriber sub_image_;
+		ros::Subscriber sub_info_;
+		ros::Publisher pub_blob_loc;
+		sensor_msgs::PointCloud BlobLocations;
+		Mat_<double> rvec, tvec;
 };
 
 //call this with a point32 to publish the blob's location
 void DemoNode::publishBlobLoc(geometry_msgs::Point32 BlobLoc)
 {
-   BlobLocations.points[0] = BlobLoc;
-   sensor_msgs::PointCloud tBlobLoc;
-   tfl->transformPointCloud("map", BlobLocations, tBlobLoc);
-   pub_blob_loc.publish(tBlobLoc);
+	BlobLocations.points[0] = BlobLoc;
+	sensor_msgs::PointCloud tBlobLoc;
+	tfl->transformPointCloud("map", BlobLocations, tBlobLoc);
+	pub_blob_loc.publish(tBlobLoc);
 }
 DemoNode::DemoNode():
   it_(nh_)
 {
-  sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
-  sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
-  pub_blob_loc = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
+	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
+	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
+	pub_blob_loc = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
 
-  BlobLocations.points = vector<geometry_msgs::Point32> (1);
-  BlobLocations.header.frame_id = "base_laser1_link";
-  ReadMat(&rvec, "rvec");
-  ReadMat(&tvec, "tvec");
+	BlobLocations.points = vector<geometry_msgs::Point32> (1);
+	BlobLocations.header.frame_id = "base_laser1_link";
+	ReadMat(&rvec, "rvec");
+	ReadMat(&tvec, "tvec");
 }
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
@@ -66,11 +66,12 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	const double* D = (msg->D).data();
 	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
 	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
-       //cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+	//cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
+
   sensor_msgs::CvBridge bridge;
   cv::Mat image;
   cv::Mat output;
@@ -108,41 +109,42 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
   }
+
 }
 
 //reads a mat from the file in ~/.ros
 void ReadMat(Mat_<double> *mat, char* file)
 {
-    FILE* mfile = fopen(file, "r");
-    int rows, cols, type;
-    fscanf(mfile, "%i", &rows);
-    fscanf(mfile, "%i", &cols);
-    fscanf(mfile, "%i", &type);
-    
-    mat = new Mat_<double> (rows, cols); 
+	FILE* mfile = fopen(file, "r");
+	int rows, cols, type;
+	fscanf(mfile, "%i", &rows);
+	fscanf(mfile, "%i", &cols);
+	fscanf(mfile, "%i", &type);
 
-    unsigned int i, j;
-    float f;
-    for (i = 0; i < mat->rows; i++)
-    {
-        fprintf(mfile,"\n");
-        for (j = 0; j < mat->cols; j++)
-        {
-		fscanf (mfile,"%8.3f", &f);
-		((*mat)(i,j)) = f;
+	mat = new Mat_<double> (rows, cols); 
+
+	unsigned int i, j;
+	float f;
+	for (i = 0; i < mat->rows; i++)
+	{
+		fprintf(mfile,"\n");
+		for (j = 0; j < mat->cols; j++)
+		{
+			fscanf (mfile,"%8.3f", &f);
+			((*mat)(i,j)) = f;
+		}     
 	}
-        
-    }
-    fclose(mfile);
+	fclose(mfile);
 }
 
 
 int main(int argc, char **argv)
 {
-  tfl = new tf::TransformListener();
-  ros::init(argc, argv, "CameraNode");
-  DemoNode motion_tracker;
-  ROS_INFO("Camera Node Started");
-  ros::spin();
-return 0;
+	ros::init(argc, argv, "CameraNode");
+	tfl = new tf::TransformListener();
+	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	DemoNode motion_tracker;
+	ROS_INFO("Camera Node Started");
+	while(ros::ok()){ros::spinOnce();}
+	return 0;
 }

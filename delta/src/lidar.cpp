@@ -40,7 +40,7 @@ int main(int argc,char **argv)
   laser_filter.registerCallback(boost::bind(laserCallback, _1)); //When a message passes through the laser_filter, we want it to call laserCallback
   P = n.advertise<sensor_msgs::PointCloud>("LIDAR_Cloud", 20);
   cout<<"1\n";
-  ros::spin(); //spin until ctrl-C or otherwise shutdown
+  while(ros::ok()){ros::spinOnce();} //spin until ctrl-C or otherwise shutdown
   delete tfl;
   return 0; // this code will only get here if this node was told to shut down, which is
   // reflected in ros::ok() is false 
