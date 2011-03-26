@@ -172,7 +172,6 @@ void SaveMat(CvMat *A, FILE* f)
     fprintf(f,"%i\n", A->type);
     for (i = 0; i < A->rows; i++)
     {
-        fprintf(f,"\n");
         switch (CV_MAT_DEPTH(A->type))
         {
             case CV_32F:
@@ -224,9 +223,9 @@ int main(int argc, char **argv)
   cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
- // ros::Rate naptime(75);
+  ros::Rate naptime(75);
 
-  //while(imagePoints.size()<100)
+  //while(imagePoints.size()<20)
   //{
   //      naptime.sleep();
   //	ros::spinOnce();
@@ -246,7 +245,11 @@ int main(int argc, char **argv)
 	CvMat rvec = rvec_;//Mat(3,1,CV_64F); //extrinsic parameter rotation matrix
 	CvMat tvec = tvec_;///Mat(3,1,CV_64F); //extrinsic parameter translation matrix
 
-if(imagePoints.size()<20)	return 1;
+if(imagePoints.size()<20)
+{
+ 	cout<<"ERROR: Not enough points to calibrate\n";
+	return 1;
+}
 
         //cameraMat = (Mat_<double>(3,3) << 532.18899999999996, 0.0, 330.678, 0.0, 531.28700000000003, 260.733, 0.0, 0.0, 1.0);
         //distMat = (Mat_<double>(5,1) <<  -0.34610800000000003, 0.17599799999999999, 0.0013294100000000001, 0.0023169800000000002, 0.0);
