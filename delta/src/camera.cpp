@@ -99,8 +99,10 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
   BlobLoc.x = projCenter[0].x;
   BlobLoc.y = projCenter[0].y;
-
+  if(Center.x>0)//Center.x should be 0 if there is no blob
+{
   publishBlobLoc(BlobLoc);
+}
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
