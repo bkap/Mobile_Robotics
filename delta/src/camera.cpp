@@ -1,5 +1,7 @@
 //#include <camera_info_manager/camera_info_manager.h>
 #include <ros/ros.h>
+#include <iostream>
+#include <fstream>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.h>
 #include <opencv2/core/core.hpp>
@@ -57,8 +59,10 @@ DemoNode::DemoNode():
 
 	BlobLocations.points = vector<geometry_msgs::Point32> (1);
 	BlobLocations.header.frame_id = "base_laser1_link";
-	ReadMat(&rvec, "rvec");
-	ReadMat(&tvec, "tvec");
+	cout << "reading mats" << endl;
+	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
+	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
+	cout << "read mats" << endl;
 }
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
@@ -115,34 +119,54 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 //reads a mat from the file in ~/.ros
 void ReadMat(Mat_<double> *mat, char* file)
 {
-	FILE* mfile = fopen(file, "r");
+	FILE* test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "w");
+	fprintf(test, "%i\n", 1);
+	fprintf(test, "%i\n", 1337);
+	fclose(test);
+	test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "r");
+	int a,b;
+	fscanf(test, "%i", &a);
+	fscanf(test, "%i", &b);
+	fclose(test);
+        cout<<"a,b "<<a<<","<<b<<"\n";
+
+	//cout<<"camout1\n";
+        ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
+	cout << "file opened" << endl;
 	int rows, cols, type;
-	fscanf(mfile, "%i", &rows);
-	fscanf(mfile, "%i", &cols);
-	fscanf(mfile, "%i", &type);
-
+	rows = cols = type = 0;
+	(*infile)>>rows;
+	cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
+	(*infile)>>cols;
+	cout<<"Scanned Columns, there are/is "<<cols<<"of them\n";
+	(*infile)>>type;
+	cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
+	//cout<<"camout2\n";
 	mat = new Mat_<double> (rows, cols); 
-
+	//cout<<"camout3\n";
 	unsigned int i, j;
 	float f;
 	for (i = 0; i < mat->rows; i++)
 	{
-		fprintf(mfile,"\n");
+		//fprintf(mfile,"\n");
 		for (j = 0; j < mat->cols; j++)
 		{
-			fscanf (mfile,"%8.3f", &f);
-			((*mat)(i,j)) = f;
+		        (*infile)>>f;
+			((*mat)(i,j)) = (double)f;
 		}     
 	}
-	fclose(mfile);
+	//cout<<"camout4\n";
+	infile->close();
 }
 
 
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "CameraNode");
+	cout << "Camera Initialized" << endl;
 	tfl = new tf::TransformListener();
-	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	while (!ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	cout << "READY"  << endl;
 	DemoNode motion_tracker;
 	ROS_INFO("Camera Node Started");
 	while(ros::ok()){ros::spinOnce();}

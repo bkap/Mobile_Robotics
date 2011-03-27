@@ -1,4 +1,6 @@
 //#include <camera_info_manager/camera_info_manager.h>
+#include <iostream>
+#include <fstream>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.h>
@@ -127,6 +129,7 @@ for(int i=1;i<num_points-1;i++){
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
+  cout<<"IMAGE CALLBACK\n";
   sensor_msgs::CvBridge bridge;
   cv::Mat image;
   cv::Mat output;
@@ -147,14 +150,14 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	//print id,i,j,r,theta,x,y as per assignment
 //	cout<< msg->header.seq<<"\t"<<center.x<<"\t"<<center.y<<"\t"<<norm(lastValidLIDARPoint)<<"\t"<<atan2(lastValidLIDARPoint.y,lastValidLIDARPoint.x);
 //	cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
-
+	cout<<"CAMERA PING YAY LOLZ YAY YAY YAY WOOOT WOOOT WOOT !!!!!!!!!!!!111!!!!!!2!!!!!5!!!!ONE\n";
 	imagePoints.push_back(center);
 	LIDARPoints.push_back(Point3f(lastValidLIDARPoint.x,lastValidLIDARPoint.y,0));
     }
  //   cv::imshow("view", output);
  //   findLines(image, output);
- //   IplImage temp = output;
- //   image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
+    IplImage temp = output;
+   image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
@@ -164,32 +167,20 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
 
-void SaveMat(CvMat *A, FILE* f)
+void SaveMat(CvMat *A, ofstream* f)
 {
     int i, j;
-    fprintf(f,"%i\n",A->rows);
-    fprintf(f,"%i\n",A->cols);
-    fprintf(f,"%i\n", A->type);
+    (*f)<<A->rows;
+    (*f)<<A->cols;
+    (*f)<<A->type;
     for (i = 0; i < A->rows; i++)
     {
-        switch (CV_MAT_DEPTH(A->type))
-        {
-            case CV_32F:
-            case CV_64F:
-                for (j = 0; j < A->cols; j++)
-                fprintf (f,"%8.6f ", (float)cvGetReal2D(A, i, j));
-                break;
-            case CV_8U:
-            case CV_16U:
-                for(j = 0; j < A->cols; j++)
-                fprintf (f,"%6d",(int)cvGetReal2D(A, i, j));
-                break;
-            default:
-                break;
-        }
+           for (j = 0; j < A->cols; j++)
+                (*f)<<(float)cvGetReal2D(A, i, j);
+        
+       
     }
-    fprintf(f,"\n");
-}
+ }
 
 void PrintMat(CvMat *A, FILE* f=stdout)
 {
@@ -220,8 +211,8 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
   DemoNode motion_tracker;
-  cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
-  cvStartWindowThread();
+  //cvNamedWindow("view"); //these cv* calls are need if you want to use cv::imshow anywhere in your program
+  //cvStartWindowThread();
   ROS_INFO("Calibration procedure started");
   ros::Rate naptime(75);
 
@@ -261,20 +252,20 @@ if(imagePoints.size()<20)
 
 	cvFindExtrinsicCameraParams2(&wPoints,&iPoints,&cvCameraMat,NULL,&rvec,&tvec);
 
-        FILE *R = fopen("rvec", "w");
-	FILE *T = fopen("tvec", "w");
 
 	cout<<endl;
 	cout<<"rotations:";
 	PrintMat(&rvec);
-        SaveMat(&rvec,R);
+//        ofstream *R = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/rvec", ofstream::out&ofstream::binary);
+//        SaveMat(&rvec,R);
 	cout<<"\ntranslations:";
 	PrintMat(&tvec);
-        SaveMat(&tvec,T);
+//   	ofstream *T = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/tvec", ofstream::out&ofstream::binary);
+//        SaveMat(&tvec,T);
 	cout<<endl;
 
-        fclose(R);
-	fclose(T);
+  //      R->close();
+//	T->close();
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);
@@ -292,6 +283,6 @@ if(imagePoints.size()<20)
 	still need to verify by comparison of projected blob centroids with corresponding lidar pings
 	*/
 	cout<<"got there"<<endl;
-    cvDestroyWindow("view");
+    //cvDestroyWindow("view");
 return 0;
 }

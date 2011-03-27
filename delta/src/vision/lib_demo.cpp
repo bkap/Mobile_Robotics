@@ -11,8 +11,8 @@
 
 int rlow = 180;
 int rhigh = 255;
-int glow = 50;
-int ghigh = 100;
+int glow = 0;
+int ghigh = 120;
 int blow = 0;
 int bhigh = 60;
 

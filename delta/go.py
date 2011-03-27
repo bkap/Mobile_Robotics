@@ -41,7 +41,7 @@ class RosRunner:
 if __name__ == "__main__":
 	parser = OptionParser()
 	parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="Don't print extra status messages")
-	parser.add_option("-j", "--job-list", action="store", type="string", dest="jobList", default="lidar,goalpublisher,lidarmapper,planner,desiredpathcrawler,profiler,steering", help="Specify which jobs to run, comma-separated list")
+	parser.add_option("-j", "--job-list", action="store", type="string", dest="jobList", default="lidar,camera,goalpublisher,mapper,planner,desiredpathcrawler,profiler,steering", help="Specify which jobs to run, comma-separated list")
 	(options, args) = parser.parse_args()
 	rr = RosRunner(options)
 	rr.runJobs()
