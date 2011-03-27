@@ -9,11 +9,11 @@
 
 #include <time.h>
 
-int rlow = 220;
+int rlow = 180;
 int rhigh = 255;
-int glow = 80;
-int ghigh = 120;
-int blow = 45;
+int glow = 50;
+int ghigh = 100;
+int blow = 0;
 int bhigh = 60;
 
 using namespace cv;
