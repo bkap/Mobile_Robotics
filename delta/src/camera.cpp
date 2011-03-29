@@ -109,7 +109,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
   Mat R;
   Rodrigues(rvec, R);
-  R.row(1) = tvec;
+  R.col(2) = tvec;
   ROS_INFO("CAM: Point Found");
   //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl; 
    
@@ -117,8 +117,11 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   
   Mat_<float> spot(3,1);
   spot << Center.x, Center.y,1;
-  Mat_<float> result = Mat_<float>(cameraMat * R * spot);
-  //result.col(0) = result.col(0) / result(2,0);
+
+  Mat_<float> invCameraMat = (cameraMat*R).inv();  
+
+  Mat_<float> result = Mat_<float>(invCameraMat*spot);
+  result.col(0) = result.col(0) / result(2,0);
   geometry_msgs::Point32 BlobLoc;
  
   //BlobLoc.x = projCenter[0].x; 
