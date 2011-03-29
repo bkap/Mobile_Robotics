@@ -63,7 +63,7 @@ void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed)
 	desired.seg_type = newSpeed->seg_type;
 	desired.seg_number = newSpeed->seg_number;
 	staleDes = false;
-	cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose="<< desired.des_pose;
+	//cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose="<< desired.des_pose;
 }
 //Forces angles to be in range
 inline double coerceAngle(double angle){
@@ -251,7 +251,7 @@ int main(int argc,char **argv)
 		stalePos = true,
 	  	staleDes = true;
 
-		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		//cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
 		pub.publish(vel_object);
 	}
 }

@@ -170,13 +170,13 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 void SaveMat(CvMat *A, ofstream* f)
 {
     int i, j;
-    (*f)<<A->rows;
-    (*f)<<A->cols;
-    (*f)<<A->type;
+    (*f)<<A->rows<<" ";
+    (*f)<<A->cols<<" ";
+    (*f)<<A->type<<" ";
     for (i = 0; i < A->rows; i++)
     {
            for (j = 0; j < A->cols; j++)
-                (*f)<<(float)cvGetReal2D(A, i, j);
+                (*f)<<(float)cvGetReal2D(A, i, j)<<" ";
         
        
     }
@@ -256,16 +256,16 @@ if(imagePoints.size()<20)
 	cout<<endl;
 	cout<<"rotations:";
 	PrintMat(&rvec);
-//        ofstream *R = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/rvec", ofstream::out&ofstream::binary);
-//        SaveMat(&rvec,R);
+        ofstream *R = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/rvec", ofstream::out&ofstream::binary);
+        SaveMat(&rvec,R);
 	cout<<"\ntranslations:";
 	PrintMat(&tvec);
-//   	ofstream *T = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/tvec", ofstream::out&ofstream::binary);
-//        SaveMat(&tvec,T);
+   	ofstream *T = new ofstream ("/home/jinx/ROSCode/delta/Mobile_Robotics/tvec", ofstream::out&ofstream::binary);
+        SaveMat(&tvec,T);
 	cout<<endl;
 
-  //      R->close();
-//	T->close();
+        R->close();
+	T->close();
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);
