@@ -159,7 +159,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 }
 
 //these two functions were used in the GetCurveAndLines routine.  defunct.
-/*
+
 void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
 {
 	A = (A-B)/2.0; //just want the distance from A to the midpoint
@@ -171,15 +171,15 @@ void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and 
 void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
 {
 	Segment->seg_length +=Magnitude3(B-A)/2.0;
-}/*
+}
 
 
-//this was designed for use in the insertTurns function.  became defunct when insert turns was merged into planner
+this was designed for use in the insertTurns function.  became defunct when insert turns was merged into planner
 
-/*void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
+void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
 
-	//find the points needed to genereate 2 lines with a curve in between
+	find the points needed to genereate 2 lines with a curve in between
 	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
 	Point3 D = (A+C)/2.0;
 	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
@@ -257,7 +257,7 @@ PathList insertTurns(list<Point2d> P)
 		ReturnVal.path_list[3*i+2] = SecondLine;
 	}
 	return ReturnVal;//return the pathlist
-}*/
+}
 
 //finds a point along a curve given inital parameters
 Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
@@ -272,203 +272,6 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		//now invert heading and adjust it by by change_in_heading
 		heading = heading - 3.14159 + change_in_heading;
 		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
-}
-//this isn't really a bug algorithm. It just goes forward, turns right, goes
-//forward, and turns right at the distances given.
-PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
-	vector<PathSegment> path;
-	Mat_<bool> map = *map_p;
-	
-	//cout << "\nBUGGY BUGGY goes to " << dest.x << ", " << dest.y;
-	
-	//figure out where we're starting
-	double heading = tf::getYaw(start.pose.orientation);
-	double x = start.pose.position.x;
-	double y = start.pose.position.y;
-	double wallx, wally;
-	bool avoiding = false;
-	bool swerved = false;
-	int segnum = 0;
-
-	//the distances we need to travel
-	double distances[] = {3.15,12.0,-1.0}; // changed last distance from 4.0 to 5.0 to allow for estop hax during demo
-	int i = 0;
-	double distance = distances[0];
-	//this is the location of the last point we were at according to the
-	//current path
-	double old_x, old_y;
-	old_x = x;
-	old_y = y;
-	//keep going until we get close to the destination
-	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
-		if(distance < 0.001 && distance > -0.5) { //this way, we keep going ad the end
-			i++;
-			if(i > 3) {
-			//if we finish the path, let's leave
-				break;
-			}
-
-			//we've finished going one segment. Let's turn
-			//first, we get the start point of the curve, which is 1 turn
-			//radius behind the current point
-			double curve_start_x = x - cos(heading) * STD_TURN_RAD;
-			double curve_start_y = y - sin(heading) * STD_TURN_RAD;
-			Point3 start_line;
-			start_line.X = old_x;
-			start_line.Y = old_y;
-			start_line.Z = 0.0;
-			Point3 curve_start;
-			curve_start.X = curve_start_x;
-			curve_start.Y = curve_start_y;
-			curve_start.Z = 0.0;
-			//now we make a line from the previous location to the current
-			//location
-			path.push_back(MakeLine(start_line,curve_start,segnum++));
-			//make a line from the previous point to the start of the curve
-			Point3 curve_end;
-			double oldheading = heading;
-
-			//turn right 90º. If that puts us out of the range ±π, then
-			//add or subtract 2π to bring it back within range.
-			heading -= 3.14159/2;
-			if(heading < -3.14159) {
-				heading += 2 * 3.14159;
-			} else if(heading > 3.14159) {
-				heading -= 2 * 3.14159;
-			}
-			curve_end.X = x + cos(heading) * STD_TURN_RAD;
-			curve_end.Y = y + sin(heading) * STD_TURN_RAD;
-			curve_end.Z = 0.0;
-
-	        //make the curve now
-			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_end));
-			x = curve_end.X;
-			y = curve_end.Y;
-			//update the distance we need to travel
-			old_x = x;
-			old_y = y;
-			distance = distances[i]-STD_TURN_RAD;
-		}
-		
-		//move forward one map square 
-		x = x + CSPACE_RESOLUTION * cos(heading);
-		y = y + CSPACE_RESOLUTION * sin(heading);
-		distance -= CSPACE_RESOLUTION;
-		if(distance < -1) {
-			continue;
-		}
-		//if we're avoiding, check stuff 0.6 meters over.
-		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = 0.25; //avoiding ? 0.6 : 0.75;
-		wallx = x + distance_to_check * cos(heading + 3.14159/2);
-		wally = y + distance_to_check * sin(heading + 3.14159/2);
-		//get the grid cells of the location to check and the possible wall
-		int grid_wall_x = (int)((wallx-origin.position.x)/CSPACE_RESOLUTION);
-		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
-		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
-		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
-		if(avoiding && !map(grid_wall_x, grid_wall_y)) {
-			cout << "\nPLANNER: CLEAR\n";
-			if(!avoiding) {
-				//this means that we need to turn
-			/*	path.push_back(Point(x,y));
-				//now move us around the circle
-				heading -= 3.14159/2;
-				x += 0.75 * cos(heading);
-				y += 0.75 * sin(heading);
-				distance -= 0.75;
-			*/
-			} else {
-				//this means we need to readjust to go back 2 feet
-				//we have been avoiding, but we no longer need to	
-				//first make the straight line to this point
-				Point3 start = Point3(old_x,old_y,0.0);
-				Point3 endline;
-
-				endline.X = x;
-				endline.Y = y;
-				endline.Z = 0.0;
-				path.push_back(MakeLine(start,endline, segnum++));
-				//path.push_back(Point(x,y));
-				
-				//now we need to make a curve that does a 45 degree arc
-				//we should get halfway to wall
-				Point3 midcurve = findPointAlongCircle(endline, heading, - 3.14159/4.0, STD_TURN_RAD);
-
-				//now make the first curve
-				
-				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,+3.14159/4.0,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading - 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = endcurve.X;
-				y = endcurve.Y;
-				old_x = x;
-				old_y = y;
-				avoiding=false;
-				distance -= 0.6;
-			}
-		} else if(map(grid_x, grid_y) &&!avoiding && !swerved) {
-				swerved = true;
-				cout << "\nPLANNER: oh noes! There's something in the way\n";
-				//Evasive Maneuvers!!!!!
-				Point3 start = Point3(old_x,old_y,0.0);
-				Point3 endline;
-
-				endline.X = x - 1.0 * cos(heading);
-				endline.Y = y - 1.0 * sin(heading);
-				endline.Z = 0.0;
-				//now make a line up to this poing
-				path.push_back(MakeLine(start,endline, segnum++));
-					
-				//now we need to make a curve that does a 45 degree arc
-				//we should get halfway to wall
-				Point3 midcurve = findPointAlongCircle(endline, heading,  +3.14159/4.0, STD_TURN_RAD);
-
-				//now make the first curve
-				
-				path.push_back(MakeCurve(heading, heading + 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,-3.14159/4,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = endcurve.X + 0.7 * cos(heading);
-				y = endcurve.Y +0.7 * sin(heading);
-				path.push_back(MakeLine(endcurve, Point3(x,y,0.0),segnum++));
-				old_x = x;
-				old_y = y;
-				distance -= 0.7;
-			avoiding = true;
-		} 
-	}
-	PathSegment p = path[path.size()-1];
-	//path.pop_back(); // remove the final curve
-	/*
-	// hax
-	int haxCount = 0;
-	while (p.seg_type == 2) { // REMOVE ALL ARCS
-        cout << "\nBUGGY BUGGLE removing arcs";
-	    p = path[path.size()-1];
-	    path.pop_back();
-	    haxCount++;
-	}
-    
-	if (haxCount == 2) {
-	// check for planner adding swerves at end and delete
-	    if (path[path.size()-1].seg_type == 1 && path[path.size()-2].seg_type == 2 && path[path.size()-3].seg_type == 3) {
-	        path.pop_back();
-	        path.pop_back();
-	        path.pop_back();
-	        cout << "\nBUGGY BUGFAIL removed a swerve";
-	    }
-	}
-	path.push_back(p);
-	*/
-	cout << "\nBUGGY BUG last curve is type " << (int)path[path.size()-1].seg_type << " and before that is ";
-	cout << (int)path[path.size()-2].seg_type << ", then " << (int)path[path.size()-3].seg_type;
-	
-	// add really short line at end?
-	path.push_back(MakeLine(Point3(old_x,old_y,heading),Point3(x,y,heading),segnum++));
-	PathList pathList;
-	pathList.path_list = path;
-	return pathList;
 }
 
 
@@ -533,12 +336,11 @@ int main(int argc,char **argv)
       	double amount_to_change = 0.0;    
       	cout<<"3\n";
 	ros::NodeHandle n;
-	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
+
 	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback); 
-	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
-	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
+
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
 	cout<<"3\n";
@@ -572,11 +374,7 @@ int main(int argc,char **argv)
 				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
 				//cout<<"yo2\n";
 			}
-		//	list<Point2d> points = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-		//	for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
-		//		cout << (*it).x << "," << (*it).y << endl;
-		//	}
-			//PathList turns = insertTurns(points);
+		
 			list<geometry_msgs::Point> points;
 			geometry_msgs::Point p;
 			for(int i=0;i<lastCSpace_Map->size().height; i++)
