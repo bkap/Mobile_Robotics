@@ -46,4 +46,13 @@ rosbuild_add_executable(camera src/camera.cpp)
 target_link_libraries(camera Vision)
 rosbuild_add_executable(calib_camera src/vision/calib_camera.cpp)
 target_link_libraries(calib_camera Vision)
+
+#FUTURE DEMO!!!!!!!!
+rosbuild_add_executable(futureplanner src/future/planner.cpp)
+rosbuild_add_executable(futuremapper src/future/mapper.cpp)
+target_link_libraries(futureplanner MathyStuff)
+target_link_libraries(futureplanner CSpaceFuncs)
+target_link_libraries(futuremapper CSpaceFuncs)
+rosbuild_add_executable(futurecamera src/future/camera.cpp)
+target_link_libraries(futurecamera Vision)
 #target_link_libraries(example ${PROJECT_NAME})
