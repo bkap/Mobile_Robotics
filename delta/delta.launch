@@ -1,7 +1,12 @@
 <launch>
+
 	<!-- Launch local nodes -->
 	<node name="lidar" pkg="delta" type="lidar" output="screen"/>
-	<node name="camera" pkg="delta" type="camera" output="screen"/>
+	<node name="camera" pkg="delta" type="camera" output="screen">	
+    		<remap from="image" to="/front_camera/image_rect_color"/>
+
+    		<remap from="camera_info" to="/front_camera/camera_info"/>
+	</node>
 	<node name="goalpublisher" pkg="delta" type="goalpublisher" output="screen"/>
 	<node name="mapper" pkg="delta" type="mapper" output="screen"/>
 	<node name="planner" pkg="delta" type="planner" output="screen"/>

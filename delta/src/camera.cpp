@@ -16,7 +16,7 @@
 #include <stdio.h>
 using namespace cv;
 using namespace std;
-void ReadMat(Mat_<double> *mat, char* file);
+void ReadMat(Mat_<float> *mat, char* file);
 
 vector<Point3f> LIDARPoints; //aggregator for rod points
 vector<Point2f> imagePoints; //aggregator for image points
@@ -39,7 +39,7 @@ class DemoNode {
 		ros::Subscriber sub_info_;
 		ros::Publisher pub_blob_loc;
 		sensor_msgs::PointCloud BlobLocations;
-		Mat_<double> rvec, tvec;
+		Mat_<float> rvec, tvec;
 };
 
 //call this with a point32 to publish the blob's location
@@ -47,35 +47,43 @@ void DemoNode::publishBlobLoc(geometry_msgs::Point32 BlobLoc)
 {
 	BlobLocations.points[0] = BlobLoc;
 	sensor_msgs::PointCloud tBlobLoc;
+	cout << BlobLoc.x << "," << BlobLoc.y << endl;
 	tfl->transformPointCloud("map", BlobLocations, tBlobLoc);
+	cout << tBlobLoc.points[0].x << "," << tBlobLoc.points[0].y << endl;
 	pub_blob_loc.publish(tBlobLoc);
 }
 DemoNode::DemoNode():
   it_(nh_)
 {
+
+	cout << "reading mats" << endl;
+	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
+	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
+	cout << "read mats" << endl;
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
 	pub_blob_loc = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
 
 	BlobLocations.points = vector<geometry_msgs::Point32> (1);
 	BlobLocations.header.frame_id = "base_laser1_link";
-	cout << "reading mats" << endl;
-	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
-	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
-	cout << "read mats" << endl;
 }
+bool cameraCalled = false;
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	const double* K = (msg->K).data();
 	const double* D = (msg->D).data();
 	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
 	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
+	cameraCalled = true;
 	//cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-
+  if(!cameraCalled) {
+	return;
+  }
+  cout << "huh callback?" << endl;
   sensor_msgs::CvBridge bridge;
   cv::Mat image;
   cv::Mat output;
@@ -92,20 +100,31 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     normalizeColors(image, output);
     CvPoint2D64f Center = blobfind(image, output);
 	
-  Mat_<double> center (1, 3);
-  center(0,0) = Center.x;
-  center(0,1) = Center.y;
-  center(0,2) = 0;
-  vector<Point_<float> > projCenter (1);
   
-  projectPoints(center, rvec, tvec, cameraMat, Mat(), projCenter);  
+  vector< Point2f > projCenter (3);
+    
+  ROS_INFO("CAM: Checking image");
 
-  geometry_msgs::Point32 BlobLoc;
-
-  BlobLoc.x = projCenter[0].x;
-  BlobLoc.y = projCenter[0].y;
   if(Center.x>0)//Center.x should be 0 if there is no blob
 {
+  Mat R;
+  Rodrigues(rvec, R);
+  R.row(1) = tvec;
+  ROS_INFO("CAM: Point Found");
+  //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl; 
+   
+   //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);  
+  
+  Mat_<float> spot(3,1);
+  spot << Center.x, Center.y,1;
+  Mat_<float> result = Mat_<float>(cameraMat * R * spot);
+  //result.col(0) = result.col(0) / result(2,0);
+  geometry_msgs::Point32 BlobLoc;
+ 
+  //BlobLoc.x = projCenter[0].x; 
+  //BlobLoc.y = projCenter[0].y;
+   BlobLoc.x = result(0,0) / result(0,2) ;
+   BlobLoc.y = result(0,1) / result(0,2);
   publishBlobLoc(BlobLoc);
 }
   }
@@ -117,7 +136,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 }
 
 //reads a mat from the file in ~/.ros
-void ReadMat(Mat_<double> *mat, char* file)
+void ReadMat(Mat_<float> *mat, char* file)
 {
 	FILE* test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "w");
 	fprintf(test, "%i\n", 1);
@@ -138,11 +157,11 @@ void ReadMat(Mat_<double> *mat, char* file)
 	(*infile)>>rows;
 	cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
 	(*infile)>>cols;
-	cout<<"Scanned Columns, there are/is "<<cols<<"of them\n";
+	cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
 	(*infile)>>type;
 	cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
 	//cout<<"camout2\n";
-	mat = new Mat_<double> (rows, cols); 
+	*mat = Mat_<float> (rows, cols); 
 	//cout<<"camout3\n";
 	unsigned int i, j;
 	float f;
@@ -152,8 +171,10 @@ void ReadMat(Mat_<double> *mat, char* file)
 		for (j = 0; j < mat->cols; j++)
 		{
 		        (*infile)>>f;
-			((*mat)(i,j)) = (double)f;
+			((*mat)(i,j)) = f;
+			cout << f << ",";
 		}     
+		cout << endl;
 	}
 	//cout<<"camout4\n";
 	infile->close();
