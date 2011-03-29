@@ -99,35 +99,39 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   try {
     normalizeColors(image, output);
     CvPoint2D64f Center = blobfind(image, output);
-	
-  
+
+
   vector< Point2f > projCenter (3);
-    
+
   ROS_INFO("CAM: Checking image");
 
   if(Center.x>0)//Center.x should be 0 if there is no blob
 {
   Mat R;
   Rodrigues(rvec, R);
+
   R.col(2) = tvec;
+
   ROS_INFO("CAM: Point Found");
-  //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl; 
-   
-   //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);  
-  
+  //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl;
+
+   //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);
+
   Mat_<float> spot(3,1);
+
   spot << Center.x, Center.y,1;
 
   Mat_<float> invCameraMat = (cameraMat*R).inv();  
 
   Mat_<float> result = Mat_<float>(invCameraMat*spot);
   result.col(0) = result.col(0) / result(2,0);
+
   geometry_msgs::Point32 BlobLoc;
- 
-  //BlobLoc.x = projCenter[0].x; 
+
+  //BlobLoc.x = projCenter[0].x;
   //BlobLoc.y = projCenter[0].y;
-   BlobLoc.x = result(0,0) / result(0,2) ;
-   BlobLoc.y = result(0,1) / result(0,2);
+   BlobLoc.x = result(0,0);// / result(0,2) ;
+   BlobLoc.y = result(0,1);// / result(0,2);
   publishBlobLoc(BlobLoc);
 }
   }
