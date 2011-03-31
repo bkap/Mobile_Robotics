@@ -194,12 +194,11 @@ void normalizeColor(cv::Mat& img){
                 //p=*it; 
                 double scale = (*it)[0]+(*it)[1]+(*it)[2];
                 //p = scale * *it;// (255.0/scale));
-                *it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uch$
-
+		*it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
         }
 }
 
-void getOrangeLines(Mat& img, vector<vec4i>& lines)
+void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
    Mat src = img.clone();
     normalizeColor(src);
