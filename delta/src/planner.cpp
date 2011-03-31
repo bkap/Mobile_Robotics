@@ -14,7 +14,6 @@
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
 #include <visualization_msgs/Marker.h>
-#include "MathyStuff.h"
 #include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 10
@@ -23,7 +22,6 @@
 #define LINE 1
 #define CURVE 2
 #define POINT_TURN 3
-
 #define STD_TURN_RAD .6 //given in the assignment but changed because it seemed to work better
 
 //define maximum speeds and accelerations
@@ -36,31 +34,56 @@
 using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
-tf::TransformListener *tfl; //transforms crap into better frames
+tf::TransformListener *tfl;
 
-//converts between the Point3 class and a geometry point for use in messages
-geometry_msgs::Point Point3toGeoPoint (Point3 A)
+// Converts a Point3f to geometry_msgs::Point
+geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
-	geometry_msgs::Point Ref_Point;
-	Ref_Point.x = A.X;
-	Ref_Point.y = A.Y;
-	Ref_Point.z = A.Z;
-	return Ref_Point;
+    geometry_msgs::Point geopt;
+    geopt.x = p3f.x;
+    geopt.y = p3f.y;
+    geopt.z = p3f.z;
+    return geopt;
+}
+
+Point3f convertGeoPointToPoint3f(geometry_msgs::Point geopt)
+{
+    Point3f p3f;
+    p3f.x = geopt.x;
+    p3f.y = geopt.y;
+    p3f.z = geopt.z;
+    return p3f;
+}
+
+// Get distance between two points
+float getDistance(Point3f A, Point3f B)
+{
+    return sqrt( (A.x-B.x)*(A.x-B.x) + (A.y-B.y)*(A.y-B.y) + (A.z-B.z)*(A.z-B.z) );
+}
+
+float getDistance(Point3f A)
+{
+    return sqrt( A.x*A.x + A.y*A.y + A.z*A.z );
+}
+
+float dotProduct(Point3f A, Point3f B)
+{
+    return A.x*B.x + A.y*B.y + A.z*B.z;
 }
 
 //makes a line from A to B of a given SegNum
-PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
+PathSegment MakeLine(Point3f A, Point3f B, int SegNum)  //woot it makes a line
 {
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
 	//cout << "makeline" << endl;
 	//cout << A.X << "," << A.Y << ":" << B.X << "," << B.Y << endl;
-	P.seg_length = Distance3(A,B);
+	P.seg_length = getDistance(A, B);
 	//cout<< P.seg_length << endl;
-	P.ref_point = Point3toGeoPoint(A);
-	Point3 Vec = B-A;
-	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
+	P.ref_point = convertPoint3fToGeoPoint(A);
+	Point3f vec = B-A;
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(vec.y, vec.x));
 	P.curvature = 1337;
 	
 	P.max_speeds.linear.x = MAX_LINEAR*0.5;
@@ -76,12 +99,12 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
 //generate a turn in place given an initial heading, a final heading, and a point to turn on.
-PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_point, int SegNum)
 {
 	double theta1 = InitAngle;
 	double theta2 = FinalAngle;
@@ -90,7 +113,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
 	P.seg_length = fabs(theta2-theta1); //how much to turn
-	P.ref_point = ref_point; //where to turn
+	P.ref_point = convertPoint3fToGeoPoint(ref_point); //where to turn
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle); //initial heading as a quaternion
 	P.curvature = (FinalAngle>InitAngle)?1:-1;//direction to turn
 	
@@ -107,17 +130,17 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
 //makes a curve again initial and final headings as well as start and end points
-PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A, Point3 B)
+PathSegment MakeCurve(double InitAngle, double FinalAngle, Point3f A, Point3f B, int SegNum)
 {
-	Point3 M = (A+B)/2.0;  //midpoint
-	Point3 MA = M-A;  //vector from midpoint to A
-	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point.  derived using basic trig
-	double Radius = Distance3(A, Center); //this may or may not work
+	Point3f M = (A+B)*(0.5);  //midpoint
+	Point3f MA = M-A;  //vector from midpoint to A
+	Point3f Center = M - Point3f(MA.y, -MA.y, 0)*(1.0/tan((FinalAngle-InitAngle)/2.0));   //get the center point.  derived using basic trig
+	double Radius = getDistance(A, Center); //this may or may not work
 
 	PathSegment P;
 	P.seg_type = CURVE;
@@ -129,13 +152,14 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 		P.seg_length += 2 * 3.14159;
 	}
 
-	P.curvature = 1/STD_TURN_RAD;// I know that curvature should be 1/Radius, but that didn't work for some reason so it was overriden
+	P.curvature = 1/STD_TURN_RAD;
+	// I know that curvature should be 1/Radius, but that didn't work for some reason so it was overriden
 	P.curvature *= (P.seg_length>0)?1:-1;
 	P.seg_length = fabs(P.seg_length);
 
 	geometry_msgs::Point gmPoint;
-	gmPoint.x = Center.X;
-	gmPoint.y = Center.Y;
+	gmPoint.x = Center.x;
+	gmPoint.y = Center.y;
 	gmPoint.z = 0.0f;
 	P.ref_point = gmPoint;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
@@ -154,73 +178,75 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
 //these two functions were used in the GetCurveAndLines routine.  defunct.
 
-void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
+void MoveBack1(Point3f A, Point3f B, PathSegment* Segment) // moves the start and end points as special cases
 {
-	A = (A-B)/2.0; //just want the distance from A to the midpoint
-	Segment->ref_point.x += A.X;
-	Segment->ref_point.y += A.Y;
-	Segment->seg_length +=Magnitude3(A);
+	A = (A-B)*0.5; //just want the distance from A to the midpoint
+	Segment->ref_point.x += A.x;
+	Segment->ref_point.y += A.y;
+	Segment->seg_length += getDistance(A);
 }
 
-void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
+void MoveBack2(Point3f A, Point3f B, PathSegment* Segment)
 {
-	Segment->seg_length +=Magnitude3(B-A)/2.0;
+	Segment->seg_length += getDistance(B-A)*0.5;
 }
 
 
-this was designed for use in the insertTurns function.  became defunct when insert turns was merged into planner
-
-void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
+// this was designed for use in the insertTurns function
+void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
+	//find the points needed to generate 2 lines with a curve in between
+	double Theta = dotProduct(A-B, B-C)/(getDistance(A-B)*getDistance(B-C));  //implement the math that I did earlier
+	Point3f D = (A+C)*0.5;
+	Point3f Center = B+(D-B)*(1/getDistance(D-B))*(STD_TURN_RAD/acos(tan(Theta/2.0)));
+	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)*(1/getDistance(B-A));
 
-	find the points needed to genereate 2 lines with a curve in between
-	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
-	Point3 D = (A+C)/2.0;
-	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
-	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-
-	Point3 Bdoubleprime = B+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
-	Point3 Midpoint2 = C-(C-B)/2.0;
-	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
+	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C)); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3f Midpoint1 = A+(A-B)*0.5;  //midpoints are used in a sec
+	Point3f Midpoint2 = C-(C-B)*0.5;
+	if (dotProduct(Midpoint1, B-A) < dotProduct(Bprime, B-A) || dotProduct(Midpoint2, B-C) < dotProduct(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
-		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine->ref_point, (*SegNum)++) ;
+		(*Curve) = MakeTurnInPlace(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 	else 
 	{
 		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
 		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
-		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
+		(*Curve) = MakeCurve(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(FirstLine->ref_point), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 }
 
-// this was supposed to take a list of points and turn them into a series of lines and turns, following the pattern (line, turn, line, line, turn, line ...) note that any two adjacent lines are parallel and connect at start and end points to essentially make a single larger line segment.  
+// this was supposed to take a list of points and turn them into a series of lines and turns, following 
+// the pattern (line, turn, line, line, turn, line ...) note that any two adjacent lines 
+// are parallel and connect at start and end points to essentially make a single larger line segment.  
 
-//this function was merged with parts of the bug algorithm because we only needed the special cases of 90 and 45 degree turns. in the future, this will be included because it is much more generically written
+// this function was merged with parts of the bug algorithm because we only needed the special 
+// cases of 90 and 45 degree turns. in the future, this will be included because it is much more 
+// generically written
 
 PathList insertTurns(list<Point2d> P)
 {
 	//convert from the list<Point2d> to an array of Point3's
-	Point3* PointList = (Point3*)calloc(sizeof(Point3),P.size());  //this should be the list of points that ben's algorithm puts out
+	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),P.size());  //this should be the list of points that ben's algorithm puts out
 	int PointListLength = P.size();
 	
 	list<Point2d>::iterator it; 
 	int i = 0;
 	for (it = P.begin(); it!=P.end(); it++)
 	{
-		PointList[i].X = it->x;
-		PointList[i].Y = it->y;
-		PointList[i].Z = 0;
+		PointList[i].x = it->x;
+		PointList[i].y = it->y;
+		PointList[i].z = 0;
 		i++;
 	}
 	
@@ -229,7 +255,7 @@ PathList insertTurns(list<Point2d> P)
 	ReturnVal.path_list.assign(path.begin(), path.end());
 	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
-	Point3 A, B, C; //points A,B,C for the line turn line pattern
+	Point3f A, B, C; //points A,B,C for the line turn line pattern
 	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
 
 	
@@ -260,7 +286,7 @@ PathList insertTurns(list<Point2d> P)
 }
 
 //finds a point along a curve given inital parameters
-Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
+Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
 		if(change_in_heading > 0) {
 			//we are going positive angle, add 90
@@ -268,10 +294,10 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		} else {
 			heading -= 3.14159/2;
 		}
-		Point3 center = Point3(startPoint.X + cos(heading) * radius, startPoint.Y + sin(heading) * radius,0.0);
+		Point3f center = Point3f(startPoint.x + cos(heading)*radius, startPoint.y + sin(heading)*radius,0.0);
 		//now invert heading and adjust it by by change_in_heading
 		heading = heading - 3.14159 + change_in_heading;
-		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
+		return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
 }
 
 
