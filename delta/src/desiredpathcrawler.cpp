@@ -45,13 +45,13 @@ Publishes: CrawlerDesiredState
 lsegDes (how far along current segment you've gone), xDes, yDes, psiDes, rhoDes, segType, segNumber
 */
 int main(int argc,char **argv)
-{   
+{
     ros::init(argc,argv,"desiredpathcrawler");//name of this node
-    
+
     ros::NodeHandle n;
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("crawlerDesState",1);
 
-	// Load parameters    
+	// Load parameters
 	if (n.getParam("/crawler/REFRESH_RATE", f)){
 		ROS_INFO("Crawler: loaded f=%f",f);
 	} else{
@@ -63,13 +63,13 @@ int main(int argc,char **argv)
     // list of subscribers
     ros::Subscriber subPathList = n.subscribe<PathList>("pathList", 1, pathListCallback);
 	ros::Subscriber subSpeedProfiler = n.subscribe<CrawlerDesiredState>("NominalSpeed", 1, speedProfilerCallback);
-	
 	ros::Rate naptime(f); //will perform sleeps to enforce loop rate of "10" Hz
     while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly.
     //Wait until ros::Time::now() will be valid, but let any callbacks happen
-    
-    while(ros::ok()&&!pathListInit){ros::spinOnce();naptime.sleep();}
-    
+
+    while(ros::ok()&&!pathListInit){
+    ros::spinOnce();naptime.sleep();}
+
     // initialize desired state
     desState.seg_type = pathlist.path_list[0].seg_type;
     desState.seg_number = 0;
@@ -80,7 +80,7 @@ int main(int argc,char **argv)
     des_pose.position = pathlist.path_list[0].ref_point;
     des_pose.orientation = pathlist.path_list[0].init_tan_angle;
     desState.des_pose = des_pose;
-    
+
     // ref
     bool finishedPath = false;
 
@@ -89,13 +89,13 @@ int main(int argc,char **argv)
     while (ros::ok()) // do work here
     {
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-        
+
         // only update if it still has path segments left...
         if (!finishedPath)
         {
             // update total distance traveled and compute the x, y, psi
 
-            double psiDes = tf::getYaw(desState.des_pose.orientation);            
+            double psiDes = tf::getYaw(desState.des_pose.orientation);
             switch (desState.seg_type) {
                 case 1: // line
                     // straightforward
@@ -107,9 +107,9 @@ int main(int argc,char **argv)
                 {
                     //distance the robot traveled in the past dt along the arc.  s = R*theta
                     desState.des_lseg += desState.des_speed * fabs(desState.des_rho) * dt;
-                    
+
                     cout << "\nARCING around circle centered at " << pathlist.path_list[desState.seg_number].ref_point << " with dpsi " << pathlist.path_list[desState.seg_number].seg_length;
-                    
+
                     double theta = 0.0; // angle from center of curvature
                     ///*
                     if (desState.des_rho >= 0) {
@@ -123,25 +123,25 @@ int main(int argc,char **argv)
                     //theta = psiDes + pi/2;
                     if (desState.des_rho < 0) {  // right-hand turn
                         //cout << "\nRHT theta = "<<theta;
-                        theta = theta - desState.des_speed * dt * fabs(desState.des_rho);
+                        theta =  theta  - desState.des_speed * dt * fabs(desState.des_rho);
                         psiDes = psiDes - desState.des_speed * dt * fabs(desState.des_rho);
                     } else {    // left-hand turn
                         //cout << "\nLHT theta = "<<theta;
-                        theta = theta + desState.des_speed * dt * fabs(desState.des_rho);
+                        theta =  theta  + desState.des_speed * dt * fabs(desState.des_rho);
                         psiDes = psiDes + desState.des_speed * dt * fabs(desState.des_rho);
                     }
-                    
+
                     // merely for reference
                     double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
                     double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
-                    
+
                     // this was the old stuff that didn't work
                     //desState.des_pose.position.x = xCenter + cos(theta) / desState.des_rho;
                     //desState.des_pose.position.y = yCenter + sin(theta) / desState.des_rho;
-                    
+
                     desState.des_pose.position.x = xCenter + cos(theta - pi) / desState.des_rho;
                     desState.des_pose.position.y = yCenter + sin(theta - pi) / desState.des_rho;
-                    
+
                     break;
                 }
                 case 3: // rotate about point
@@ -153,15 +153,15 @@ int main(int argc,char **argv)
                         psiDes += desState.des_speed * dt;
                     break;
             }
-            
+
             // fix heading
             if (psiDes > pi)
                 psiDes -= 2*pi;
             else if (psiDes < -pi)
                 psiDes += 2*pi;
-            
+
             desState.des_pose.orientation = tf::createQuaternionMsgFromYaw(psiDes);
-            
+
             // figure out if we are at a new segment
             if (desState.des_lseg >= fabs(pathlist.path_list[desState.seg_number].seg_length)) {
                 // if this is not the last segment, increment
@@ -174,15 +174,15 @@ int main(int argc,char **argv)
                     desState.des_lseg = 0.0;
                     geometry_msgs::Pose des_pose;
                     des_pose.orientation = pathlist.path_list[desState.seg_number].init_tan_angle;
-                    
+
                     if (desState.seg_type == 2) { // arc
                         double theta = 0.0; // angle from center of curvature
-                        
+
                         if (desState.des_rho >= 0)
                             theta = psiDes - pi/2;
                         else
                             theta = psiDes + pi/2;
-                        
+
                         /*if (desState.des_rho < 0) {  // right-hand turn
                             cout << "\nRHT theta = "<<theta;
                             theta = theta - desState.des_speed * dt * fabs(desState.des_rho);
@@ -192,10 +192,10 @@ int main(int argc,char **argv)
                             theta = theta + desState.des_speed * dt * fabs(desState.des_rho);
                             psiDes = psiDes + desState.des_speed * dt * fabs(desState.des_rho);
                         }*/
-                        
+
                         double xCenter = pathlist.path_list[desState.seg_number].ref_point.x;
                         double yCenter = pathlist.path_list[desState.seg_number].ref_point.y;
-                    
+
                         // this isn't really necessary
                         geometry_msgs::Point arcStartPt;
                         arcStartPt.x = xCenter + cos(theta - pi) / desState.des_rho;    // need to correct by pi
@@ -209,9 +209,8 @@ int main(int argc,char **argv)
                         */
                         des_pose.position = arcStartPt;
                     } else { // line or point
-                        des_pose.position = pathlist.path_list[desState.seg_number].ref_point;                    
+                        des_pose.position = pathlist.path_list[desState.seg_number].ref_point;
                     }
-                    
                     desState.des_pose = des_pose;
                 } else {
                     cout << "\n\ndpc: LAST segment\n";

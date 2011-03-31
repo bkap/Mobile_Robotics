@@ -123,7 +123,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
   Mat_<float> invCameraMat = (cameraMat*R).inv();  
 
-  Mat_<float> result = Mat_<float>(invCameraMat*spot);
+  Mat_<float> result = invCameraMat*spot;
   result.col(0) = result.col(0) / result(2,0);
 
   geometry_msgs::Point32 BlobLoc;
@@ -185,6 +185,48 @@ void ReadMat(Mat_<float> *mat, char* file)
 	}
 	//cout<<"camout4\n";
 	infile->close();
+}
+
+void normalizeColor(cv::Mat& img){
+        cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
+        cv::Vec<uchar,3> p;
+        for(;it!=it_end;++it){
+                //p=*it; 
+                double scale = (*it)[0]+(*it)[1]+(*it)[2];
+                //p = scale * *it;// (255.0/scale));
+                *it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uch$
+
+        }
+}
+
+void getOrangeLines(Mat& img, vector<vec4i>& lines)
+{
+   Mat src = img.clone();
+    normalizeColor(src);
+    Mat temp = src;
+    vector<Mat> mats;
+    split(temp, mats);
+  // Set all values below value to zero, leave rest the same
+  // Then inverse binary threshold the remaining pixels
+  // Threshold blue channel
+  threshold(mats[0], mats[0], 60, 255, THRESH_TOZERO_INV);
+  threshold(mats[0], mats[0], 0, 255, THRESH_BINARY);
+  // Threshold green channel
+  threshold(mats[1], mats[1], 80, 255, THRESH_TOZERO_INV);
+  threshold(mats[1], mats[1], 60, 255, THRESH_BINARY);
+  // Threshold red channel
+  threshold(mats[2], mats[2], 200, 255, THRESH_TOZERO_INV);
+  threshold(mats[2], mats[2], 130, 255, THRESH_BINARY);
+  Mat dst, cdst;
+  multiply(mats[0], mats[1], dst);
+  multiply(dst, mats[2], dst);
+    cvtColor(dst, cdst, CV_GRAY2BGR);
+    HoughLinesP(dst, lines, 1, CV_PI/180, 50, 50, 10 );
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        Vec4i l = lines[i];
+        line( cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
+    }
 }
 
 
