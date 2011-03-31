@@ -1,4 +1,4 @@
-#include "../command_publisher.h"
+#include "command_publisher.h"
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -14,7 +14,7 @@
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
 #include <visualization_msgs/Marker.h>
-#include "../CSpaceFuncs.h"
+#include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 10
 
@@ -44,6 +44,15 @@ geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
     geopt.y = p3f.y;
     geopt.z = p3f.z;
     return geopt;
+}
+
+Point3f convertGeoPointToPoint3f(geometry_msgs::Point geopt)
+{
+    Point3f p3f;
+    p3f.x = geopt.x;
+    p3f.y = geopt.y;
+    p3f.z = geopt.z;
+    return p3f;
 }
 
 // Get distance between two points
@@ -95,7 +104,7 @@ PathSegment MakeLine(Point3f A, Point3f B, int SegNum)  //woot it makes a line
 }
 
 //generate a turn in place given an initial heading, a final heading, and a point to turn on.
-PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_point, int SegNum)
 {
 	double theta1 = InitAngle;
 	double theta2 = FinalAngle;
@@ -104,7 +113,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
 	P.seg_length = fabs(theta2-theta1); //how much to turn
-	P.ref_point = ref_point; //where to turn
+	P.ref_point = convertPoint3fToGeoPoint(ref_point); //where to turn
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle); //initial heading as a quaternion
 	P.curvature = (FinalAngle>InitAngle)?1:-1;//direction to turn
 	
@@ -126,7 +135,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 }
 
 //makes a curve again initial and final headings as well as start and end points
-PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3f A, Point3f B)
+PathSegment MakeCurve(double InitAngle, double FinalAngle, Point3f A, Point3f B, int SegNum)
 {
 	Point3f M = (A+B)*(0.5);  //midpoint
 	Point3f MA = M-A;  //vector from midpoint to A
@@ -193,26 +202,26 @@ void MoveBack2(Point3f A, Point3f B, PathSegment* Segment)
 void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
 	//find the points needed to generate 2 lines with a curve in between
-	double Theta = dotProduct(A-B, B-C)/(getDistance(A-B)*getDistance(B-C));  //impliment the math that I did earlier
-	Point3f D = (A+C)/2.0;
-	Point3f Center = B+(D-B)/getDistance(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
-	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)/getDistance(B-A);
+	double Theta = dotProduct(A-B, B-C)/(getDistance(A-B)*getDistance(B-C));  //implement the math that I did earlier
+	Point3f D = (A+C)*0.5;
+	Point3f Center = B+(D-B)*(1/getDistance(D-B))*(STD_TURN_RAD/acos(tan(Theta/2.0)));
+	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)*(1/getDistance(B-A));
 
-	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)/getDistance(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3f Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
-	Point3f Midpoint2 = C-(C-B)/2.0;
+	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C)); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3f Midpoint1 = A+(A-B)*0.5;  //midpoints are used in a sec
+	Point3f Midpoint2 = C-(C-B)*0.5;
 	if (dotProduct(Midpoint1, B-A) < dotProduct(Bprime, B-A) || dotProduct(Midpoint2, B-C) < dotProduct(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
-		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, convertPoint3fToGeoPoint(SecondLine->ref_point), (*SegNum)++) ;
+		(*Curve) = MakeTurnInPlace(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 	else 
 	{
 		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
 		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
-		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
+		(*Curve) = MakeCurve(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(FirstLine->ref_point), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 }
@@ -235,9 +244,9 @@ PathList insertTurns(list<Point2d> P)
 	int i = 0;
 	for (it = P.begin(); it!=P.end(); it++)
 	{
-		PointList[i].X = it->x;
-		PointList[i].Y = it->y;
-		PointList[i].Z = 0;
+		PointList[i].x = it->x;
+		PointList[i].y = it->y;
+		PointList[i].z = 0;
 		i++;
 	}
 	
@@ -246,7 +255,7 @@ PathList insertTurns(list<Point2d> P)
 	ReturnVal.path_list.assign(path.begin(), path.end());
 	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
 	int SegNum = 0;
-	Point3 A, B, C; //points A,B,C for the line turn line pattern
+	Point3f A, B, C; //points A,B,C for the line turn line pattern
 	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
 
 	
@@ -277,7 +286,7 @@ PathList insertTurns(list<Point2d> P)
 }
 
 //finds a point along a curve given inital parameters
-Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
+Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
 		if(change_in_heading > 0) {
 			//we are going positive angle, add 90
@@ -285,10 +294,10 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		} else {
 			heading -= 3.14159/2;
 		}
-		Point3 center = Point3(startPoint.X + cos(heading) * radius, startPoint.Y + sin(heading) * radius,0.0);
+		Point3f center = Point3f(startPoint.x + cos(heading)*radius, startPoint.y + sin(heading)*radius,0.0);
 		//now invert heading and adjust it by by change_in_heading
 		heading = heading - 3.14159 + change_in_heading;
-		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
+		return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
 }
 
 

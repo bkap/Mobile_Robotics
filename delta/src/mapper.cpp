@@ -11,7 +11,7 @@
 #include <vector>
 #include <math.h>
 #include <iostream>		
-#include "../CSpaceFuncs.h"
+#include "CSpaceFuncs.h"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/core/core.hpp"
