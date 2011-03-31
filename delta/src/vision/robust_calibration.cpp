@@ -90,11 +90,11 @@ void ReadMat(Mat_<float> *mat, char* file)
 
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
-	const double* K = (msg->K).data();
-	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
-	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
-       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+  const double* K = (msg->K).data();
+  const double* D = (msg->D).data();
+  Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
+  Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
+  cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
 // Callback triggered whenever you receive a laser scan
@@ -128,44 +128,50 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-float rodSepThresh  = 0.4; //min dist of rod from surrounding
-float rodDispThresh = 0.05;//max radial diff between rod points
-float rodWidthThresh= 3;   //max pings of a rod
-float rodDistThresh = 2;   //max distance to rod
-bool maybeRod = false;
-int rodStart = -1;
-float minr = 1000;
-float maxr = 0;
+  float rodSepThresh  = 0.4; //min dist of rod from surrounding
+  float rodDispThresh = 0.05;//max radial diff between rod points
+  float rodWidthThresh= 3;   //max pings of a rod
+  float rodDistThresh = 2;   //max distance to rod
+  bool maybeRod = false;
+  int rodStart = -1;
+  float minr = 1000;
+  float maxr = 0;
 
-last_scan_valid = false;
+  last_scan_valid = false;
 
-for(int i=1;i<num_points-1;i++){
-        if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh){
-            maybeRod = true;
-            rodStart = i;
-            minr = scan.ranges[i];
-            maxr = scan.ranges[i];
-        }
-        if(maybeRod){
-            minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
-            maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
- 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh){
-	         if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh){
-        	     maybeRod = false;
-            	 }
-	         else{
-                    float r = (maxr + minr) / 2;
-		    float t = 3.1415926535 * ( ((float) (rodStart+i))/360.0 -0.5);
-                    last_scan_valid = true;
-                    lastValidLIDARPoint.x = r*cos(t);
-                    lastValidLIDARPoint.y = r*sin(t);
-                    maybeRod = false;
-                    maxr = 0;
-                    minr = 1000;
-		    break;
-            	}
+  for(int i=1;i<num_points-1;i++)
+  {
+    if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh)
+    {
+        maybeRod = true;
+        rodStart = i;
+        minr = scan.ranges[i];
+        maxr = scan.ranges[i];
+    }
+    if(maybeRod)
+    {
+      minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
+      maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
+ 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh)
+      {
+        if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh)
+        {
+  	      maybeRod = false;
+      	}
+        else
+        {
+          float r = (maxr + minr) / 2;
+          float t = 3.1415926535 * ( ((float) (rodStart+i))/360.0 -0.5);
+          last_scan_valid = true;
+          lastValidLIDARPoint.x = r*cos(t);
+          lastValidLIDARPoint.y = r*sin(t);
+          maybeRod = false;
+          maxr = 0;
+          minr = 1000;
+          break;
+      	}
 	    }
-	}
+	  }
  }
 
  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
