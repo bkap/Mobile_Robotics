@@ -46,6 +46,8 @@ rosbuild_add_executable(camera src/camera.cpp)
 target_link_libraries(camera Vision)
 rosbuild_add_executable(calib_camera src/vision/calib_camera.cpp)
 target_link_libraries(calib_camera Vision)
+rosbuild_add_executable(robust_calib src/vision/robust_calibration.cpp)
+target_link_libraries(robust_calib Vision)
 
 #FUTURE DEMO!!!!!!!!
 rosbuild_add_executable(futureplanner src/future/planner.cpp)
