@@ -228,6 +228,40 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
     }
 }
 
+list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
+{
+	list<Point2i> origList(); //I want it as a list not a vector cause I want to pop quickly.
+	for(vector<Vec4i>::iterator i = lines.begin(); i != lines.end(); i++)
+	{
+		origList.push_back(Point2i(i->x1, i->y1));
+		origList.push_back(Point2i(i->x2, i->y2));
+	}	
+	
+	list<Point2i> nastyLine();//where the nasty line will be put
+	Point2i oldTemp = PopNearestToRobot(origList); //this should pop the nearest point to the robot
+	nastyLine.push_back(oldTemp);
+	Point2i temp;
+
+	bool GotThere = false;
+	while(!GotThere)
+	{
+		temp = PopNearest(oldTemp, origList);//this should pop the nearest point to the oldTemp	
+		if(CloseEnoughButNotTooClose(temp, oldTemp)) //are they within some threshold of each other, but not too close
+		{
+			//if they are, then we want to add them to the list.
+			nastyLine.push_back(temp);
+			oldTemp=temp;
+		}
+		else if(AckPersonalSpace(temp, oldTemp))
+		{
+			//lol, discard the stuff
+		}
+		else GotThere = true;
+	}
+	
+	return nastyLine;
+}
+
 
 int main(int argc, char **argv)
 {
