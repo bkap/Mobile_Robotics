@@ -212,7 +212,8 @@ void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, 
 	Point3f Center = B+(D-B)*(1/getDistance(D-B))*(STD_TURN_RAD/acos(tan(Theta/2.0)));
 	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)*(1/getDistance(B-A));
 
-	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C)); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C));
+	//the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
 	Point3f Midpoint1 = A+(A-B)*0.5;  //midpoints are used in a sec
 	Point3f Midpoint2 = C-(C-B)*0.5;
 	if (dotProduct(Midpoint1, B-A) < dotProduct(Bprime, B-A) || dotProduct(Midpoint2, B-C) < dotProduct(Bdoubleprime, B-C))
@@ -238,13 +239,13 @@ void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, 
 // this function was merged with parts of the bug algorithm because we only needed the special 
 // cases of 90 and 45 degree turns. in the future, this will be included because it is much more 
 // generically written
-PathList insertTurns(list<Point2d> P)
+PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 {
+    int pointListSize = pointCloud.points.size();
+	/*
 	//convert from the list<Point2d> to an array of Point3's
-	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),P.size());  //this should be the list of points that ben's algorithm puts out
-	int PointListLength = P.size();
-	
-	list<Point2d>::iterator it; 
+	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),P.size());
+    list<Point2d>::iterator it; 
 	int i = 0;
 	for (it = P.begin(); it!=P.end(); it++)
 	{
@@ -253,17 +254,24 @@ PathList insertTurns(list<Point2d> P)
 		PointList[i].z = 0;
 		i++;
 	}
+	*/
+	
+	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),pointCloud.points.size());
+	// convert pointCloud to PointList
+	for (int i=0; i<pointListSize-1; i++)
+	{
+	    PointList[i] = convertGeoPointToPoint3f(pointCloud.points[i]);
+	}
 	
 	PathList ReturnVal;//the path list that we will eventually return
-	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));//3(n-2) segments are needed when using the line turn line line turn line pattern
+	vector<PathSegment> path = vector<PathSegment>(3*(pointListSize-2));//3(n-2) segments are needed when using the line turn line line turn line pattern
 	ReturnVal.path_list.assign(path.begin(), path.end());
-	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
+	
 	int SegNum = 0;
 	Point3f A, B, C; //points A,B,C for the line turn line pattern
 	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
 
-	
-	for (int i = 0; i<PointListLength-2; i++)
+	for (int i = 0; i<pointListSize-2; i++)
 	{
 		A = PointList[i];  //copy to temp variables for readability
 		B = PointList[i+1];
@@ -277,7 +285,7 @@ PathList insertTurns(list<Point2d> P)
 		{
 			MoveBack1(A,B, &FirstLine);
 		}
-		else if (i == PointListLength-3)
+		else if (i == pointListSize-3)
 		{
 			MoveBack2(B,C, &SecondLine);
 		}
@@ -311,15 +319,17 @@ PathList joinPoints(sensor_msgs::PointCloud pointList)
     vector<PathSegment> lines;
     
     // This is the stupid way - no smooth rotations
+    /*
     for (int i=0; i<pointList.points.size()-2; i++)
     {
         Point3f A = convertGeoPointToPoint3f(pointList.points[i]);
         Point3f B = convertGeoPointToPoint3f(pointList.points[i+1]);
         lines.push_back(MakeLine(A, B, i));
     }
+    */
     
-    PathList pathList;
-    pathList.path_list = lines;
+    // with smoothing, oh hey, this was already written
+    PathList pathList = insertTurns(pointList);
     return pathList;
 }
 
