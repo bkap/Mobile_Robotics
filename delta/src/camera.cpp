@@ -50,6 +50,7 @@ void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
 	tfl->transformPointCloud("map", NavPts, tNavPts);
 	pub_nav_pts.publish(tNavPts);
 }
+
 DemoNode::DemoNode():
   it_(nh_)
 {
@@ -77,8 +78,9 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-  if(!cameraCalled) {
-	return;
+  if(!cameraCalled) 
+  {
+    return;
   }
   cout << "huh callback?" << endl;
   sensor_msgs::CvBridge bridge;
@@ -92,44 +94,15 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
   }
-  try {
-    normalizeColors(image, output);
-    CvPoint2D64f Center = blobfind(image, output);
+  try 
+  {
+    // Detect the lines in the image
+    vector<Vec4i> lines;
+    getOrangeLines(image, lines)
 
+    // Turn the lines into a sequence of points
 
-  vector< Point2f > projCenter (3);
-
-  ROS_INFO("CAM: Checking image");
-
-  if(Center.x>0)//Center.x should be 0 if there is no blob
-{
-  Mat R;
-  Rodrigues(rvec, R);
-
-  R.col(2) = tvec;
-
-  ROS_INFO("CAM: Point Found");
-  //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl;
-
- //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);
-
-  Mat_<float> spot(3,1);
-
-  spot << Center.x, Center.y,1;
-
-  Mat_<float> invCameraMat = (cameraMat*R).inv();  
-
-  Mat_<float> result = invCameraMat*spot;
-  result.col(0) = result.col(0) / result(2,0);
-
-  geometry_msgs::Point32 BlobLoc;
-
-  //BlobLoc.x = projCenter[0].x;
-  //BlobLoc.y = projCenter[0].y;
-   BlobLoc.x = result(0,0);// / result(0,2) ;
-   BlobLoc.y = result(0,1);// / result(0,2);
-  publishBlobLoc(BlobLoc);
-}
+    }
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
@@ -141,39 +114,39 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 //reads a mat from the file in ~/.ros
 void ReadMat(Mat_<float> *mat, char* file)
 {
-	FILE* test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "w");
-	fprintf(test, "%i\n", 1);
-	fprintf(test, "%i\n", 1337);
-	fclose(test);
-	test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "r");
-	int a,b;
-	fscanf(test, "%i", &a);
-	fscanf(test, "%i", &b);
-	fclose(test);
-        cout<<"a,b "<<a<<","<<b<<"\n";
+  FILE* test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "w");
+  fprintf(test, "%i\n", 1);
+  fprintf(test, "%i\n", 1337);
+  fclose(test);
+  test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "r");
+  int a,b;
+  fscanf(test, "%i", &a);
+  fscanf(test, "%i", &b);
+  fclose(test);
+  cout<<"a,b "<<a<<","<<b<<"\n";
 
-	//cout<<"camout1\n";
-        ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
-	cout << "file opened" << endl;
-	int rows, cols, type;
-	rows = cols = type = 0;
-	(*infile)>>rows;
-	cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
-	(*infile)>>cols;
-	cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
-	(*infile)>>type;
-	cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
-	//cout<<"camout2\n";
-	*mat = Mat_<float> (rows, cols); 
-	//cout<<"camout3\n";
-	unsigned int i, j;
-	float f;
+  //cout<<"camout1\n";
+  ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
+  cout << "file opened" << endl;
+  int rows, cols, type;
+  rows = cols = type = 0;
+  (*infile)>>rows;
+  cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
+  (*infile)>>cols;
+  cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
+  (*infile)>>type;
+  cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
+  //cout<<"camout2\n";
+  *mat = Mat_<float> (rows, cols); 
+  //cout<<"camout3\n";
+  unsigned int i, j;
+  float f;
 	for (i = 0; i < mat->rows; i++)
 	{
 		//fprintf(mfile,"\n");
 		for (j = 0; j < mat->cols; j++)
 		{
-		        (*infile)>>f;
+      (*infile)>>f;
 			((*mat)(i,j)) = f;
 			cout << f << ",";
 		}     
@@ -184,14 +157,15 @@ void ReadMat(Mat_<float> *mat, char* file)
 }
 
 void normalizeColor(cv::Mat& img){
-        cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
-        cv::Vec<uchar,3> p;
-        for(;it!=it_end;++it){
-                //p=*it; 
-                double scale = (*it)[0]+(*it)[1]+(*it)[2];
-                //p = scale * *it;// (255.0/scale));
-		*it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
-        }
+  cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
+  cv::Vec<uchar,3> p;
+  for(;it!=it_end;++it)
+  {
+    //p=*it; 
+    double scale = (*it)[0]+(*it)[1]+(*it)[2];
+    //p = scale * *it;// (255.0/scale));
+    *it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
+  }
 }
 
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
