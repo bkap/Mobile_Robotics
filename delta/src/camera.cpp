@@ -28,7 +28,7 @@ class DemoNode {
 	public:
 		DemoNode();
 		//static void info(const sensor_msgs::CameraInfo msg);
-		void publishBlobLoc(geometry_msgs::Point32 BlobLoc);
+		void publishNavLoc(vector<Point2i> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
 		void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
@@ -37,20 +37,18 @@ class DemoNode {
 		image_transport::ImageTransport it_;
 		image_transport::Subscriber sub_image_;
 		ros::Subscriber sub_info_;
-		ros::Publisher pub_blob_loc;
-		sensor_msgs::PointCloud BlobLocations;
+		ros::Publisher pub_nav_pts;
+		sensor_msgs::PointCloud NavPts;
 		Mat_<float> rvec, tvec;
 };
 
 //call this with a point32 to publish the blob's location
-void DemoNode::publishBlobLoc(geometry_msgs::Point32 BlobLoc)
+void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
 {
-	BlobLocations.points[0] = BlobLoc;
-	sensor_msgs::PointCloud tBlobLoc;
-	cout << BlobLoc.x << "," << BlobLoc.y << endl;
-	tfl->transformPointCloud("map", BlobLocations, tBlobLoc);
-	cout << tBlobLoc.points[0].x << "," << tBlobLoc.points[0].y << endl;
-	pub_blob_loc.publish(tBlobLoc);
+	NavPts.points = transformPts(NavPoints); //this should transform the points into geometry points and it should convert from pixel coordinates to robot coordinates
+	sensor_msgs::PointCloud tNavPts;
+	tfl->transformPointCloud("map", NavPts, tNavPts);
+	pub_nav_pts.publish(tNavPts);
 }
 DemoNode::DemoNode():
   it_(nh_)
@@ -62,10 +60,9 @@ DemoNode::DemoNode():
 	cout << "read mats" << endl;
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
-	pub_blob_loc = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
-
-	BlobLocations.points = vector<geometry_msgs::Point32> (1);
-	BlobLocations.header.frame_id = "base_laser1_link";
+	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
+ 
+	NavPts.header.frame_id = "base_laser1_link";
 }
 bool cameraCalled = false;
 // Callback for CameraInfo (intrinsic parameters)
@@ -228,44 +225,77 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
     }
 }
 
+//these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
+
+
+void GetNearest(&list<Point2i> Points, &list<Point2i> OrderedPoints, Point2i Target)
+{
+	double StartDist = 10000;
+	double Dist = 10000;
+	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); i++)
+	{
+		//distance from start to origin
+		TargetDist =  sqrt((Start->x-Target.x)*(Start->x-Target.x)+(Start->y-Target.y)*(Start->y-Target.y))
+		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.x)*(it->y-Target.Y))
+		if (Dist<TargetDist) Start = it;
+	}
+
+	NastyPolyLine.push_back(*Start);
+	TempList.erase(Start);
+}
+
+#define IMAGE_ORIGIN_X 320
+#define IMAGE_ORIGIN_Y 479
+
 list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 {
-	list<Point2i> origList(); //I want it as a list not a vector cause I want to pop quickly.
-	for(vector<Vec4i>::iterator i = lines.begin(); i != lines.end(); i++)
-	{
-		origList.push_back(Point2i(i->x1, i->y1));
-		origList.push_back(Point2i(i->x2, i->y2));
-	}	
-	
-	list<Point2i> nastyLine();//where the nasty line will be put
-	Point2i oldTemp = PopNearestToRobot(origList); //this should pop the nearest point to the robot
-	nastyLine.push_back(oldTemp);
-	Point2i temp;
+	list<Point2i> NastyPolyLine ();
+	list<Point2i> TempList();
 
-	bool GotThere = false;
-	while(!GotThere)
+	for(i = 0; i<size(lines); i++)
 	{
-		temp = PopNearest(oldTemp, origList);//this should pop the nearest point to the oldTemp	
-		if(CloseEnoughButNotTooClose(temp, oldTemp)) //are they within some threshold of each other, but not too close
-		{
-			//if they are, then we want to add them to the list.
-			nastyLine.push_back(temp);
-			oldTemp=temp;
-		}
-		else if(AckPersonalSpace(temp, oldTemp))
-		{
-			//lol, discard the stuff
-		}
-		else GotThere = true;
+		TempList.push_back(Point2i(lines[i].x1, lines[i].y1));
+		TempList.push_back(Point2i(lines[i].x2, lines[i].y2));
+	}
+
+	//find nearest to origin
+	GetNearest(TempList, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
+
+	while(TempList.size()>0)
+	{
+		GetNearest(TempList, NastyPolyLine, NastyPolyLine.end());
 	}
 	
-	return nastyLine;
+	return NastyPolyLine;
 }
 
 
+list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
+{
+	list<Point2i>::iterator leastSignificant;
+	double minSignif; //short for minimum significance
+	while(NastyPolyLine.size()>NumRemaining)
+	{
+		minSignif = 10000000; 
+		for (list<Point2i>::iterator it=NastyPolyLine.begin(); it!=NastyPolyLine.end(); i++)
+		{
+			Point2i A = (*(it-1))-(*it);
+			Point2i B = (*(it+1))-(*it);
+			double angle = asin(A*B/(A.norm()*B.norm));
+			double curSignif = fabs(180-angle)*A*B/(A.norm()*B.norm);
+			if(curSignif<minSignif)
+			{
+				minSignif = curSignif;
+				leastSignificant = it;
+			}
+		}
+		NastyPolyline.erase(it);
+	}	
+}
+
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "CameraNode");
+	ros::init(argc, argv, "CameraNode");//
 	cout << "Camera Initialized" << endl;
 	tfl = new tf::TransformListener();
 	while (!ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();

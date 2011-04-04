@@ -207,6 +207,18 @@ void PrintMat(CvMat *A, FILE* f=stdout)
     fprintf(f,"\n");
 }
 
+void PrintMat(cv::Mat_<double>* A, FILE* f=stdout)
+{
+    int i, j;
+    for (i = 0; i < A->rows; i++)
+    {
+        fprintf(f,"\n");
+                for (j = 0; j < A->cols; j++)
+                fprintf (f,"%8.6f ",(*A)(i,j));
+    }
+    fprintf(f,"\n");
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
@@ -269,14 +281,17 @@ if(imagePoints.size()<20)
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);
+	cout<<"Pre-Rodrigues\n";
+	Mat R2;
+	Rodrigues(rvec_, R2);
+	cout<<"Post-Rodrigues\n";
+	R2.col(1) = R2.col(2);
+	R2.col(2) = tvec_;
 
-	//Mat R;
-	//Rodrigues(rvec_, R);
-	//R.col(1) = R.col(2);
-	//R.col(2) = tvec_;
-
-	//Mat projector = (cameraMat * R).inv();
-	
+	cout<<"Projector\n";
+	Mat_<double> projector = Mat_<double>((Mat_<double>(cameraMat) *Mat_<double>( R2)).inv());
+	cout<<"Print Mat\n";
+	PrintMat(&projector);
 	/*
 	reverse projection should be robotCoordinateFramePoint = projector * imagePoint
 	(x,y,1) = projector * (u v 1)
