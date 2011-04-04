@@ -87,7 +87,6 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   try
   {
     image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
-
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
@@ -112,7 +111,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   ROS_INFO("CAM: Point Found");
   //cout << CV_IS_MAT(&CvMat(center)) << "," << CV_IS_MAT(&CvMat(rvec)) << "," << CV_IS_MAT(&CvMat(tvec)) << "," << CV_IS_MAT(&CvMat(cameraMat)) << endl;
 
-   //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);
+ //projectPoints(center, rvec, tvec, cameraMat, (Mat_<float>(5,1) << 0,0,0,0,0), projCenter);
 
   Mat_<float> spot(3,1);
 
@@ -197,32 +196,68 @@ void normalizeColor(cv::Mat& img){
 
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
-   Mat src = img.clone();
-    normalizeColor(src);
-    Mat temp = src;
-    vector<Mat> mats;
-    split(temp, mats);
-  // Set all values below value to zero, leave rest the same
-  // Then inverse binary threshold the remaining pixels
-  // Threshold blue channel
-  threshold(mats[0], mats[0], 60, 255, THRESH_TOZERO_INV);
-  threshold(mats[0], mats[0], 0, 255, THRESH_BINARY);
-  // Threshold green channel
-  threshold(mats[1], mats[1], 80, 255, THRESH_TOZERO_INV);
-  threshold(mats[1], mats[1], 60, 255, THRESH_BINARY);
-  // Threshold red channel
-  threshold(mats[2], mats[2], 200, 255, THRESH_TOZERO_INV);
-  threshold(mats[2], mats[2], 130, 255, THRESH_BINARY);
-  Mat dst, cdst;
-  multiply(mats[0], mats[1], dst);
-  multiply(dst, mats[2], dst);
-    cvtColor(dst, cdst, CV_GRAY2BGR);
-    HoughLinesP(dst, lines, 1, CV_PI/180, 50, 50, 10 );
-    for( size_t i = 0; i < lines.size(); i++ )
+  Mat src = img.clone();
+
+  Mat cdst, temp; 
+  // I'm operating on the non-normalized image
+  //normalizeColor(src);
+
+  // get a mat of the same dimensions as src, but floating point.
+  Mat dst(src.rows, src.cols, CV_8U);
+
+  Vec3b srcpixel;
+  uchar* dstpixel;
+  float val;
+
+  // Access each pixel (remember they are ordered BGR)
+  for( int i=0; i<src.rows; i++ )
+  {
+    for( int j=0; j<src.cols; j++ )
     {
-        Vec4i l = lines[i];
-        line( cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
+      // Point to the right pixels in the source and destination mats
+      srcpixel = src.at<Vec3b>(i,j);
+      dstpixel = &dst.at<uchar>(i,j);
+
+      // This pixel is redish-orange if R >= G >= B
+      if( srcpixel[2] >= srcpixel[1] && srcpixel[1] >= srcpixel[0] )
+      {
+        // Hue = 60(G-B)/(R-B)
+        val = 60.0*((float)srcpixel[1]-(float)srcpixel[0])/((float)srcpixel[2]-(float)srcpixel[0]);
+
+        // Threshold based on hue
+        if( val>15.0 && val<35.0 )
+        {
+          *dstpixel = 255; // The hue is redidsh-orange
+        }
+      }
+      else // Does not meet criteria for redish-orange
+      {
+        *dstpixel = 0.0; // The hue is not reddish-orange.
+      }
     }
+  }  
+
+  // Erode and dilate to get rid of stray pixels
+  erode(dst, dst, Mat());
+  dilate(dst, dst, Mat());
+
+  cvtColor(dst, cdst, CV_GRAY2BGR);
+
+  // Run the line finding algorithm, and draw them on the source image
+  HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
+  for( int i = 0; i < lines.size(); i++ )
+  {
+    Vec4i l = lines[i];
+    line( src, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
+  }
+
+  // Show the thresholded image
+  //cvNamedWindow("thresholded image");
+  //imshow("thresholded image",dst);
+
+  // Show the image with lines
+  //cvNamedWindow("detected lines");
+  //imshow("detected lines",src);
 }
 
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
