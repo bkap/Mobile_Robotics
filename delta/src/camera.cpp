@@ -172,6 +172,10 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
   Mat src = img.clone();
 
+  // Apply a gaussian filter
+  Size ksize(7,7);
+  GaussianBlur(img,src,ksize,2,2);
+
   Mat cdst, temp; 
   // I'm operating on the non-normalized image
   //normalizeColor(src);
