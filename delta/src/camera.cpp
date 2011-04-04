@@ -18,7 +18,6 @@ using namespace cv;
 using namespace std;
 void ReadMat(Mat_<float> *mat, char* file);
 
-vector<Point3f> LIDARPoints; //aggregator for rod points
 vector<Point2f> imagePoints; //aggregator for image points
 Mat cameraMat; //intrinsic parameters
 Mat distMat; //distortion parameters
@@ -31,8 +30,7 @@ class DemoNode {
 		void publishNavLoc(vector<Point2i> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
-		void lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
-		ros::NodeHandle nh_; // Made this public to access it and subscribe to the LIDAR
+		ros::NodeHandle nh_; // Made this public to access it
 	private:
 		image_transport::ImageTransport it_;
 		image_transport::Subscriber sub_image_;
@@ -59,12 +57,14 @@ DemoNode::DemoNode():
 	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
 	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
 	cout << "read mats" << endl;
+
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
 	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
  
 	NavPts.header.frame_id = "base_laser1_link";
 }
+
 bool cameraCalled = false;
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
