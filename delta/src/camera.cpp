@@ -203,7 +203,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
         val = 60.0*((float)srcpixel[1]-(float)srcpixel[0])/((float)srcpixel[2]-(float)srcpixel[0]);
 
         // Threshold based on hue
-        if( val>15.0 && val<35.0 )
+        if( val>15.0 && val<28.0 )
         {
           *dstpixel = 255; // The hue is redidsh-orange
         }
