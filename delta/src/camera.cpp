@@ -212,6 +212,10 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 
   // Run the line finding algorithm, and draw them on the source image
   HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
+
+  // Output how many lines you found
+  ROS_INFO("Found %d lines",lines.size());
+
   for( int i = 0; i < lines.size(); i++ )
   {
     Vec4i l = lines[i];

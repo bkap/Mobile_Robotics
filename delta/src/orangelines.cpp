@@ -57,7 +57,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
         *dstpixel = 0.0; // The hue is not reddish-orange.
       }
     }
-  }  
+  }
 
   // Erode and dilate to get rid of stray pixels
   erode(dst, dst, Mat());
@@ -70,6 +70,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   imshow("thresholded image",dst);
 
   HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
+  ROS_INFO("Found %d lines",lines.size());
   for( int i = 0; i < lines.size(); i++ )
   {
     Vec4i l = lines[i];
