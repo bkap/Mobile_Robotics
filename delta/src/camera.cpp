@@ -18,7 +18,6 @@ using namespace cv;
 using namespace std;
 void ReadMat(Mat_<float> *mat, char* file);
 
-vector<Point2f> imagePoints; //aggregator for image points
 Mat cameraMat; //intrinsic parameters
 Mat distMat; //distortion parameters
 tf::TransformListener *tfl;
@@ -26,7 +25,6 @@ tf::TransformListener *tfl;
 class DemoNode {
 	public:
 		DemoNode();
-		//static void info(const sensor_msgs::CameraInfo msg);
 		void publishNavLoc(vector<Point2i> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
@@ -43,7 +41,10 @@ class DemoNode {
 //call this with a point32 to publish the blob's location
 void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
 {
-	NavPts.points = transformPts(NavPoints); //this should transform the points into geometry points and it should convert from pixel coordinates to robot coordinates
+  // Convert into geometry points, and transform from pixel to robot coordinates
+	NavPts.points = transformPts(NavPoints);
+
+  // Transform the point cloud from robot coordinates to map coordinates
 	sensor_msgs::PointCloud tNavPts;
 	tfl->transformPointCloud("map", NavPts, tNavPts);
 	pub_nav_pts.publish(tNavPts);
@@ -52,14 +53,17 @@ void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
 DemoNode::DemoNode():
   it_(nh_)
 {
-
+  // Read the extrinsic calibration parameters
 	cout << "reading mats" << endl;
 	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
 	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
 	cout << "read mats" << endl;
 
+  // Subscribe to the image and camera info
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
+
+  // Publish a cloud of points on the orange line
 	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
  
 	NavPts.header.frame_id = "base_laser1_link";
@@ -76,16 +80,20 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	//cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
+// Called whenever you get a new image
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
+  // Don't do anything until you get the intrinsic parameters
   if(!cameraCalled) 
   {
     return;
   }
-  cout << "huh callback?" << endl;
+
+  cout << "imageCallback" << endl;
+
   sensor_msgs::CvBridge bridge;
   cv::Mat image;
-  cv::Mat output;
+  // Convert image from ROS format to OpenCV format
   try
   {
     image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
@@ -94,20 +102,13 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
   }
-  try 
-  {
-    // Detect the lines in the image
-    vector<Vec4i> lines;
-    getOrangeLines(image, lines)
 
-    // Turn the lines into a sequence of points
+  // Detect the lines in the image
+  vector<Vec4i> lines;
+  getOrangeLines(image, lines)
 
-    }
-  }
-  catch (sensor_msgs::CvBridgeException& e)
-  {
-    ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
-  }
+  // Turn the lines into a sequence of points
+
 
 }
 
@@ -156,18 +157,6 @@ void ReadMat(Mat_<float> *mat, char* file)
 	infile->close();
 }
 
-void normalizeColor(cv::Mat& img){
-  cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
-  cv::Vec<uchar,3> p;
-  for(;it!=it_end;++it)
-  {
-    //p=*it; 
-    double scale = (*it)[0]+(*it)[1]+(*it)[2];
-    //p = scale * *it;// (255.0/scale));
-    *it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
-  }
-}
-
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
   Mat src = img.clone();
@@ -177,7 +166,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   GaussianBlur(img,src,ksize,2,2);
 
   Mat cdst, temp; 
-  // I'm operating on the non-normalized image
+  // I'm operating in hue space on the non-normalized image
   //normalizeColor(src);
 
   // get a mat of the same dimensions as src, but floating point.
@@ -239,8 +228,6 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 }
 
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
-
-
 void GetNearest(&list<Point2i> Points, &list<Point2i> OrderedPoints, Point2i Target)
 {
 	double StartDist = 10000;
@@ -308,12 +295,15 @@ list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "CameraNode");//
+	ros::init(argc, argv, "CameraNode");
 	cout << "Camera Initialized" << endl;
+
+  // Wait until you get transform data
 	tfl = new tf::TransformListener();
 	while (!ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
-	cout << "READY"  << endl;
+
 	DemoNode motion_tracker;
+
 	ROS_INFO("Camera Node Started");
 	while(ros::ok()){ros::spinOnce();}
 	return 0;
