@@ -53,7 +53,6 @@ void linesToPoints(vector<Vec4i>& lines, vector<Point2i>& points, int pixelres)
       npts++;
     } 
   }
-  ROS_INFO("Converted into %d points",npts);
 }
 
 
@@ -121,14 +120,14 @@ void createPathFromPoints(Point2i start, vector<Point2i>& points, vector<Point2i
     points.erase(points.begin() + nearest_neighbor_index);
 
     // Also remove near points from consideration
-    removeNearPoints(currpoint,points,maxdist*.8);
+    removeNearPoints(currpoint,points,maxdist*.7);
 
     // Find the new nearest neighbor
     nearest_neighbor_index = getNearestNeighbor(points, currpoint, maxdist);
   }
 
   // Smooth out the path
-  approxPolyDP(pathpoints,pathpoints,maxdist,false);
+  approxPolyDP(Mat(pathpoints),pathpoints,10,false);
 
 }
 
@@ -185,8 +184,6 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   imshow("thresholded image",dst);
 
   HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
-  ROS_INFO("Found %d lines",lines.size());
-
 }
 
 
@@ -199,8 +196,10 @@ int main(int argc, char **argv)
  
   Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
   
+  // Get lines from the image
   vector<Vec4i> lines;
   getOrangeLines(img,lines);
+  ROS_INFO("Found %d lines",lines.size());
 
   // Render the lines
   Mat temp = Mat(img);
@@ -216,6 +215,7 @@ int main(int argc, char **argv)
   vector<Point2i> points;
   linesToPoints(lines, points, 3);
 
+  // Render the points
   Mat temp2 = Mat(img);
   for( int i = 0; i < points.size()-1; i++ )
   {
@@ -227,12 +227,10 @@ int main(int argc, char **argv)
   // Make a path from the points
   Point2i start(1,479);
   vector<Point2i> pathpoints;
-
-  ROS_INFO("Converting %d points to lines",points.size());
-  createPathFromPoints(start, points, pathpoints,50);
+  createPathFromPoints(start, points, pathpoints,40);
   ROS_INFO("Got %d path points",pathpoints.size());
   
-
+  // Render the path points
   Mat temp3 = Mat(img);
   for( int i = 0; i < pathpoints.size()-1; i++ )
   {
