@@ -14,8 +14,12 @@
 #include <eecs376_vision/lib_demo.h>
 #include<tf/transform_listener.h> 
 #include <stdio.h>
+#include <list>
+
+using namespace cv;
+using namespace std;
 
 void getOrangeLines(Mat& img, vector<Vec4i>& lines);
-void GetNearest(&list<Point2i> Points, &list<Point2i> OrderedPoints, Point2i Target);
+void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Target);
 list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines);
-list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining);
+list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining =20);

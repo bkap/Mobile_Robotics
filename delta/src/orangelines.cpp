@@ -14,6 +14,7 @@
 #include <eecs376_vision/lib_demo.h>
 #include<tf/transform_listener.h> 
 #include <stdio.h>
+#include <list>
 #include "camera_funcs.h"
 
 using namespace cv;
@@ -30,7 +31,7 @@ int main(int argc, char **argv)
   cvNamedWindow("original");
   Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
   imshow("original",img);
-
+  Mat img2 = Mat(img);
   vector<Vec4i> lines;
   getOrangeLines(img,lines);
   for( size_t i = 0; i < lines.size(); i++ )
@@ -39,6 +40,16 @@ int main(int argc, char **argv)
     line( img, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
   }
 
+  cvNamedWindow("cleanLine");
+  list<Point2i> PL = linesToNastyPolyLine(lines);
+  PL = cleanNastyPolyLine(PL);
+  
+  for(list<Point2i>::iterator it = PL.begin(); it!=PL.end(); it++)
+  {
+	  line(img2, *it, *(++it--), Scalar(0,0,255),3, CV_AA);
+  }
+  
+  imshow("cleanLine", img);
   imshow("detected lines",img);
   waitKey(-1);
   cvDestroyWindow("detected lines");

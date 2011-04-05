@@ -14,7 +14,11 @@
 #include <eecs376_vision/lib_demo.h>
 #include<tf/transform_listener.h> 
 #include <stdio.h>
+#include <list>
 #include "camera_funcs.h"
+
+using namespace cv;
+using namespace std;
 
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
@@ -91,20 +95,21 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 }
 
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
-void GetNearest(&list<Point2i> Points, &list<Point2i> OrderedPoints, Point2i Target)
+void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Target)
 {
-	double StartDist = 10000;
+	list<Point2i>::iterator Start;
 	double Dist = 10000;
-	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); i++)
+	double TargetDist = 10000;
+	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		//distance from start to origin
-		TargetDist =  sqrt((Start->x-Target.x)*(Start->x-Target.x)+(Start->y-Target.y)*(Start->y-Target.y))
-		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.x)*(it->y-Target.Y))
+		TargetDist =  sqrt((Start->x-Target.x)*(Start->x-Target.x)+(Start->y-Target.y)*(Start->y-Target.y));
+		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.x)*(it->y-Target.y));
 		if (Dist<TargetDist) Start = it;
 	}
 
-	NastyPolyLine.push_back(*Start);
-	TempList.erase(Start);
+	OrderedPoints.push_back(*Start);
+	Points.erase(Start);
 }
 
 #define IMAGE_ORIGIN_X 320
@@ -112,13 +117,13 @@ void GetNearest(&list<Point2i> Points, &list<Point2i> OrderedPoints, Point2i Tar
 
 list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 {
-	list<Point2i> NastyPolyLine ();
-	list<Point2i> TempList();
+	list<Point2i > NastyPolyLine;
+	list<Point2i > TempList;
 
-	for(i = 0; i<size(lines); i++)
+	for(int i = 0; i<lines.size(); i++)
 	{
-		TempList.push_back(Point2i(lines[i].x1, lines[i].y1));
-		TempList.push_back(Point2i(lines[i].x2, lines[i].y2));
+		TempList.push_back(Point2i(lines[i][0], lines[i][1]));
+		TempList.push_back(Point2i(lines[i][2], lines[i][3]));
 	}
 
 	//find nearest to origin
@@ -126,7 +131,7 @@ list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 
 	while(TempList.size()>0)
 	{
-		GetNearest(TempList, NastyPolyLine, NastyPolyLine.end());
+		GetNearest(TempList, NastyPolyLine, *NastyPolyLine.end());
 	}
 	
 	return NastyPolyLine;
@@ -140,18 +145,19 @@ list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
 	while(NastyPolyLine.size()>NumRemaining)
 	{
 		minSignif = 10000000; 
-		for (list<Point2i>::iterator it=NastyPolyLine.begin(); it!=NastyPolyLine.end(); i++)
+		for (list<Point2i>::iterator it=NastyPolyLine.begin(); it!=NastyPolyLine.end(); it++)
 		{
-			Point2i A = (*(it-1))-(*it);
-			Point2i B = (*(it+1))-(*it);
-			double angle = asin(A*B/(A.norm()*B.norm));
-			double curSignif = fabs(180-angle)*A*B/(A.norm()+B.norm());
+			Point2i A = (*(--it))-(*(++it));
+			Point2i B = (*(++it))-(*(--it));
+			double angle = acos(A.ddot(B)/(norm(A)*norm(B)));
+			double curSignif = fabs(180-angle)*A.ddot(B)/(norm(A)+norm(B));
 			if(curSignif<minSignif)
 			{
 				minSignif = curSignif;
 				leastSignificant = it;
 			}
 		}
-		NastyPolyline.erase(it);
+		NastyPolyLine.erase(leastSignificant);
 	}	
+	return NastyPolyLine;
 }

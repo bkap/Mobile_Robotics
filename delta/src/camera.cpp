@@ -14,6 +14,7 @@
 #include <eecs376_vision/lib_demo.h>
 #include<tf/transform_listener.h> 
 #include <stdio.h>
+#include <list>
 #include "camera_funcs.h"
 
 using namespace cv;
