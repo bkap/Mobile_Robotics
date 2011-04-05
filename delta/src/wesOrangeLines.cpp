@@ -14,6 +14,7 @@
 #include <eecs376_vision/lib_demo.h>
 #include<tf/transform_listener.h> 
 #include <stdio.h>
+#include "camera_funcs.h"
 using namespace cv;
 using namespace std;
 
@@ -194,46 +195,40 @@ int main(int argc, char **argv)
 	cout << "READY"  << endl;
 	ROS_INFO("Camera Node Started");
  
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
   cvNamedWindow("detected lines");
   cvNamedWindow("original");
   Mat img = imread("/home/wes/Desktop/Mobile_Robotics/delta/frame.jpg", 1);
   imshow("original",img);
   Mat img2 = Mat(img);
-=======
-  Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
-  
-  // Get lines from the image
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
+
   vector<Vec4i> lines;
 cout<<"begin orangeLines\n";
   getOrangeLines(img,lines);
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
-cout<<"end orangeLines\n";
-=======
-  ROS_INFO("Found %d lines",lines.size());
 
-  // Render the lines
-  Mat temp = Mat(img);
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
-  for( size_t i = 0; i < lines.size(); i++ )
-  {
-    Vec4i l = lines[i];
-    line( temp, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 1, CV_AA);
-  }
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
+cout<<"end orangeLines\n";
+
+
 cout<<"I drawed good stuffs\n";
   cvNamedWindow("cleanLine");
   cout<<"linesToNastyPolyLine\n";
   list<Point2i> PL = linesToNastyPolyLine(lines);
   cout<<"can haz clean path\n";
-  PL = cleanNastyPolyLine(PL,5);
+  cout<<"there are "<<PL.size()<<" points in the nasty path.\n";
+  PL = cleanNastyPolyLine(PL,10);
   cout<<"drawing more stuff\n";
-  
-  for(list<Point2i>::iterator it = PL.begin(); it!=PL.end(); it++)
+  cout<<PL.size()<<" points are in the clean line\n";
+  for(list<Point2i>::iterator it = PL.begin(); it!= PL.end(); it++)
   {
-	  line(img2, *it, *it, Scalar(0,255,0),3, CV_AA);
+	  line(img2, *it, *(it), Scalar(0,255,0),3, CV_AA);
+	  cout<<it->x<<","<<it->y<<"\n";
   }
+
+  vector<Point2i> tempVec (PL.begin(), PL.end());
+  for(int i =0; i<tempVec.size()-1; i++)
+  {
+	line(img2, tempVec[i], tempVec[i+1], Scalar(0,255,0),3, CV_AA);
+  }
+
   cout<<"show stuff\n";
   imshow("cleanLine", img);
   imshow("detected lines",img);
@@ -241,38 +236,7 @@ cout<<"I drawed good stuffs\n";
   cvDestroyWindow("detected lines");
   cvDestroyWindow("original");
   cvDestroyWindow("thresholded image");
-=======
-  cvNamedWindow("detected lines");
-  imshow("detected lines",temp);
 
-  // Convert lines into points
-  vector<Point2i> points;
-  linesToPoints(lines, points, 3);
-
-  // Render the points
-  Mat temp2 = Mat(img);
-  for( int i = 0; i < points.size()-1; i++ )
-  {
-    line( temp2, points[i], Point2i(points[i].x+1,points[i].y+1), Scalar(255,0,0), 1, CV_AA);
-  }
-  cvNamedWindow("points");
-  imshow("points",temp2);
-
-  // Make a path from the points
-  Point2i start(1,479);
-  vector<Point2i> pathpoints;
-  createPathFromPoints(start, points, pathpoints,40);
-  ROS_INFO("Got %d path points",pathpoints.size());
-  
-  // Render the path points
-  Mat temp3 = Mat(img);
-  for( int i = 0; i < pathpoints.size()-1; i++ )
-  {
-    line( temp3, pathpoints[i], pathpoints[i+1], Scalar(255,255,0), 1, CV_AA);
-  }
-  cvNamedWindow("new lines");
-  imshow("new lines",temp3);
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
 
   waitKey(-1);
 	while(ros::ok()){ros::spinOnce();}

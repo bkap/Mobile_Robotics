@@ -15,6 +15,7 @@
 #include<tf/transform_listener.h> 
 #include <stdio.h>
 #include <list>
+#include <algorithm>
 #include "camera_funcs.h"
 
 using namespace cv;
@@ -94,9 +95,22 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   //imshow("detected lines",src);
 }
 
+bool IsIn(list<Point2i>::iterator A, list<Point2i> L)
+{
+	for(list<Point2i>::iterator B = L.begin(); B!=L.end(); B++)
+	{
+		if(A->x==B->x&&A->y==B->y)
+		{
+			return true;
+		}
+	} 
+	return false;
+}
+
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
 void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Target)
 {
+	bool found = false;
 	list<Point2i>::iterator Nearest;
 	double TargetDist = 10000;
 	double Dist;
@@ -104,17 +118,16 @@ void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Tar
 	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		//distance from it to target
-		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.x)*(it->y-Target.y));
-		if (Dist<TargetDist) 
+		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.y)*(it->y-Target.y));
+		if (Dist<TargetDist&&Dist<500&&!IsIn(it, OrderedPoints)) 
 		{
+			found = true;
 			Nearest = it;
 			TargetDist = Dist;
 		}
 	}
 	//cout<<"\t\tfound some stuffs\n";
-	OrderedPoints.push_back(*Nearest);
-	//cout<<"\t\terasing stuff\n";
-	Points.erase(Nearest);
+	if(found)OrderedPoints.push_back(*Nearest);
 }
 
 #define IMAGE_ORIGIN_X 320
@@ -130,15 +143,15 @@ list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 		TempList.push_back(Point2i(lines[i][0], lines[i][1]));
 		TempList.push_back(Point2i(lines[i][2], lines[i][3]));
 	}
+
 	cout<<"\tlTNPL: getting first point\n";
 	//find nearest to origin
 	GetNearest(TempList, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
 	cout<<"\tlTNPL: MOAR PTS!!!!\n";
-	int i = 0;
-	while(TempList.size()>0)
+
+	for(int i = 0; i< TempList.size(); i++)
 	{
 		GetNearest(TempList, NastyPolyLine, *(--(NastyPolyLine.end())));
-		cout<<i++<<","<<TempList.size()<<"\n";
 	}
 	cout<<"\tlTNPL:DONE!!!!\n";
 	return NastyPolyLine;
@@ -158,9 +171,10 @@ list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
 		{
 			Point2i A = (*(--it))-(*(++it));
 			Point2i B = (*(++it))-(*(--it));
-			double angle = acos(A.ddot(B)/(norm(A)*norm(B)));
+			double cosTheta = A.ddot(B)/(norm(A)*norm(B));
+			double angle = acos(cosTheta);
 			double curSignif = fabs(180-angle)*A.ddot(B)/(norm(A)+norm(B));
-			
+			if(cosTheta>0) curSignif = -100;
 			if(curSignif<minSignif)
 			{
 				minSignif = curSignif;

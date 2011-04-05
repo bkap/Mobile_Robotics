@@ -51,6 +51,8 @@ rosbuild_add_executable(robust_calib src/vision/robust_calibration.cpp)
 target_link_libraries(robust_calib Vision)
 rosbuild_add_executable(orangelines src/orangelines.cpp)
 target_link_libraries(orangelines camera_funcs)
+rosbuild_add_executable(wesOrangeLines src/wesOrangeLines.cpp)
+target_link_libraries(wesOrangeLines camera_funcs)
 
 #FUTURE DEMO!!!!!!!!
 #rosbuild_add_executable(futureplanner src/future/planner.cpp)

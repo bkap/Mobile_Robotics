@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 	cout << "READY"  << endl;
 	ROS_INFO("Camera Node Started");
  
-  Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
+  Mat img = imread("/home/wes/Desktop/Mobile_Robotics/delta/frame.jpg", 1);
   
   // Get lines from the image
   vector<Vec4i> lines;
