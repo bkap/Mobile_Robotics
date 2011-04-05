@@ -17,6 +17,121 @@
 using namespace cv;
 using namespace std;
 
+// Turns each line in "lines" into a series of points, spaced by pixelres
+void linesToPoints(vector<Vec4i>& lines, vector<Point2i>& points, int pixelres)
+{
+  int npts = 0;
+  Point2f p1f, p2f, pf;
+  Point2i p;
+  float xhat, yhat, length, traveledlength;
+
+  // Convert the lines to points
+  for( int i=0; i<lines.size(); i++ )
+  {
+    // Get the start, endpoint of the current line
+    p1f.x = (float)lines[i][0];
+    p1f.y = (float)lines[i][1];
+    p2f.x = (float)lines[i][2];
+    p2f.y = (float)lines[i][3];
+
+    // Get unit vector from start to end
+    length = sqrt((p2f.x-p1f.x)*(p2f.x-p1f.x) + (p2f.y-p1f.y)*(p2f.y-p1f.y));
+    xhat = -(p1f.x-p2f.x)/length;
+    yhat = -(p1f.y-p2f.y)/length;
+
+    // Walk along the line toward p2 with resolution pixelres
+    for( float traveledlength=0; traveledlength < length ; traveledlength+=(float)pixelres )
+    {
+      // Calculate the current point
+      pf.x = p1f.x + xhat*traveledlength;
+      pf.y = p1f.y + yhat*traveledlength;
+
+      p = Point2i((int)pf.x, (int)pf.y);
+
+      // Add current point to point list
+      points.push_back(p);
+      npts++;
+    } 
+  }
+  ROS_INFO("Converted into %d points",npts);
+}
+
+
+// Returns index of the nearest point to p, not further away than maxdist.
+// Returns -1 if no such point is found
+int getNearestNeighbor(vector<Point2i>& points, Point2i p, double max_detect_dist)
+{
+  int minindex = -1;
+  float mindist, currdist;
+  Point2i p1;
+
+  mindist = 99999.9;
+
+  for( int index=0; index<points.size(); index++ )
+  {
+    p1 = points[index];
+
+    currdist = sqrt( (float)((p.x-p1.x)*(p.x-p1.x)) + (float)((p.y-p1.y)*(p.y-p1.y)) );
+    if( currdist < mindist  && currdist < max_detect_dist )
+    {
+      mindist = currdist;
+      minindex = index;
+    }
+  }
+
+  return(minindex);
+}
+
+// Removes points near to p
+void removeNearPoints(Point2i p, vector<Point2i>& points, double dist)
+{
+  float currdist;
+  Point2i p1;
+  for( int index=0; index<points.size(); index++ )
+  {
+    p1 = points[index];
+
+    currdist = sqrt( (float)((p.x-p1.x)*(p.x-p1.x)) + (float)((p.y-p1.y)*(p.y-p1.y)) );
+    if( currdist < dist )
+    {
+      index--;
+      // remove it from further consideration
+      points.erase(points.begin() + index);
+    }
+  }
+}
+
+
+void createPathFromPoints(Point2i start, vector<Point2i>& points, vector<Point2i>& pathpoints, int maxdist)
+{
+  // Add the closest point
+  pathpoints.push_back(start);
+
+  Point2i currpoint = Point2i(start);
+  int nearest_neighbor_index = getNearestNeighbor(points, currpoint, 5000);
+
+  // While a nearest neighbor exists
+  while( nearest_neighbor_index != -1 )
+  {
+    // Get the closest point
+    currpoint = points[nearest_neighbor_index];
+    pathpoints.push_back(currpoint);
+
+    // remove it from further consideration
+    points.erase(points.begin() + nearest_neighbor_index);
+
+    // Also remove near points from consideration
+    removeNearPoints(currpoint,points,maxdist*.8);
+
+    // Find the new nearest neighbor
+    nearest_neighbor_index = getNearestNeighbor(points, currpoint, maxdist);
+  }
+
+  // Smooth out the path
+  approxPolyDP(pathpoints,pathpoints,maxdist,false);
+
+}
+
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
   Mat src = img.clone();
@@ -71,11 +186,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 
   HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
   ROS_INFO("Found %d lines",lines.size());
-  for( int i = 0; i < lines.size(); i++ )
-  {
-    Vec4i l = lines[i];
-    line( cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
-  }
+
 }
 
 
@@ -86,25 +197,51 @@ int main(int argc, char **argv)
 	cout << "READY"  << endl;
 	ROS_INFO("Camera Node Started");
  
-  cvNamedWindow("detected lines");
-  cvNamedWindow("original");
   Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
-  imshow("original",img);
-
+  
   vector<Vec4i> lines;
   getOrangeLines(img,lines);
+
+  // Render the lines
+  Mat temp = Mat(img);
   for( size_t i = 0; i < lines.size(); i++ )
   {
     Vec4i l = lines[i];
-    line( img, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
+    line( temp, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 1, CV_AA);
   }
+  cvNamedWindow("detected lines");
+  imshow("detected lines",temp);
 
-  imshow("detected lines",img);
+  // Convert lines into points
+  vector<Point2i> points;
+  linesToPoints(lines, points, 3);
+
+  Mat temp2 = Mat(img);
+  for( int i = 0; i < points.size()-1; i++ )
+  {
+    line( temp2, points[i], Point2i(points[i].x+1,points[i].y+1), Scalar(255,0,0), 1, CV_AA);
+  }
+  cvNamedWindow("points");
+  imshow("points",temp2);
+
+  // Make a path from the points
+  Point2i start(1,479);
+  vector<Point2i> pathpoints;
+
+  ROS_INFO("Converting %d points to lines",points.size());
+  createPathFromPoints(start, points, pathpoints,50);
+  ROS_INFO("Got %d path points",pathpoints.size());
+  
+
+  Mat temp3 = Mat(img);
+  for( int i = 0; i < pathpoints.size()-1; i++ )
+  {
+    line( temp3, pathpoints[i], pathpoints[i+1], Scalar(255,255,0), 1, CV_AA);
+  }
+  cvNamedWindow("new lines");
+  imshow("new lines",temp3);
+
   waitKey(-1);
-  cvDestroyWindow("detected lines");
-  cvDestroyWindow("original");
-  cvDestroyWindow("thresholded image");
-
 	while(ros::ok()){ros::spinOnce();}
 	return 0;
 }
