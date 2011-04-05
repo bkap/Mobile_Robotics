@@ -4,7 +4,11 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <tf/transform_datatypes.h>
-#include<tf/transform_listener.h>
+#include <tf/transform_listener.h>
+#include <image_transport/image_transport.h>
+#include <opencv/cv.h>
+#include <opencv2/core/core.hpp>
+#include <opencv/highgui.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/mat.hpp>
 #include <list>
@@ -460,12 +464,8 @@ int main(int argc,char **argv)
         {
             geometry_msgs::Point32 p;
             p.x = (last_x + i/2)*10;
-            switch(i){
-                case 0: p.y=0.0;break;
-                case 1: case 2: p.y=10.0;break;
-                case 3: p.y=20.0;break;
-            }
-            //p.y = (last_y + (i+1)/2)*10;
+            p.y = (last_y + (i+1)/2)*10;
+            //p.y = (last_y + i)*10;
             p.z = 0.0;
             pointList.points.push_back(p);
             cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
@@ -479,6 +479,49 @@ int main(int argc,char **argv)
 	    {
 	        cout << turns.path_list[i] << "\n";
 	    }
+	    
+	    cout << "PRETTY PICTURE TIME\n";
+	    // and put a pretty picture
+	    Mat img = Mat::zeros(50, 50, CV_32F);
+	    //Mat img2 = Mat::zeros(500, 500, CV_32F);
+	    cvNamedWindow("path");
+	    //cvNamedWindow("path2");
+	    
+	    // woo get the lines
+	    for (int i=0; i<turns.path_list.size(); i++)
+	    {
+	        PathSegment seg = turns.path_list[i];
+	        switch(seg.seg_type) {
+	            case 1: // line
+	            {
+	                double angle = tf::getYaw(seg.init_tan_angle);
+	                double endx = seg.ref_point.x+seg.seg_length*cos(angle);
+	                double endy = seg.ref_point.y+seg.seg_length*sin(angle);
+	                Point refpt;
+	                refpt.x = seg.ref_point.x;
+	                refpt.y = seg.ref_point.y;
+	                line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
+	                break;
+                }
+                case 2: // arc
+                {
+                    double angle = tf::getYaw(seg.init_tan_angle);
+	                Point refpt;
+	                refpt.x = seg.ref_point.x;
+	                refpt.y = seg.ref_point.y;
+                    ellipse(img, refpt, Size(1/seg.curvature, 1/seg.curvature), 0.0, angle*180/PI, (angle+seg.seg_length)*180/PI, Scalar(255, 0, 0), 1, CV_AA);
+                    break;
+                }
+	        }
+    	}
+	    
+	    //ellipse(img, Point(100, 100), Size(100, 100), 0.0, 0.0, 45, Scalar(200, 200, 0), 1, CV_AA);
+	    
+	    //pyrUp(img, img2, Size(img.cols*10, img.rows*10));
+	    imshow("path", img);
+	    //imshow("path2", img2);
+	    waitKey(-1);
+	    cout << "yay pretty pictures\n";
 	    
     } else {
 	    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
