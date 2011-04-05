@@ -26,7 +26,7 @@
 #define LINE 1
 #define CURVE 2
 #define POINT_TURN 3
-#define STD_TURN_RAD .6 //given in the assignment but changed because it seemed to work better
+#define STD_TURN_RAD 6.0//.6 //given in the assignment but changed because it seemed to work better
 
 //define maximum speeds and accelerations
 #define MAX_LINEAR .5
@@ -460,11 +460,12 @@ int main(int argc,char **argv)
         // try a square?
         double last_x = 0.0;
         double last_y = 0.0;
+        double offset = 50.0; // padding
         for (int i=0; i < 4; i++)
         {
             geometry_msgs::Point32 p;
-            p.x = (last_x + i/2)*10;
-            p.y = (last_y + (i+1)/2)*10;
+            p.x = (last_x + i/2)*50 + offset;
+            p.y = (last_y + (i+1)/2)*50 + offset;
             //p.y = (last_y + i)*10;
             p.z = 0.0;
             pointList.points.push_back(p);
@@ -482,10 +483,8 @@ int main(int argc,char **argv)
 	    
 	    cout << "PRETTY PICTURE TIME\n";
 	    // and put a pretty picture
-	    Mat img = Mat::zeros(50, 50, CV_32F);
-	    //Mat img2 = Mat::zeros(500, 500, CV_32F);
+	    Mat img = Mat::zeros(500, 500, CV_32F);
 	    cvNamedWindow("path");
-	    //cvNamedWindow("path2");
 	    
 	    // woo get the lines
 	    for (int i=0; i<turns.path_list.size(); i++)
@@ -509,7 +508,16 @@ int main(int argc,char **argv)
 	                Point refpt;
 	                refpt.x = seg.ref_point.x;
 	                refpt.y = seg.ref_point.y;
-                    ellipse(img, refpt, Size(1/seg.curvature, 1/seg.curvature), 0.0, angle*180/PI, (angle+seg.seg_length)*180/PI, Scalar(255, 0, 0), 1, CV_AA);
+	                
+	                Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
+	                
+	                cout << "makin a ellipse\n";
+	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
+	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
+	                
+	                // Not sure if the angles are measured the same
+                    ellipse(img, refpt, axes, 90.0, angle*180/PI, (angle+seg.seg_length)*180/PI, Scalar(255, 0, 0), 1, CV_AA, 0);
+                    cout << "yay i maded oen\n";
                     break;
                 }
 	        }
@@ -517,9 +525,7 @@ int main(int argc,char **argv)
 	    
 	    //ellipse(img, Point(100, 100), Size(100, 100), 0.0, 0.0, 45, Scalar(200, 200, 0), 1, CV_AA);
 	    
-	    //pyrUp(img, img2, Size(img.cols*10, img.rows*10));
 	    imshow("path", img);
-	    //imshow("path2", img2);
 	    waitKey(-1);
 	    cout << "yay pretty pictures\n";
 	    
