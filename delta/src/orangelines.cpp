@@ -194,54 +194,20 @@ int main(int argc, char **argv)
 	cout << "READY"  << endl;
 	ROS_INFO("Camera Node Started");
  
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
-  cvNamedWindow("detected lines");
-  cvNamedWindow("original");
-  Mat img = imread("/home/wes/Desktop/Mobile_Robotics/delta/frame.jpg", 1);
-  imshow("original",img);
-  Mat img2 = Mat(img);
-=======
   Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
   
   // Get lines from the image
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
   vector<Vec4i> lines;
-cout<<"begin orangeLines\n";
   getOrangeLines(img,lines);
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
-cout<<"end orangeLines\n";
-=======
   ROS_INFO("Found %d lines",lines.size());
 
   // Render the lines
   Mat temp = Mat(img);
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
   for( size_t i = 0; i < lines.size(); i++ )
   {
     Vec4i l = lines[i];
     line( temp, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 1, CV_AA);
   }
-<<<<<<< HEAD:delta/src/wesOrangeLines.cpp
-cout<<"I drawed good stuffs\n";
-  cvNamedWindow("cleanLine");
-  cout<<"linesToNastyPolyLine\n";
-  list<Point2i> PL = linesToNastyPolyLine(lines);
-  cout<<"can haz clean path\n";
-  PL = cleanNastyPolyLine(PL,5);
-  cout<<"drawing more stuff\n";
-  
-  for(list<Point2i>::iterator it = PL.begin(); it!=PL.end(); it++)
-  {
-	  line(img2, *it, *it, Scalar(0,255,0),3, CV_AA);
-  }
-  cout<<"show stuff\n";
-  imshow("cleanLine", img);
-  imshow("detected lines",img);
-  waitKey(-1);
-  cvDestroyWindow("detected lines");
-  cvDestroyWindow("original");
-  cvDestroyWindow("thresholded image");
-=======
   cvNamedWindow("detected lines");
   imshow("detected lines",temp);
 
@@ -272,7 +238,6 @@ cout<<"I drawed good stuffs\n";
   }
   cvNamedWindow("new lines");
   imshow("new lines",temp3);
->>>>>>> c4ca925ba682aeefaa88000c9fd7287b8ebef71b:delta/src/orangelines.cpp
 
   waitKey(-1);
 	while(ros::ok()){ros::spinOnce();}
