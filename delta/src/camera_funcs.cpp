@@ -97,19 +97,24 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
 void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Target)
 {
-	list<Point2i>::iterator Start;
-	double Dist = 10000;
+	list<Point2i>::iterator Nearest;
 	double TargetDist = 10000;
+	double Dist;
+	//cout<<"\t\tGetNearest Init\n";
 	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
-		//distance from start to origin
-		TargetDist =  sqrt((Start->x-Target.x)*(Start->x-Target.x)+(Start->y-Target.y)*(Start->y-Target.y));
+		//distance from it to target
 		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.x)*(it->y-Target.y));
-		if (Dist<TargetDist) Start = it;
+		if (Dist<TargetDist) 
+		{
+			Nearest = it;
+			TargetDist = Dist;
+		}
 	}
-
-	OrderedPoints.push_back(*Start);
-	Points.erase(Start);
+	//cout<<"\t\tfound some stuffs\n";
+	OrderedPoints.push_back(*Nearest);
+	//cout<<"\t\terasing stuff\n";
+	Points.erase(Nearest);
 }
 
 #define IMAGE_ORIGIN_X 320
@@ -119,21 +124,23 @@ list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 {
 	list<Point2i > NastyPolyLine;
 	list<Point2i > TempList;
-
+	cout<<"\tlTNPL:make TempList\n";
 	for(int i = 0; i<lines.size(); i++)
 	{
 		TempList.push_back(Point2i(lines[i][0], lines[i][1]));
 		TempList.push_back(Point2i(lines[i][2], lines[i][3]));
 	}
-
+	cout<<"\tlTNPL: getting first point\n";
 	//find nearest to origin
 	GetNearest(TempList, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
-
+	cout<<"\tlTNPL: MOAR PTS!!!!\n";
+	int i = 0;
 	while(TempList.size()>0)
 	{
-		GetNearest(TempList, NastyPolyLine, *NastyPolyLine.end());
+		GetNearest(TempList, NastyPolyLine, *(--(NastyPolyLine.end())));
+		cout<<i++<<","<<TempList.size()<<"\n";
 	}
-	
+	cout<<"\tlTNPL:DONE!!!!\n";
 	return NastyPolyLine;
 }
 
@@ -142,15 +149,18 @@ list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
 {
 	list<Point2i>::iterator leastSignificant;
 	double minSignif; //short for minimum significance
+	int i =0;
 	while(NastyPolyLine.size()>NumRemaining)
 	{
+		//cout<<"loopin "<<i++<<"\n";
 		minSignif = 10000000; 
-		for (list<Point2i>::iterator it=NastyPolyLine.begin(); it!=NastyPolyLine.end(); it++)
+		for (list<Point2i>::iterator it=++(NastyPolyLine.begin()); it!=--(NastyPolyLine.end()); it++)
 		{
 			Point2i A = (*(--it))-(*(++it));
 			Point2i B = (*(++it))-(*(--it));
 			double angle = acos(A.ddot(B)/(norm(A)*norm(B)));
 			double curSignif = fabs(180-angle)*A.ddot(B)/(norm(A)+norm(B));
+			
 			if(curSignif<minSignif)
 			{
 				minSignif = curSignif;

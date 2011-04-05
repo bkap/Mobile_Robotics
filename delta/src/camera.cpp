@@ -39,7 +39,33 @@ class DemoNode {
 		ros::Publisher pub_nav_pts;
 		sensor_msgs::PointCloud NavPts;
 		Mat_<float> rvec, tvec;
+		Mat_<double> rvec_, tvec_;
+		Mat R2;
+		Mat_<double> projector;
 };
+
+vector<geometry_msgs::Point32> transformPts(vector<Point2i> NavPoints)
+{
+	vector<geometry_msgs::Point32> result; 
+	geometry_msgs::Point32 temp;
+	Point3d V;
+	
+	for(vector<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
+	{
+		V.x = it->x;
+		V.y = it->y;
+		V.z = 0;
+		
+		V = projector*V;
+		temp.x = V.x;
+		temp.y = V.y;
+		temp.z = 0;
+		cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
+		result.push_back(temp);
+	}
+	
+	return result;
+}
 
 //call this with a point32 to publish the blob's location
 void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
@@ -70,6 +96,15 @@ DemoNode::DemoNode():
 	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
  
 	NavPts.header.frame_id = "base_laser1_link";
+	
+	rvec_ = Mat(&rvec);
+	tvec_ = Mat(&tvec);
+	cout<<"Pre-Rodrigues\n";
+	Rodrigues(rvec_, R2);
+	cout<<"Post-Rodrigues\n";
+	R2.col(1) = R2.col(2);
+	R2.col(2) = tvec_;
+
 }
 
 bool cameraCalled = false;
@@ -81,6 +116,8 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
 	cameraCalled = true;
 	//cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+	cout<<"Projector\n";
+	projector = Mat_<double>((Mat_<double>(cameraMat) *Mat_<double>( R2)).inv());
 }
 
 // Called whenever you get a new image
@@ -100,35 +137,21 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   try
   {
     image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
+    vector<vec4i> vickyTheVector;
+    getOrangeLines(image, vickyTheVector);
+    vector<Point2i> PointList = linesToNastyPolyLine(vickyTheVector);
+    PointList = cleanNastyPolyLine(PointList, 5);
+    pub_nav_pts(PointList);
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
     ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
   }
-
-  // Detect the lines in the image
-  vector<Vec4i> lines;
-  getOrangeLines(image, lines)
-
-  // Turn the lines into a sequence of points
-
-
 }
 
 //reads a mat from the file in ~/.ros
 void ReadMat(Mat_<float> *mat, char* file)
 {
-  FILE* test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "w");
-  fprintf(test, "%i\n", 1);
-  fprintf(test, "%i\n", 1337);
-  fclose(test);
-  test = fopen("/home/jinx/ROSCode/delta/Mobile_Robotics/deltatest", "r");
-  int a,b;
-  fscanf(test, "%i", &a);
-  fscanf(test, "%i", &b);
-  fclose(test);
-  cout<<"a,b "<<a<<","<<b<<"\n";
-
   //cout<<"camout1\n";
   ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
   cout << "file opened" << endl;

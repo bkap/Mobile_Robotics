@@ -29,26 +29,31 @@ int main(int argc, char **argv)
  
   cvNamedWindow("detected lines");
   cvNamedWindow("original");
-  Mat img = imread("/home/bk/code/dev_stacks/Mobile_Robotics/delta/frame.jpg", 1);
+  Mat img = imread("/home/wes/Desktop/Mobile_Robotics/delta/frame.jpg", 1);
   imshow("original",img);
   Mat img2 = Mat(img);
   vector<Vec4i> lines;
+cout<<"begin orangeLines\n";
   getOrangeLines(img,lines);
+cout<<"end orangeLines\n";
   for( size_t i = 0; i < lines.size(); i++ )
   {
     Vec4i l = lines[i];
     line( img, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
   }
-
+cout<<"I drawed good stuffs\n";
   cvNamedWindow("cleanLine");
+  cout<<"linesToNastyPolyLine\n";
   list<Point2i> PL = linesToNastyPolyLine(lines);
-  PL = cleanNastyPolyLine(PL);
+  cout<<"can haz clean path\n";
+  PL = cleanNastyPolyLine(PL,5);
+  cout<<"drawing more stuff\n";
   
   for(list<Point2i>::iterator it = PL.begin(); it!=PL.end(); it++)
   {
-	  line(img2, *it, *(++it--), Scalar(0,0,255),3, CV_AA);
+	  line(img2, *it, *it, Scalar(0,255,0),3, CV_AA);
   }
-  
+  cout<<"show stuff\n";
   imshow("cleanLine", img);
   imshow("detected lines",img);
   waitKey(-1);
