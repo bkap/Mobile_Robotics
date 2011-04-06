@@ -90,6 +90,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   //imshow("detected lines",src);
 }
 
+//asks the question is L or a point near L already in A.
 bool IsIn(list<Point2d>::iterator A, list<Point2d> L, double minSeparation)
 {
 	for(list<Point2d>::iterator B = L.begin(); B!=L.end(); B++)
@@ -103,7 +104,7 @@ bool IsIn(list<Point2d>::iterator A, list<Point2d> L, double minSeparation)
 	return false;
 }
 
-//these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
+//pops the nearest point to target that isn't within minSeparation
 void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Target, double minSeparation)
 {
 	bool found = false;
@@ -126,6 +127,8 @@ void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Tar
 	if(found)OrderedPoints.push_back(*Nearest);
 }
 
+//*****WARNING THIS IS FOR TESTING PURPOSES ONLY**********
+//*****IT DOESN'T TRANSFORM INTO ACTUAL COORDINATES****
 list<Point2d> noTransform(list<Point2i> Pts)
 {
 	list<Point2d> result;
@@ -152,24 +155,27 @@ list<Point2i> getUnsortedPoints(vector<Vec4i> lines)
 	return TempList;
 }
 
+
+//minSeparation should be in meters for the robot code, but can be in pixels if noTransform is used instead of transformPts.
+//the origin should be like 0,0 for the robot, but should be the bottom center of the image if noTransform is used.
 list<Point2d> linesToNastyPolyLine(list<Point2d> Lines, double IMAGE_ORIGIN_X, double IMAGE_ORIGIN_Y, double minSeparation)
 {
 	list<Point2d > NastyPolyLine;
 	
-	cout<<"\tlTNPL: getting first point\n";
+	//cout<<"\tlTNPL: getting first point\n";
 	//find nearest to origin
 	popNearest(Lines, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y), minSeparation);
-	cout<<"\tlTNPL: MOAR PTS!!!!\n";
+	//cout<<"\tlTNPL: MOAR PTS!!!!\n";
 
 	for(int i = 0; i< Lines.size(); i++)
 	{
 		popNearest(Lines, NastyPolyLine, *(--(NastyPolyLine.end())), minSeparation);
 	}
-	cout<<"\tlTNPL:DONE!!!!\n";
+	//cout<<"\tlTNPL:DONE!!!!\n";
 	return NastyPolyLine;
 }
 
-
+//Cleans the PolyLine, may not be necessary after all.
 list<Point2d> cleanNastyPolyLine(list<Point2d> NastyPolyLine, int NumRemaining)
 {
 	list<Point2d>::iterator leastSignificant;

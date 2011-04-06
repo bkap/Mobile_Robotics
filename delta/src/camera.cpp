@@ -154,7 +154,14 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     list<Point2d> crtPts = transformPts(imPts); 
     crtPts = linesToNastyPolyLine(crtPts, 0, 0, .3);
     crtPts = cleanNastyPolyLine(crtPts, 5);
-    this->publishNavLoc(crtPts);
+    if(vickyTheVector.size()==0)
+    {
+	this->publishNavLoc(crtPts);
+    }
+    else
+    {
+	ROS_INFO("CAM: LOLWUT< I DIDN'T SEE ANY LINES!!!!!!\n");
+    }
   }
   catch (sensor_msgs::CvBridgeException& e)
   {

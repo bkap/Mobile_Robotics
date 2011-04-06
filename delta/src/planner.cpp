@@ -276,7 +276,8 @@ void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, 
 	}
 }
 */
-
+vector<PathSegment> oldPath;
+bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
 PathList insertTurns(sensor_msgs::PointCloud pointCloud)
@@ -287,47 +288,36 @@ PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 	for (int i=0; i<pointListSize; i++) {
 	    PointList[i] = convertGeoPointToPoint3f(pointCloud.points[i]);
 	}
+PathList ReturnVal; //the path list that we will eventually return
+vector<PathSegment> path; 
+if(FirstTime)
+{
+	FirstTime = false;
 	
-	PathList ReturnVal; //the path list that we will eventually return
-	vector<PathSegment> path = vector<PathSegment>(3*(pointListSize-2)); //3(n-2) segments are needed when using the line turn line line turn line pattern
-	ReturnVal.path_list.assign(path.begin(), path.end());
+	path = vector<PathSegment>(pointListSize);
 	
-	int SegNum = 0;
-	Point3f A, B, C; //points A,B,C for the line turn line pattern
-	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
-
-	for (int i = 0; i<pointListSize-2; i++)
+	for(int i =0; i<pointListSize-1; i++)
 	{
-		A = PointList[i];  //copy to temp variables for readability
-		B = PointList[i+1];
-		C = PointList[i+2];
-		
-		cout << "\ninsertTurns points for i="<<i<<":\n";
-		cout <<"A="<<A.x<<","<<A.y<<", B="<<B.x<<","<<B.y<<", C="<<C.x<<","<<C.y<<"\n";
-		//cout << "all points are:\n";
-		//for (int k=0;k<pointListSize;k++)
-		//    cout <<k<<": "<<PointList[k].x<<","<<PointList[k].y<<"\n";
-		
-		//from the points (A,B,C), generate (line, turn, line)
-		GetCurveAndLines2(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
-		
-		//the first and last line segments need to be special cased.  the move back functions just add to their length
-		// shady
-		/*
-		if(i == 0)
-		{
-			MoveBack1(A,B, &FirstLine);
-		}
-		else if (i == pointListSize-3)
-		{
-			MoveBack2(B,C, &SecondLine);
-		}
-		*/
-		
-		ReturnVal.path_list[3*i] = FirstLine;
-		ReturnVal.path_list[3*i+1] = Curve;
-		ReturnVal.path_list[3*i+2] = SecondLine;
+	     path[i] = MakeLine(PointList[i], PointList[i+1], i);
 	}
+	oldPath = path;
+	ReturnVal.path_list.assign(path.begin(), path.end());
+}
+else
+{
+	//get the first point on the suggested path list which is not too close to the current pose
+	//TODO make this function and get the current segment by subscribing to it
+	int StartIndex = getFirstNotTooClose(currentPathSeg, PointList);
+	path = vector<PathSegment>(pointListSize-StartIndex+currentPathSeg.segNum+1); //the +1 is because segNum's start at 0
+	for(int i = 0; i<currentPathSeg.segNum+1; i++)
+	{
+		path[i] = oldPath[i];
+	}
+	for(int i = currentPathSeg.segNum+1;
+	
+}
+	
+	
 	return ReturnVal;//return the pathlist
 }
 
@@ -459,8 +449,8 @@ int main(int argc,char **argv)
         {
             geometry_msgs::Point32 p;
             p.x = (i/2)*50 + offset;
-            //p.y = ((i+1)/2)*50 + offset;
-            p.y = i*50 + offset;
+            p.y = ((i+1)/2)*50 + offset;
+            //p.y = i*50 + offset;
             p.z = 0.0;
             pointList.points.push_back(p);
             cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
