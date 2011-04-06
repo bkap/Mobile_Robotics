@@ -28,10 +28,10 @@ tf::TransformListener *tfl;
 class DemoNode {
 	public:
 		DemoNode();
-		void publishNavLoc(list<Point2i> NavPoints);
+		void publishNavLoc(list<Point2d> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
-		vector<geometry_msgs::Point32> transformPts(list<Point2i> NavPoints);
+		list<Point2d> transformPts(list<Point2i> NavPoints);
 		ros::NodeHandle nh_; // Made this public to access it
 	private:
 		image_transport::ImageTransport it_;
@@ -45,22 +45,22 @@ class DemoNode {
 		Mat_<double> projector;
 };
 
-vector<geometry_msgs::Point32> DemoNode::transformPts(list<Point2i> NavPoints)
+list<Point2d> DemoNode::transformPts(list<Point2i> NavPoints)
 {
-	vector<geometry_msgs::Point32> result; 
-	geometry_msgs::Point32 temp;
-	Vec3d V;
+	list<Point2d> result; 
+	Point2d temp;
+	Point3d V;
 	
 	for(list<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
 	{
-		V[0] = it->x;
-		V[1] = it->y;
-		V[2] = 0;
+		V.x = it->x;
+		V.y = it->y;
+		V.z = 0;
 		
-		V = projector*V;
-		temp.x = V[0];
-		temp.y = V[1];
-		temp.z = 0;
+		Mat_<double> W = projector*Mat(V);
+		temp.x = W(0);
+		temp.y = W(1);
+
 		cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
 		result.push_back(temp);
 	}
@@ -69,10 +69,20 @@ vector<geometry_msgs::Point32> DemoNode::transformPts(list<Point2i> NavPoints)
 }
 
 //call this with a point32 to publish the blob's location
-void DemoNode::publishNavLoc(list<Point2i> NavPoints)
+void DemoNode::publishNavLoc(list<Point2d> NavPoints)
 {
+	NavPts.points.erase(NavPts.points.begin(), NavPts.points.end());
   // Convert into geometry points, and transform from pixel to robot coordinates
-	NavPts.points = transformPts(NavPoints);
+	while(NavPoints.size()>0)
+	{
+		geometry_msgs::Point32 geoPoint;
+		geoPoint.x = NavPoints.begin()->x;
+		geoPoint.y = NavPoints.begin()->y;
+		geoPoint.z = 0;
+		NavPts.points.push_back(geoPoint);
+		NavPoints.pop_front();
+	}
+	
 
   // Transform the point cloud from robot coordinates to map coordinates
 	sensor_msgs::PointCloud tNavPts;
@@ -98,13 +108,13 @@ DemoNode::DemoNode():
  
 	NavPts.header.frame_id = "base_laser1_link";
 	
-	rvec_ = Mat(&rvec);
-	tvec_ = Mat(&tvec);
+	//rvec_ = Mat(&rvec);
+	//tvec_ = Mat(&tvec);
 	cout<<"Pre-Rodrigues\n";
-	Rodrigues(rvec_, R2);
+	Rodrigues(rvec, R2);
 	cout<<"Post-Rodrigues\n";
 	R2.col(1) = R2.col(2);
-	R2.col(2) = tvec_;
+	R2.col(2) = tvec;
 
 }
 
@@ -140,9 +150,11 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
     vector<Vec4i> vickyTheVector;
     getOrangeLines(image, vickyTheVector);
-    list<Point2i> PointList = linesToNastyPolyLine(vickyTheVector);
-    PointList = cleanNastyPolyLine(PointList, 5);
-    this->publishNavLoc(PointList);
+    list<Point2i> imPts = getUnsortedPoints(vickyTheVector);
+    list<Point2d> crtPts = transformPts(imPts); 
+    crtPts = linesToNastyPolyLine(crtPts);
+    crtPts = cleanNastyPolyLine(crtPts, 5);
+    this->publishNavLoc(crtPts);
   }
   catch (sensor_msgs::CvBridgeException& e)
   {

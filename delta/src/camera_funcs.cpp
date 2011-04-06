@@ -95,9 +95,9 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   //imshow("detected lines",src);
 }
 
-bool IsIn(list<Point2i>::iterator A, list<Point2i> L)
+bool IsIn(list<Point2d>::iterator A, list<Point2d> L)
 {
-	for(list<Point2i>::iterator B = L.begin(); B!=L.end(); B++)
+	for(list<Point2d>::iterator B = L.begin(); B!=L.end(); B++)
 	{
 		if(A->x==B->x&&A->y==B->y)
 		{
@@ -108,14 +108,14 @@ bool IsIn(list<Point2i>::iterator A, list<Point2i> L)
 }
 
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
-void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Target)
+void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Target)
 {
 	bool found = false;
-	list<Point2i>::iterator Nearest;
+	list<Point2d>::iterator Nearest;
 	double TargetDist = 10000;
 	double Dist;
 	//cout<<"\t\tGetNearest Init\n";
-	for (list<Point2i>::iterator it=Points.begin(); it!=Points.end(); it++)
+	for (list<Point2d>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		//distance from it to target
 		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.y)*(it->y-Target.y));
@@ -130,12 +130,25 @@ void GetNearest(list<Point2i>& Points, list<Point2i>& OrderedPoints, Point2i Tar
 	if(found)OrderedPoints.push_back(*Nearest);
 }
 
+list<Point2d> noTransform(list<Point2i> Pts)
+{
+	list<Point2d> result;
+	for(list<Point2i>::iterator it = Pts.begin(); it!=Pts.end(); it++)
+	{
+		Point2d temp;
+		temp.x = it->x;
+		temp.y = it->y;
+		result.push_back(temp);
+	}
+	return result;
+}
+
 #define IMAGE_ORIGIN_X 320
 #define IMAGE_ORIGIN_Y 479
 
-list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
+list<Point2i> getUnsortedPoints(vector<Vec4i> lines)
 {
-	list<Point2i > NastyPolyLine;
+
 	list<Point2i > TempList;
 	cout<<"\tlTNPL:make TempList\n";
 	for(int i = 0; i<lines.size(); i++)
@@ -143,31 +156,37 @@ list<Point2i> linesToNastyPolyLine(vector<Vec4i> lines)
 		TempList.push_back(Point2i(lines[i][0], lines[i][1]));
 		TempList.push_back(Point2i(lines[i][2], lines[i][3]));
 	}
+	return TempList;
+}
 
+list<Point2d> linesToNastyPolyLine(list<Point2d> Lines)
+{
+	list<Point2d > NastyPolyLine;
+	
 	cout<<"\tlTNPL: getting first point\n";
 	//find nearest to origin
-	GetNearest(TempList, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
+	popNearest(Lines, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
 	cout<<"\tlTNPL: MOAR PTS!!!!\n";
 
-	for(int i = 0; i< TempList.size(); i++)
+	for(int i = 0; i< Lines.size(); i++)
 	{
-		GetNearest(TempList, NastyPolyLine, *(--(NastyPolyLine.end())));
+		popNearest(Lines, NastyPolyLine, *(--(NastyPolyLine.end())));
 	}
 	cout<<"\tlTNPL:DONE!!!!\n";
 	return NastyPolyLine;
 }
 
 
-list<Point2i> cleanNastyPolyLine(list<Point2i> NastyPolyLine, int NumRemaining)
+list<Point2d> cleanNastyPolyLine(list<Point2d> NastyPolyLine, int NumRemaining)
 {
-	list<Point2i>::iterator leastSignificant;
+	list<Point2d>::iterator leastSignificant;
 	double minSignif; //short for minimum significance
 	int i =0;
 	while(NastyPolyLine.size()>NumRemaining)
 	{
 		//cout<<"loopin "<<i++<<"\n";
 		minSignif = 10000000; 
-		for (list<Point2i>::iterator it=++(NastyPolyLine.begin()); it!=--(NastyPolyLine.end()); it++)
+		for (list<Point2d>::iterator it=++(NastyPolyLine.begin()); it!=--(NastyPolyLine.end()); it++)
 		{
 			Point2i A = (*(--it))-(*(++it));
 			Point2i B = (*(++it))-(*(--it));
