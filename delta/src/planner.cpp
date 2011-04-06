@@ -500,11 +500,13 @@ int main(int argc,char **argv)
 	                refpt.x = seg.ref_point.x;
 	                refpt.y = seg.ref_point.y;
 	                line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
+	                cout << "hey I made a line\n";
+	                cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<"\n";
 	                break;
                 }
                 case 2: // arc
                 {
-                    double angle = tf::getYaw(seg.init_tan_angle);
+                    double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
 	                Point refpt;
 	                refpt.x = seg.ref_point.x;
 	                refpt.y = seg.ref_point.y;
@@ -515,8 +517,26 @@ int main(int argc,char **argv)
 	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
 	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
 	                
+                    /*
+                    // from dpcrawler
+                    if (desState.des_rho >= 0) {
+                        theta = psiDes - PI/2;
+                    } else { // right hand
+                        theta = psiDes + PI/2;
+                    }*/
+                    
+                    double angle1 = angle;
+                    double angle2;
+                    if (seg.curvature >= 0) { // left
+                        cout << "ellipse turns left woo\n";
+                        angle2 = angle+seg.seg_length*180/PI;
+                    } else { // right
+                        cout << "ellipse turns right woo\n";
+                        angle2 = angle-seg.seg_length*180/PI;
+                    }
+                
 	                // Not sure if the angles are measured the same
-                    ellipse(img, refpt, axes, 90.0, angle*180/PI, (angle+seg.seg_length)*180/PI, Scalar(255, 0, 0), 1, CV_AA, 0);
+                    ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
                     cout << "yay i maded oen\n";
                     break;
                 }
