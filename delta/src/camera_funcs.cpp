@@ -25,12 +25,8 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
   Mat src = img.clone();
 
-  // Apply a gaussian filter
-  Size ksize(7,7);
-  GaussianBlur(img,src,ksize,2,2);
-
   Mat cdst, temp; 
-  // I'm operating in hue space on the non-normalized image
+  // I'm operating on the non-normalized image
   //normalizeColor(src);
 
   // get a mat of the same dimensions as src, but floating point.
@@ -45,7 +41,6 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   {
     for( int j=0; j<src.cols; j++ )
     {
-      // Point to the right pixels in the source and destination mats
       srcpixel = src.at<Vec3b>(i,j);
       dstpixel = &dst.at<uchar>(i,j);
 
@@ -56,7 +51,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
         val = 60.0*((float)srcpixel[1]-(float)srcpixel[0])/((float)srcpixel[2]-(float)srcpixel[0]);
 
         // Threshold based on hue
-        if( val>15.0 && val<28.0 )
+        if( val>15.0 && val<35.0 )
         {
           *dstpixel = 255; // The hue is redidsh-orange
         }
@@ -66,7 +61,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
         *dstpixel = 0.0; // The hue is not reddish-orange.
       }
     }
-  }  
+  }
 
   // Erode and dilate to get rid of stray pixels
   erode(dst, dst, Mat());
@@ -74,11 +69,11 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 
   cvtColor(dst, cdst, CV_GRAY2BGR);
 
-  // Run the line finding algorithm, and draw them on the source image
-  HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
+  // Show the thresholded image
+  cvNamedWindow("thresholded image");
+  imshow("thresholded image",dst);
 
-  // Output how many lines you found
-  ROS_INFO("Found %d lines",lines.size());
+  HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
 
   for( int i = 0; i < lines.size(); i++ )
   {
@@ -95,11 +90,12 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   //imshow("detected lines",src);
 }
 
-bool IsIn(list<Point2d>::iterator A, list<Point2d> L)
+bool IsIn(list<Point2d>::iterator A, list<Point2d> L, double minSeparation)
 {
 	for(list<Point2d>::iterator B = L.begin(); B!=L.end(); B++)
 	{
-		if(A->x==B->x&&A->y==B->y)
+		double d = sqrt((A->x-B->x)*(A->x-B->x)+(A->y-B->y)*(A->y-B->y));
+		if(d<minSeparation)
 		{
 			return true;
 		}
@@ -108,7 +104,7 @@ bool IsIn(list<Point2d>::iterator A, list<Point2d> L)
 }
 
 //these should be the closest point in the image to the robot.  I am just guessing that the image is 640 by 480 and that the robot is at the bottom of the image, in the middle
-void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Target)
+void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Target, double minSeparation)
 {
 	bool found = false;
 	list<Point2d>::iterator Nearest;
@@ -119,7 +115,7 @@ void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Tar
 	{
 		//distance from it to target
 		Dist = sqrt((it->x-Target.x)*(it->x-Target.x)+(it->y-Target.y)*(it->y-Target.y));
-		if (Dist<TargetDist&&Dist<500&&!IsIn(it, OrderedPoints)) 
+		if (Dist<TargetDist&&!IsIn(it, OrderedPoints, minSeparation)) 
 		{
 			found = true;
 			Nearest = it;
@@ -143,9 +139,6 @@ list<Point2d> noTransform(list<Point2i> Pts)
 	return result;
 }
 
-#define IMAGE_ORIGIN_X 320
-#define IMAGE_ORIGIN_Y 479
-
 list<Point2i> getUnsortedPoints(vector<Vec4i> lines)
 {
 
@@ -159,18 +152,18 @@ list<Point2i> getUnsortedPoints(vector<Vec4i> lines)
 	return TempList;
 }
 
-list<Point2d> linesToNastyPolyLine(list<Point2d> Lines)
+list<Point2d> linesToNastyPolyLine(list<Point2d> Lines, double IMAGE_ORIGIN_X, double IMAGE_ORIGIN_Y, double minSeparation)
 {
 	list<Point2d > NastyPolyLine;
 	
 	cout<<"\tlTNPL: getting first point\n";
 	//find nearest to origin
-	popNearest(Lines, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y));
+	popNearest(Lines, NastyPolyLine, Point2i(IMAGE_ORIGIN_X, IMAGE_ORIGIN_Y), minSeparation);
 	cout<<"\tlTNPL: MOAR PTS!!!!\n";
 
 	for(int i = 0; i< Lines.size(); i++)
 	{
-		popNearest(Lines, NastyPolyLine, *(--(NastyPolyLine.end())));
+		popNearest(Lines, NastyPolyLine, *(--(NastyPolyLine.end())), minSeparation);
 	}
 	cout<<"\tlTNPL:DONE!!!!\n";
 	return NastyPolyLine;

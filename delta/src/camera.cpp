@@ -152,7 +152,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     getOrangeLines(image, vickyTheVector);
     list<Point2i> imPts = getUnsortedPoints(vickyTheVector);
     list<Point2d> crtPts = transformPts(imPts); 
-    crtPts = linesToNastyPolyLine(crtPts);
+    crtPts = linesToNastyPolyLine(crtPts, 0, 0, .3);
     crtPts = cleanNastyPolyLine(crtPts, 5);
     this->publishNavLoc(crtPts);
   }
