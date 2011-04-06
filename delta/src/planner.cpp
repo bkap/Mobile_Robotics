@@ -202,7 +202,7 @@ double getHeading(Point3f a, Point3f b)
 }
 
 // Take three points, return a smooth path with an arc by the middle one
-// replacing GetCurveAndLines because of shady vector math
+// replacing shady vector math of GetCurveAndLines with slightly less shady trigonometry
 void GetCurveAndLines2(Point3f a, Point3f b, Point3f c, PathSegment* line1, PathSegment* curve, PathSegment* line2, int* segNum)
 {
     cout << "\nshady trig getcurveandlines2\n";
@@ -244,7 +244,9 @@ void GetCurveAndLines2(Point3f a, Point3f b, Point3f c, PathSegment* line1, Path
     *line2 = MakeLine(b2, c, (*segNum)++);
 }
 
+/*
 // this was designed for use in the insertTurns function
+// uses shady vectors and appears to be wrongish
 void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
     cout << "shady vector getcurveandlines\n";
@@ -273,14 +275,10 @@ void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, 
 		(*SegNum)++;
 	}
 }
+*/
 
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
-// the pattern (line, turn, line, line, turn, line ...) note that any two adjacent lines 
-// are parallel and connect at start and end points to essentially make a single larger line segment.  
-
-// this function was merged with parts of the bug algorithm because we only needed the special 
-// cases of 90 and 45 degree turns. in the future, this will be included because it is much more 
-// generically written
+// the pattern (line, turn, line, line, turn, line ...)
 PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 {
     int pointListSize = pointCloud.points.size();
@@ -298,7 +296,7 @@ PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 	Point3f A, B, C; //points A,B,C for the line turn line pattern
 	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
 
-	for (int i = 0; i<pointListSize-2; i++) // uhh.. minus 3?
+	for (int i = 0; i<pointListSize-2; i++)
 	{
 		A = PointList[i];  //copy to temp variables for readability
 		B = PointList[i+1];
@@ -456,17 +454,13 @@ int main(int argc,char **argv)
         
         // let's make some fake points for a path WOO
         sensor_msgs::PointCloud pointList;
-        
-        // try a square?
-        double last_x = 0.0;
-        double last_y = 0.0;
         double offset = 50.0; // padding
         for (int i=0; i < 4; i++)
         {
             geometry_msgs::Point32 p;
-            p.x = (last_x + i/2)*50 + offset;
-            //p.y = (last_y + (i+1)/2)*50 + offset;
-            p.y = (last_y + i)*50;
+            p.x = (i/2)*50 + offset;
+            //p.y = ((i+1)/2)*50 + offset;
+            p.y = i*50 + offset;
             p.z = 0.0;
             pointList.points.push_back(p);
             cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
@@ -501,7 +495,7 @@ int main(int argc,char **argv)
 	                refpt.y = seg.ref_point.y;
 	                line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
 	                cout << "hey I made a line\n";
-	                cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<"\n";
+	                cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
 	                break;
                 }
                 case 2: // arc
@@ -513,18 +507,6 @@ int main(int argc,char **argv)
 	                
 	                Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
 	                
-	                cout << "makin a ellipse\n";
-	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
-	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
-	                
-                    /*
-                    // from dpcrawler
-                    if (desState.des_rho >= 0) {
-                        theta = psiDes - PI/2;
-                    } else { // right hand
-                        theta = psiDes + PI/2;
-                    }*/
-                    
                     double angle1 = angle;
                     double angle2;
                     if (seg.curvature >= 0) { // left
@@ -534,7 +516,12 @@ int main(int argc,char **argv)
                         cout << "ellipse turns right woo\n";
                         angle2 = angle-seg.seg_length*180/PI;
                     }
-                
+                    
+                    cout << "makin a ellipse\n";
+	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
+	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
+                    cout << "angles="<<angle1<<" to "<<angle2<<"\n";
+                    
 	                // Not sure if the angles are measured the same
                     ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
                     cout << "yay i maded oen\n";
@@ -542,8 +529,6 @@ int main(int argc,char **argv)
                 }
 	        }
     	}
-	    
-	    //ellipse(img, Point(100, 100), Size(100, 100), 0.0, 0.0, 45, Scalar(200, 200, 0), 1, CV_AA);
 	    
 	    imshow("path", img);
 	    waitKey(-1);
