@@ -465,8 +465,8 @@ int main(int argc,char **argv)
         {
             geometry_msgs::Point32 p;
             p.x = (last_x + i/2)*50 + offset;
-            p.y = (last_y + (i+1)/2)*50 + offset;
-            //p.y = (last_y + i)*10;
+            //p.y = (last_y + (i+1)/2)*50 + offset;
+            p.y = (last_y + i)*50;
             p.z = 0.0;
             pointList.points.push_back(p);
             cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
