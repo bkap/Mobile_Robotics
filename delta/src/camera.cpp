@@ -28,9 +28,10 @@ tf::TransformListener *tfl;
 class DemoNode {
 	public:
 		DemoNode();
-		void publishNavLoc(vector<Point2i> NavPoints);
+		void publishNavLoc(list<Point2i> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
+		vector<geometry_msgs::Point32> transformPts(list<Point2i> NavPoints);
 		ros::NodeHandle nh_; // Made this public to access it
 	private:
 		image_transport::ImageTransport it_;
@@ -44,21 +45,21 @@ class DemoNode {
 		Mat_<double> projector;
 };
 
-vector<geometry_msgs::Point32> transformPts(vector<Point2i> NavPoints)
+vector<geometry_msgs::Point32> DemoNode::transformPts(list<Point2i> NavPoints)
 {
 	vector<geometry_msgs::Point32> result; 
 	geometry_msgs::Point32 temp;
-	Point3d V;
+	Vec3d V;
 	
-	for(vector<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
+	for(list<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
 	{
-		V.x = it->x;
-		V.y = it->y;
-		V.z = 0;
+		V[0] = it->x;
+		V[1] = it->y;
+		V[2] = 0;
 		
 		V = projector*V;
-		temp.x = V.x;
-		temp.y = V.y;
+		temp.x = V[0];
+		temp.y = V[1];
 		temp.z = 0;
 		cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
 		result.push_back(temp);
@@ -68,7 +69,7 @@ vector<geometry_msgs::Point32> transformPts(vector<Point2i> NavPoints)
 }
 
 //call this with a point32 to publish the blob's location
-void DemoNode::publishNavLoc(vector<Point2i> NavPoints)
+void DemoNode::publishNavLoc(list<Point2i> NavPoints)
 {
   // Convert into geometry points, and transform from pixel to robot coordinates
 	NavPts.points = transformPts(NavPoints);
@@ -137,11 +138,11 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   try
   {
     image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
-    vector<vec4i> vickyTheVector;
+    vector<Vec4i> vickyTheVector;
     getOrangeLines(image, vickyTheVector);
-    vector<Point2i> PointList = linesToNastyPolyLine(vickyTheVector);
+    list<Point2i> PointList = linesToNastyPolyLine(vickyTheVector);
     PointList = cleanNastyPolyLine(PointList, 5);
-    pub_nav_pts(PointList);
+    this->publishNavLoc(PointList);
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
