@@ -12,13 +12,10 @@
 #include <math.h>
 #include <iostream>		
 #include "CSpaceFuncs.h"
-
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/core/core.hpp"
 #define pi 3.14159265358979323846264338327950288
-
-
 
 /*TODO
 	tie grid position to pose
@@ -214,7 +211,6 @@ int main(int argc,char **argv)
 
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
-	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud",20, cloudCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);

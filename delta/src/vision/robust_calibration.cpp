@@ -13,10 +13,13 @@
 using namespace cv;
 using namespace std;
 
+
+#define PRECAL 1
+
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
 Point2f lastValidLIDARPoint; //set this the x,y coordinate of any rod found
-vector<Point3f> LIDARPoints; //aggregator for rod points
+vector<Point2f> LIDARPoints; //aggregator for rod points
 vector<Point2f> imagePoints; //aggregator for image points
 Mat cameraMat; //intrinsic parameters
 Mat distMat; //distortion parameters
@@ -43,14 +46,55 @@ DemoNode::DemoNode():
   sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);  
   sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
   image_pub_ = it_.advertise("demo_image", 1);
+  cameraMat = (Mat_<float>(3,3) << 532.18899999999996, 0.0, 330.678, 0.0, 531.28700000000003, 260.733, 0.0, 0.0, 1.0);
+  if(PRECAL){
+	cameraMat = (Mat_<float>(3,3)<< 6.95737e-05, 0.00189569, 0.462498, 0.00255953, -3.17985e-05, -0.8876, -1.97874e-05, -0.00150113, 1);
+  }
 }
+
+void ReadMat(Mat_<float> *mat, char* file)
+{
+        //cout<<"camout1\n";
+        ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
+        cout << "file opened" << endl;
+        int rows, cols, type;
+        rows = cols = type = 0;
+        (*infile)>>rows;
+//        cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
+        (*infile)>>cols;
+//        cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
+       (*infile)>>cols;
+//        cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
+        (*infile)>>type;
+//        cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
+        //cout<<"camout2\n";
+        *mat = Mat_<float> (rows, cols); 
+        //cout<<"camout3\n";
+        unsigned int i, j;
+        float f;
+        for (i = 0; i < mat->rows; i++)
+        {
+                //fprintf(mfile,"\n");
+                for (j = 0; j < mat->cols; j++)
+                {
+                        (*infile)>>f;
+                        ((*mat)(i,j)) = f;
+                        cout << f << ",";
+                }     
+                cout << endl;
+        }
+        infile->close();
+}
+
+
+
 // Callback for CameraInfo (intrinsic parameters)
 void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
-	const double* K = (msg->K).data();
-	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
-	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
-       cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
+  const double* K = (msg->K).data();
+  const double* D = (msg->D).data();
+  Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
+  Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
+  cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
 }
 
 // Callback triggered whenever you receive a laser scan
@@ -84,44 +128,50 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     num_filtered++;
   }
 
-float rodSepThresh  = 0.4; //min dist of rod from surrounding
-float rodDispThresh = 0.05;//max radial diff between rod points
-float rodWidthThresh= 3;   //max pings of a rod
-float rodDistThresh = 2;   //max distance to rod
-bool maybeRod = false;
-int rodStart = -1;
-float minr = 1000;
-float maxr = 0;
+  float rodSepThresh  = 0.4; //min dist of rod from surrounding
+  float rodDispThresh = 0.05;//max radial diff between rod points
+  float rodWidthThresh= 3;   //max pings of a rod
+  float rodDistThresh = 2;   //max distance to rod
+  bool maybeRod = false;
+  int rodStart = -1;
+  float minr = 1000;
+  float maxr = 0;
 
-last_scan_valid = false;
+  last_scan_valid = false;
 
-for(int i=1;i<num_points-1;i++){
-        if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh){
-            maybeRod = true;
-            rodStart = i;
-            minr = scan.ranges[i];
-            maxr = scan.ranges[i];
-        }
-        if(maybeRod){
-            minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
-            maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
- 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh){
-	         if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh){
-        	     maybeRod = false;
-            	 }
-	         else{
-                    float r = (maxr + minr) / 2;
-		    float t = 3.1415926535 * ( ((float) (rodStart+i))/360.0 -0.5);
-                    last_scan_valid = true;
-                    lastValidLIDARPoint.x = r*cos(t);
-                    lastValidLIDARPoint.y = r*sin(t);
-                    maybeRod = false;
-                    maxr = 0;
-                    minr = 1000;
-		    break;
-            	}
+  for(int i=1;i<num_points-1;i++)
+  {
+    if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh)
+    {
+        maybeRod = true;
+        rodStart = i;
+        minr = scan.ranges[i];
+        maxr = scan.ranges[i];
+    }
+    if(maybeRod)
+    {
+      minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
+      maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
+ 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh)
+      {
+        if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh)
+        {
+  	      maybeRod = false;
+      	}
+        else
+        {
+          float r = (maxr + minr) / 2;
+          float t = 3.1415926535 * ( ((float) (rodStart+i))/360.0 -0.5);
+          last_scan_valid = true;
+          lastValidLIDARPoint.x = r*cos(t);
+          lastValidLIDARPoint.y = r*sin(t);
+          maybeRod = false;
+          maxr = 0;
+          minr = 1000;
+          break;
+      	}
 	    }
-	}
+	  }
  }
 
  ROS_INFO("LIDAR scan received. Smoothed out %d bad points out of %d",num_filtered,num_points);
@@ -152,10 +202,18 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 //	cout<<"\t"<<lastValidLIDARPoint.x<<"\t"<<lastValidLIDARPoint.y<<endl;
 	cout<<"CAMERA PING YAY LOLZ YAY YAY YAY WOOOT WOOOT WOOT !!!!!!!!!!!!111!!!!!!2!!!!!5!!!!ONE\n";
 	imagePoints.push_back(center);
-	LIDARPoints.push_back(Point3f(lastValidLIDARPoint.x,lastValidLIDARPoint.y,0));
+	LIDARPoints.push_back(Point2f(lastValidLIDARPoint.x,lastValidLIDARPoint.y));
     }
  //   cv::imshow("view", output);
  //   findLines(image, output);
+
+    if(PRECAL){
+	Mat_<float> H = cameraMat.clone();
+	//ReadMat(&H,"/home/connor/Code/Mobile_Robotics/delta/H");
+	Mat temp;
+	warpPerspective(image,temp,H,Size(600,600),WARP_INVERSE_MAP);
+	output = temp;
+    }
     IplImage temp = output;
    image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
   }
@@ -164,6 +222,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
   }
 }
+
 
 // from http://blog.weisu.org/2007/11/opencv-print-matrix.html
 
@@ -207,18 +266,6 @@ void PrintMat(CvMat *A, FILE* f=stdout)
     fprintf(f,"\n");
 }
 
-void PrintMat(cv::Mat_<double>* A, FILE* f=stdout)
-{
-    int i, j;
-    for (i = 0; i < A->rows; i++)
-    {
-        fprintf(f,"\n");
-                for (j = 0; j < A->cols; j++)
-                fprintf (f,"%8.6f ",(*A)(i,j));
-    }
-    fprintf(f,"\n");
-}
-
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "eecs376_vision_demo1");
@@ -234,6 +281,18 @@ int main(int argc, char **argv)
   //	ros::spinOnce();
   //}
 	ros::spin();
+	if(PRECAL){
+		return 0;
+	}
+	cout<<"beginning calibration"<<endl;
+	CvMat H = findHomography(Mat(imagePoints),Mat(LIDARPoints),CV_RANSAC);
+	ofstream *R = new ofstream ("/home/connor/Code/Mobile_Robotics/delta/H", ofstream::out&ofstream::binary);
+	SaveMat(&H,R);
+	R->close();
+/*
+
+
+
 	Mat iPoints_ = Mat(imagePoints); //matrix of points in image-space
 	Mat wPoints_ = Mat(LIDARPoints); //matrix of points in world-space
 	iPoints_.convertTo(iPoints_,CV_64F);
@@ -281,17 +340,14 @@ if(imagePoints.size()<20)
 
 	rvec_ = Mat(&rvec);
 	tvec_ = Mat(&tvec);
-	cout<<"Pre-Rodrigues\n";
-	Mat R2;
-	Rodrigues(rvec_, R2);
-	cout<<"Post-Rodrigues\n";
-	R2.col(1) = R2.col(2);
-	R2.col(2) = tvec_;
 
-	cout<<"Projector\n";
-	Mat_<double> projector = Mat_<double>((Mat_<double>(cameraMat) *Mat_<double>( R2)).inv());
-	cout<<"Print Mat\n";
-	PrintMat(&projector);
+	//Mat R;
+	//Rodrigues(rvec_, R);
+	//R.col(1) = R.col(2);
+	//R.col(2) = tvec_;
+
+	//Mat projector = (cameraMat * R).inv();
+*/	
 	/*
 	reverse projection should be robotCoordinateFramePoint = projector * imagePoint
 	(x,y,1) = projector * (u v 1)

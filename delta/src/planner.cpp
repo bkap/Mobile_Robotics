@@ -4,7 +4,11 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <tf/transform_datatypes.h>
-#include<tf/transform_listener.h>
+#include <tf/transform_listener.h>
+#include <image_transport/image_transport.h>
+#include <opencv/cv.h>
+#include <opencv2/core/core.hpp>
+#include <opencv/highgui.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/mat.hpp>
 #include <list>
@@ -13,8 +17,8 @@
 #include <iostream>
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
 #include <visualization_msgs/Marker.h>
-#include "MathyStuff.h"
 #include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 10
@@ -23,8 +27,7 @@
 #define LINE 1
 #define CURVE 2
 #define POINT_TURN 3
-
-#define STD_TURN_RAD .6 //given in the assignment but changed because it seemed to work better
+#define STD_TURN_RAD 6.0//.6 //given in the assignment but changed because it seemed to work better
 
 //define maximum speeds and accelerations
 #define MAX_LINEAR .5
@@ -32,35 +35,71 @@
 #define MAX_LINEAR_ACC .1
 #define MAX_ANGULAR_ACC .1
 
+#define PI 3.141592
+
 //uses some namespaces
 using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
-tf::TransformListener *tfl; //transforms crap into better frames
+tf::TransformListener *tfl;
 
-//converts between the Point3 class and a geometry point for use in messages
-geometry_msgs::Point Point3toGeoPoint (Point3 A)
+int segnum = 0;
+// Point type conversions
+geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
-	geometry_msgs::Point Ref_Point;
-	Ref_Point.x = A.X;
-	Ref_Point.y = A.Y;
-	Ref_Point.z = A.Z;
-	return Ref_Point;
+    geometry_msgs::Point geopt;
+    geopt.x = p3f.x;
+    geopt.y = p3f.y;
+    geopt.z = p3f.z;
+    return geopt;
 }
 
-//makes a line from A to B of a given SegNum
-PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
+Point3f convertGeoPointToPoint3f(geometry_msgs::Point geopt)
+{
+    Point3f p3f;
+    p3f.x = geopt.x;
+    p3f.y = geopt.y;
+    p3f.z = geopt.z;
+    return p3f;
+}
+
+Point3f convertGeoPointToPoint3f(geometry_msgs::Point32 geopt)
+{
+    Point3f p3f;
+    p3f.x = geopt.x;
+    p3f.y = geopt.y;
+    p3f.z = geopt.z;
+    return p3f;
+}
+
+// Get distance between two points
+float getDistance(Point3f A, Point3f B)
+{
+    return sqrt( (A.x-B.x)*(A.x-B.x) + (A.y-B.y)*(A.y-B.y) + (A.z-B.z)*(A.z-B.z) );
+}
+
+// 'Distance' of one point = magnitude of A = distance from origin to A
+float getDistance(Point3f A)
+{
+    return sqrt( A.x*A.x + A.y*A.y + A.z*A.z );
+}
+
+// used in GetCurveAndLines
+float dotProduct(Point3f A, Point3f B)
+{
+    return A.x*B.x + A.y*B.y + A.z*B.z;
+}
+
+// Make a line from A to B
+PathSegment MakeLine(Point3f A, Point3f B, int SegNum)
 {
 	PathSegment P;
 	P.seg_type = LINE;
 	P.seg_number = SegNum;
-	//cout << "makeline" << endl;
-	//cout << A.X << "," << A.Y << ":" << B.X << "," << B.Y << endl;
-	P.seg_length = Distance3(A,B);
-	//cout<< P.seg_length << endl;
-	P.ref_point = Point3toGeoPoint(A);
-	Point3 Vec = B-A;
-	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(Vec.Y, Vec.X));
+	P.seg_length = getDistance(A, B);
+	P.ref_point = convertPoint3fToGeoPoint(A);
+	Point3f vec = B-A;
+	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(vec.y, vec.x));
 	P.curvature = 1337;
 	
 	P.max_speeds.linear.x = MAX_LINEAR*0.5;
@@ -76,12 +115,12 @@ PathSegment MakeLine(Point3 A, Point3 B, int SegNum)  //woot it makes a line
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
-//generate a turn in place given an initial heading, a final heading, and a point to turn on.
-PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs::Point ref_point, int SegNum)
+// Generate a turn in place given an initial heading, a final heading, and a point to turn on.
+PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_point, int SegNum)
 {
 	double theta1 = InitAngle;
 	double theta2 = FinalAngle;
@@ -90,9 +129,9 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
 	P.seg_length = fabs(theta2-theta1); //how much to turn
-	P.ref_point = ref_point; //where to turn
+	P.ref_point = convertPoint3fToGeoPoint(ref_point); //where to turn
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle); //initial heading as a quaternion
-	P.curvature = (FinalAngle>InitAngle)?1:-1;//direction to turn
+	P.curvature = (FinalAngle>InitAngle)?1:-1; //direction to turn
 	
 	P.max_speeds.linear.x = 0;
 	P.max_speeds.linear.y = 0;
@@ -107,40 +146,40 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, geometry_msgs:
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
-//makes a curve again initial and final headings as well as start and end points
-PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A, Point3 B)
+// Make a curve given initial and final headings as well as start and end points
+PathSegment MakeCurve(double InitAngle, double FinalAngle, Point3f A, Point3f B, int SegNum)
 {
-	Point3 M = (A+B)/2.0;  //midpoint
-	Point3 MA = M-A;  //vector from midpoint to A
-	Point3 Center = M - Point3(MA.Y, -MA.X, 0)/tan((FinalAngle-InitAngle)/2.0);//get the center point.  derived using basic trig
-	double Radius = Distance3(A, Center); //this may or may not work
+	Point3f M = (A+B)*(0.5);  //midpoint
+	Point3f MA = M-A;  //vector from midpoint to A
+	Point3f Center = M - Point3f(MA.y, -MA.y, 0)*(1.0/tan((FinalAngle-InitAngle)/2.0)); //get the center point.  derived using basic trig
+	double Radius = getDistance(A, Center); //this may or may not work
 
 	PathSegment P;
 	P.seg_type = CURVE;
 	P.seg_number = SegNum;
 	P.seg_length = FinalAngle-InitAngle;
-		if(P.seg_length > 3.14159) {
+	if(P.seg_length > 3.14159) {
 		P.seg_length -= 2 * 3.14159;
 	} else if(P.seg_length < -3.14159) {
 		P.seg_length += 2 * 3.14159;
 	}
 
-	P.curvature = 1/STD_TURN_RAD;// I know that curvature should be 1/Radius, but that didn't work for some reason so it was overriden
+	P.curvature = 1/STD_TURN_RAD;
+	// I know that curvature should be 1/Radius, but that didn't work for some reason so it was overriden
 	P.curvature *= (P.seg_length>0)?1:-1;
 	P.seg_length = fabs(P.seg_length);
 
 	geometry_msgs::Point gmPoint;
-	gmPoint.x = Center.X;
-	gmPoint.y = Center.Y;
+	gmPoint.x = Center.x;
+	gmPoint.y = Center.y;
 	gmPoint.z = 0.0f;
 	P.ref_point = gmPoint;
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle);
-	
-	
+
 	P.max_speeds.linear.x = MAX_LINEAR;
 	P.max_speeds.linear.y = 0;
 	P.max_speeds.linear.z = 0;
@@ -154,113 +193,163 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, int SegNum, Point3 A,
 	P.min_speeds.angular.x = 0;
 	P.min_speeds.angular.y = 0;
 	P.min_speeds.angular.z = 0;
-	P.accel_limit = MAX_LINEAR_ACC; //dude wtf, why is there just one here?  is it angular or linear?
+	P.accel_limit = MAX_LINEAR_ACC;
 	return P;
 }
 
-//these two functions were used in the GetCurveAndLines routine.  defunct.
-/*
-void MoveBack1(Point3 A, Point3 B, PathSegment* Segment) // moves the start and end points as special cases
+// get the heading based on two points
+double getHeading(Point3f a, Point3f b)
 {
-	A = (A-B)/2.0; //just want the distance from A to the midpoint
-	Segment->ref_point.x += A.X;
-	Segment->ref_point.y += A.Y;
-	Segment->seg_length +=Magnitude3(A);
+    return atan((b.x-a.x)/(b.y-a.y));
 }
 
-void MoveBack2(Point3 A, Point3 B, PathSegment* Segment)
+// Take three points, return a smooth path with an arc by the middle one
+// replacing shady vector math of GetCurveAndLines with slightly less shady trigonometry
+void GetCurveAndLines2(Point3f a, Point3f b, Point3f c, PathSegment* line1, PathSegment* curve, PathSegment* line2, int* segNum)
 {
-	Segment->seg_length +=Magnitude3(B-A)/2.0;
-}/*
+    cout << "\nshady trig getcurveandlines2\n";
+    cout <<"a="<<a.x<<","<<a.y<<", b="<<b.x<<","<<b.y<<", c="<<c.x<<","<<c.y<<"\n";
+    
+    double radius = STD_TURN_RAD; // eh
+    double psi1 = getHeading(a,b);
+    double psi2 = getHeading(b,c);
+    double theta1 = psi1 + PI/2.0; // theta is relative to center of circle
+    double theta2 = psi2 + PI/2.0; // this could be wrong dpdg on curvature check it
+        
+    if (a.x < b.x) // turn left, this is probably completely wrong
+    {
+        cout << "turning left lolz\n";
+        theta1 = psi1 - PI/2.0;
+        theta2 = psi2 - PI/2.0;
+    }
+    // else turn right
+    
+    /*
+    // from dpcrawler
+    if (desState.des_rho >= 0) {
+        theta = psiDes - PI/2;
+    } else { // right hand
+        theta = psiDes + PI/2;
+    }*/
+    double theta = theta2-theta1;
+    double cornerDist = fabs(radius * sin(theta/2) / sin(PI/2 - theta/2));
+    
+    cout <<"psi1="<<psi1<<", psi2="<<psi2<<"\ntheta1="<<theta1<<", theta2="<<theta2<<", theta="<<theta<<"\ncornerdist="<<cornerDist<<"\n";
+    
+    Point3f b1 = Point3f(b.x - cornerDist*sin(psi1), b.y - cornerDist*cos(psi1), 0); // end point of first line
+    Point3f b2 = Point3f(b.x + cornerDist*sin(psi2), b.y + cornerDist*cos(psi2), 0); // start point of second line
+    
+    cout <<"b1="<<b1.x<<","<<b1.y<<"\nb2="<<b2.x<<","<<b2.y<<"\n";
+    
+    *line1 = MakeLine(a, b1, (*segNum)++);
+    *curve = MakeCurve(theta1, theta2, b1, b2, (*segNum)++);
+    *line2 = MakeLine(b2, c, (*segNum)++);
+}
 
-
-//this was designed for use in the insertTurns function.  became defunct when insert turns was merged into planner
-
-/*void GetCurveAndLines( Point3 A, Point3 B, Point3 C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
+/*
+// this was designed for use in the insertTurns function
+// uses shady vectors and appears to be wrongish
+void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
 {
+    cout << "shady vector getcurveandlines\n";
+	//find the points needed to generate 2 lines with a curve in between
+	double Theta = acos(dotProduct(A-B, B-C)/(getDistance(A-B)*getDistance(B-C)));  //implement the math that I did earlier
+	Point3f D = (A+C)*0.5;
+	Point3f Center = B+(D-B)*(1/getDistance(D-B))*(STD_TURN_RAD/acos(tan(Theta/2.0))); //???
+	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)*(1/getDistance(B-A));
 
-	//find the points needed to genereate 2 lines with a curve in between
-	double Theta = Dot3(A-B, B-C)/(Magnitude3(A-B)*Magnitude3(B-C));  //impliment the math that I did earlier
-	Point3 D = (A+C)/2.0;
-	Point3 Center = B+(D-B)/Magnitude3(D-B) * (STD_TURN_RAD/acos(tan(Theta/2.0)));
-	Point3 Bprime = A+Dot3(Center-A,B-A)*(B-A)/Magnitude3(B-A);
-
-	Point3 Bdoubleprime = B+Dot3(Center-C,B-C)*(B-C)/Magnitude3(B-C); //the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3 Midpoint1 = A+(A-B)/2.0;  //midpoints are used in a sec
-	Point3 Midpoint2 = C-(C-B)/2.0;
-	if (Dot3(Midpoint1, B-A)<Dot3(Bprime, B-A)||Dot3(Midpoint2, B-C)<Dot3(Bdoubleprime, B-C))
+	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C));
+	//the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
+	Point3f Midpoint1 = A+(A-B)*0.5;  //midpoints are used in a sec
+	Point3f Midpoint2 = C-(C-B)*0.5;
+	if (dotProduct(Midpoint1, B-A) < dotProduct(Bprime, B-A) || dotProduct(Midpoint2, B-C) < dotProduct(Bdoubleprime, B-C))
 	{
 		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
 		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
-		(*Curve) = MakeTurnInPlace(FirstLine->init_tan_angle, SecondLine->init_tan_angle, SecondLine->ref_point, (*SegNum)++) ;
+		(*Curve) = MakeTurnInPlace(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 	else 
 	{
 		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
 		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
-		(*Curve) = MakeCurve(FirstLine->init_tan_angle, SecondLine->init_tan_angle, FirstLine->ref_point,(*SegNum)++) ;
+		(*Curve) = MakeCurve(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(FirstLine->ref_point), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
 		(*SegNum)++;
 	}
 }
+*/
 
-// this was supposed to take a list of points and turn them into a series of lines and turns, following the pattern (line, turn, line, line, turn, line ...) note that any two adjacent lines are parallel and connect at start and end points to essentially make a single larger line segment.  
+vector<PathSegment> oldPath;
+int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
+	Point3f p = convertGeoPointToPoint3f(oldPath[segnum].ref_point);
+	double tan_angle = tf::getYaw(oldPath[segnum].init_tan_angle);
+	p.x += oldPath[segnum].seg_length * cos(tan_angle);
+	p.y += oldPath[segnum].seg_length * sin(tan_angle);
+    for(int i = 0; i < size; i++) {
+		//threshold = 0.5 meters
+		if(getDistance(p, PointList[i]) > 0.5) {
+			return i;
+		}
+	}
+	return -1;
+}
 
-//this function was merged with parts of the bug algorithm because we only needed the special cases of 90 and 45 degree turns. in the future, this will be included because it is much more generically written
-
-PathList insertTurns(list<Point2d> P)
+bool FirstTime = true;
+// this was supposed to take a list of points and turn them into a series of lines and turns, following 
+// the pattern (line, turn, line, line, turn, line ...)
+PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 {
-	//convert from the list<Point2d> to an array of Point3's
-	Point3* PointList = (Point3*)calloc(sizeof(Point3),P.size());  //this should be the list of points that ben's algorithm puts out
-	int PointListLength = P.size();
-	
-	list<Point2d>::iterator it; 
-	int i = 0;
-	for (it = P.begin(); it!=P.end(); it++)
-	{
-		PointList[i].X = it->x;
-		PointList[i].Y = it->y;
-		PointList[i].Z = 0;
-		i++;
+    int pointListSize = pointCloud.points.size();
+	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),pointCloud.points.size());
+	// convert pointCloud to PointList
+	for (int i=0; i<pointListSize; i++) {
+	    PointList[i] = convertGeoPointToPoint3f(pointCloud.points[i]);
 	}
+PathList ReturnVal; //the path list that we will eventually return
+vector<PathSegment> path; 
+if(FirstTime)
+{
+	FirstTime = false;
 	
-	PathList ReturnVal;//the path list that we will eventually return
-	vector<PathSegment> path = vector<PathSegment>(3*(PointListLength-2));//3(n-2) segments are needed when using the line turn line line turn line pattern
+	path = vector<PathSegment>(pointListSize);
+	
+	for(int i =0; i<pointListSize-1; i++)
+	{
+	     path[i] = MakeLine(PointList[i], PointList[i+1], i);
+	}
+	oldPath = path;
 	ReturnVal.path_list.assign(path.begin(), path.end());
-	//(PathSegment*)malloc(sizeof(PathSegment)*(3*(PointListLength))); //the equation for this comes from the path planner splitting each segment except for the first and last.
-	int SegNum = 0;
-	Point3 A, B, C; //points A,B,C for the line turn line pattern
-	PathSegment FirstLine, Curve, SecondLine; //the path segments we will generate
-
+}
+else
+{
+	//get the first point on the suggested path list which is not too close to the current pose
+	//TODO make this function and get the current segment by subscribing to it
+	int StartIndex = getFirstNotTooClose(segnum, PointList, pointCloud.points.size());
+	if(StartIndex != -1) {
+		
 	
-	for (int i = 0; i<PointListLength-2; i++)
-	{
-		A = PointList[i];  //copy to temp variables for readability
-		B = PointList[i+1];
-		C = PointList[i+2];
-		
-		//from the points (A,B,C), generate (line, turn, line)
-		GetCurveAndLines(A, B, C, &FirstLine, &Curve, &SecondLine, &SegNum);//hand the points A,B,C to the curve maker thing
-		
-		//the first and last line segments need to be special cased.  the move back functions just add to their length 
-		if(i == 0)
+		path = vector<PathSegment>(pointListSize-StartIndex+segnum+1); //the +1 is because segNum's start at 0
+		for(int i = 0; i<segnum+1; i++)
 		{
-			MoveBack1(A,B, &FirstLine);
+			path[i] = oldPath[i];
 		}
-		else if (i == PointListLength-3)
-		{
-			MoveBack2(B,C, &SecondLine);
+		for(int i = 0; i < pointListSize - StartIndex; ++i) {
+	
+		     path[i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
 		}
-		
-		ReturnVal.path_list[3*i] = FirstLine;
-		ReturnVal.path_list[3*i+1] = Curve;
-		ReturnVal.path_list[3*i+2] = SecondLine;
+	} else {
+		path = oldPath;
 	}
+	
+	oldPath = path;
+	ReturnVal.path_list.assign(path.begin(), path.end());
+}
+	
+    free(PointList);	
 	return ReturnVal;//return the pathlist
-}*/
-
-//finds a point along a curve given inital parameters
-Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double change_in_heading, double radius) {
+}
+//finds a point along a curve given initial parameters
+Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
 		if(change_in_heading > 0) {
 			//we are going positive angle, add 90
@@ -268,223 +357,54 @@ Point3 findPointAlongCircle(Point3 startPoint, double initial_heading, double ch
 		} else {
 			heading -= 3.14159/2;
 		}
-		Point3 center = Point3(startPoint.X + cos(heading) * radius, startPoint.Y + sin(heading) * radius,0.0);
+		Point3f center = Point3f(startPoint.x + cos(heading)*radius, startPoint.y + sin(heading)*radius,0.0);
 		//now invert heading and adjust it by by change_in_heading
 		heading = heading - 3.14159 + change_in_heading;
-		return Point3(center.X + cos(heading) * radius, center.Y + sin(heading) * radius, 0.0);
+		return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
 }
-//this isn't really a bug algorithm. It just goes forward, turns right, goes
-//forward, and turns right at the distances given.
-PathList bugAlgorithm(Mat_<bool>* map_p, Point dest, geometry_msgs::PoseStamped start, geometry_msgs::Pose origin) {
-	vector<PathSegment> path;
-	Mat_<bool> map = *map_p;
-	
-	//cout << "\nBUGGY BUGGY goes to " << dest.x << ", " << dest.y;
-	
-	//figure out where we're starting
-	double heading = tf::getYaw(start.pose.orientation);
-	double x = start.pose.position.x;
-	double y = start.pose.position.y;
-	double wallx, wally;
-	bool avoiding = false;
-	bool swerved = false;
-	int segnum = 0;
 
-	//the distances we need to travel
-	double distances[] = {3.15,12.0,-1.0}; // changed last distance from 4.0 to 5.0 to allow for estop hax during demo
-	int i = 0;
-	double distance = distances[0];
-	//this is the location of the last point we were at according to the
-	//current path
-	double old_x, old_y;
-	old_x = x;
-	old_y = y;
-	//keep going until we get close to the destination
-	while((fabs(x - dest.x) > 0.5 || fabs(y - dest.y) > 0.5)) {
-		if(distance < 0.001 && distance > -0.5) { //this way, we keep going ad the end
-			i++;
-			if(i > 3) {
-			//if we finish the path, let's leave
-				break;
-			}
-
-			//we've finished going one segment. Let's turn
-			//first, we get the start point of the curve, which is 1 turn
-			//radius behind the current point
-			double curve_start_x = x - cos(heading) * STD_TURN_RAD;
-			double curve_start_y = y - sin(heading) * STD_TURN_RAD;
-			Point3 start_line;
-			start_line.X = old_x;
-			start_line.Y = old_y;
-			start_line.Z = 0.0;
-			Point3 curve_start;
-			curve_start.X = curve_start_x;
-			curve_start.Y = curve_start_y;
-			curve_start.Z = 0.0;
-			//now we make a line from the previous location to the current
-			//location
-			path.push_back(MakeLine(start_line,curve_start,segnum++));
-			//make a line from the previous point to the start of the curve
-			Point3 curve_end;
-			double oldheading = heading;
-
-			//turn right 90º. If that puts us out of the range ±π, then
-			//add or subtract 2π to bring it back within range.
-			heading -= 3.14159/2;
-			if(heading < -3.14159) {
-				heading += 2 * 3.14159;
-			} else if(heading > 3.14159) {
-				heading -= 2 * 3.14159;
-			}
-			curve_end.X = x + cos(heading) * STD_TURN_RAD;
-			curve_end.Y = y + sin(heading) * STD_TURN_RAD;
-			curve_end.Z = 0.0;
-
-	        //make the curve now
-			path.push_back(MakeCurve(oldheading, heading, segnum++, curve_start, curve_end));
-			x = curve_end.X;
-			y = curve_end.Y;
-			//update the distance we need to travel
-			old_x = x;
-			old_y = y;
-			distance = distances[i]-STD_TURN_RAD;
-		}
-		
-		//move forward one map square 
-		x = x + CSPACE_RESOLUTION * cos(heading);
-		y = y + CSPACE_RESOLUTION * sin(heading);
-		distance -= CSPACE_RESOLUTION;
-		if(distance < -1) {
-			continue;
-		}
-		//if we're avoiding, check stuff 0.6 meters over.
-		//the 0.75 is left over from previous wall-crawling
-		double distance_to_check = 0.25; //avoiding ? 0.6 : 0.75;
-		wallx = x + distance_to_check * cos(heading + 3.14159/2);
-		wally = y + distance_to_check * sin(heading + 3.14159/2);
-		//get the grid cells of the location to check and the possible wall
-		int grid_wall_x = (int)((wallx-origin.position.x)/CSPACE_RESOLUTION);
-		int grid_wall_y = (int)((wally-origin.position.y)/CSPACE_RESOLUTION);
-		int grid_x = (int)((x-origin.position.x)/CSPACE_RESOLUTION);
-		int grid_y = (int)((y-origin.position.y)/CSPACE_RESOLUTION);
-		if(avoiding && !map(grid_wall_x, grid_wall_y)) {
-			cout << "\nPLANNER: CLEAR\n";
-			if(!avoiding) {
-				//this means that we need to turn
-			/*	path.push_back(Point(x,y));
-				//now move us around the circle
-				heading -= 3.14159/2;
-				x += 0.75 * cos(heading);
-				y += 0.75 * sin(heading);
-				distance -= 0.75;
-			*/
-			} else {
-				//this means we need to readjust to go back 2 feet
-				//we have been avoiding, but we no longer need to	
-				//first make the straight line to this point
-				Point3 start = Point3(old_x,old_y,0.0);
-				Point3 endline;
-
-				endline.X = x;
-				endline.Y = y;
-				endline.Z = 0.0;
-				path.push_back(MakeLine(start,endline, segnum++));
-				//path.push_back(Point(x,y));
-				
-				//now we need to make a curve that does a 45 degree arc
-				//we should get halfway to wall
-				Point3 midcurve = findPointAlongCircle(endline, heading, - 3.14159/4.0, STD_TURN_RAD);
-
-				//now make the first curve
-				
-				path.push_back(MakeCurve(heading, heading - 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading-3.14159/4.0,+3.14159/4.0,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading - 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = endcurve.X;
-				y = endcurve.Y;
-				old_x = x;
-				old_y = y;
-				avoiding=false;
-				distance -= 0.6;
-			}
-		} else if(map(grid_x, grid_y) &&!avoiding && !swerved) {
-				swerved = true;
-				cout << "\nPLANNER: oh noes! There's something in the way\n";
-				//Evasive Maneuvers!!!!!
-				Point3 start = Point3(old_x,old_y,0.0);
-				Point3 endline;
-
-				endline.X = x - 1.0 * cos(heading);
-				endline.Y = y - 1.0 * sin(heading);
-				endline.Z = 0.0;
-				//now make a line up to this poing
-				path.push_back(MakeLine(start,endline, segnum++));
-					
-				//now we need to make a curve that does a 45 degree arc
-				//we should get halfway to wall
-				Point3 midcurve = findPointAlongCircle(endline, heading,  +3.14159/4.0, STD_TURN_RAD);
-
-				//now make the first curve
-				
-				path.push_back(MakeCurve(heading, heading + 3.14159/4.0,segnum++, endline, midcurve));
-				Point3 endcurve = findPointAlongCircle(midcurve, heading+3.14159/4.0,-3.14159/4,STD_TURN_RAD);	
-				path.push_back(MakeCurve(heading + 3.14159/4.0, heading, segnum++, midcurve, endcurve));
-				x = endcurve.X + 0.7 * cos(heading);
-				y = endcurve.Y +0.7 * sin(heading);
-				path.push_back(MakeLine(endcurve, Point3(x,y,0.0),segnum++));
-				old_x = x;
-				old_y = y;
-				distance -= 0.7;
-			avoiding = true;
-		} 
-	}
-	PathSegment p = path[path.size()-1];
-	//path.pop_back(); // remove the final curve
-	/*
-	// hax
-	int haxCount = 0;
-	while (p.seg_type == 2) { // REMOVE ALL ARCS
-        cout << "\nBUGGY BUGGLE removing arcs";
-	    p = path[path.size()-1];
-	    path.pop_back();
-	    haxCount++;
-	}
+// Takes the list of points and joins them into lines with orientation, etc
+// Assumes that the points are in order (this should be done in camera)
+PathList joinPoints(sensor_msgs::PointCloud pointList)
+{
+    vector<PathSegment> lines;
     
-	if (haxCount == 2) {
-	// check for planner adding swerves at end and delete
-	    if (path[path.size()-1].seg_type == 1 && path[path.size()-2].seg_type == 2 && path[path.size()-3].seg_type == 3) {
-	        path.pop_back();
-	        path.pop_back();
-	        path.pop_back();
-	        cout << "\nBUGGY BUGFAIL removed a swerve";
-	    }
-	}
-	path.push_back(p);
-	*/
-	cout << "\nBUGGY BUG last curve is type " << (int)path[path.size()-1].seg_type << " and before that is ";
-	cout << (int)path[path.size()-2].seg_type << ", then " << (int)path[path.size()-3].seg_type;
-	
-	// add really short line at end?
-	path.push_back(MakeLine(Point3(old_x,old_y,heading),Point3(x,y,heading),segnum++));
-	PathList pathList;
-	pathList.path_list = path;
-	return pathList;
+    // This is the stupid way - no smooth rotations
+    /*
+    for (int i=0; i<pointList.points.size()-2; i++)
+    {
+        Point3f A = convertGeoPointToPoint3f(pointList.points[i]);
+        Point3f B = convertGeoPointToPoint3f(pointList.points[i+1]);
+        lines.push_back(MakeLine(A, B, i));
+    }
+    */
+    
+    // with smoothing, oh hey, this was already written
+    PathList pathList = insertTurns(pointList);
+    // write mah own
+    //pathList = smoothLine(pointList);
+    return pathList;
 }
 
-
-using namespace std;
+// Begin main loop, callbacks, etc
 
 cv::Mat_<bool> *lastCSpace_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
+
 geometry_msgs::PoseStamped poseDes;
 geometry_msgs::Pose goalPose; 
 geometry_msgs::Pose mapOrigin;
 geometry_msgs::PoseStamped poseActual;
+sensor_msgs::PointCloud pointList;
+
+
 bool LIDARcalled = false;
 bool poseDescalled = false;
 bool goalPosecalled = false;
 bool poseActualcalled = false;
+bool pointListcalled = false;
+
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSpace_Map)
 {
 	//cout << "recieved width: " <<  (*CSpace_Map).info.width<< endl;
@@ -495,7 +415,9 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	mapOrigin = (*CSpace_Map).info.origin;
 	LIDARcalled = true;
 }
-//MOAR CALLBACKS!!!!!!!!!!
+void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
+	segnum = (*crawledState).seg_number+1;
+} 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
 {
@@ -523,89 +445,178 @@ void goalPose_Callback(const geometry_msgs::Pose::ConstPtr& newGoalPose)
 	goalPosecalled = true;
 }
 
-
+void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
+{
+    pointList = *newPointList;
+    pointListcalled = true;
+}
 
 int main(int argc,char **argv)
 {
-	cout<<"3\n";
-	ros::init(argc,argv,"pathPlanner");//name of this node
-	tfl = new tf::TransformListener();
+	cout<<argc<<"=argc, argv's=\n";
+	for (int i=0;i<argc;i++)
+	    cout <<i<<": "<< *argv[i] << "\n";
+    
+    ros::init(argc,argv,"pathPlanner");//name of this node
+    tfl = new tf::TransformListener();
       	double amount_to_change = 0.0;    
       	cout<<"3\n";
-	ros::NodeHandle n;
-	//ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
-	ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
-	ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
-	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback); 
-	//ros::Subscriber sub2 = n.subscribe<cv::Mat>("SONAR_Map", 1, SONAR_Callback); 
-	//ros::Subscriber sub3 = n.subscribe<cv::Mat>("VISION_Map", 1, VISION_Callback); 
-	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
-	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
-	cout<<"3\n";
-	ros::Duration elapsed_time; // define a variable to hold elapsed time
-	ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-	while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-      	cout<<"3\n";
-	ros::Time birthday = ros::Time::now();
-	//desired_pose.header.stamp = birthday;
-	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
-	cout<<"3\n";
-	ROS_INFO("birthday started as %f", birthday.toSec());
-  
-	while (ros::ok()) // do work here
-	{
-	//cout<<"3\n";
-		ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-		ros::Time current_time = ros::Time::now();
-		//desired_pose.header.stamp = current_time;
-		elapsed_time= ros::Time::now()-birthday;
-	//	ROS_INFO("birthday is %f", birthday.toSec());
-	//	ROS_INFO("elapsed time is %f", elapsed_time.toSec());
+    ros::NodeHandle n;
 
-	//cout<<"3\n";
-		if(LIDARcalled && goalPosecalled) {
-			if(!poseDescalled) {
-				//cout<<"yo1\n";
-				//this means we haven't used yet, so use our actual pose
-				poseDes.pose.position.x = 7.57;
-				poseDes.pose.position.y = 14.26;
-				poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
-				//cout<<"yo2\n";
-			}
-		//	list<Point2d> points = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-		//	for(list<Point2d>::iterator it = points.begin(); it != points.end();it++) {
-		//		cout << (*it).x << "," << (*it).y << endl;
-		//	}
-			//PathList turns = insertTurns(points);
-			list<geometry_msgs::Point> points;
-			geometry_msgs::Point p;
-			for(int i=0;i<lastCSpace_Map->size().height; i++)
-			{
-				for(int j =0; j<lastCSpace_Map->size().width; j++)
-				{
-					if((*lastCSpace_Map)(i,j)) {
-						p.x = mapOrigin.position.x+.05*j;
-						p.y = mapOrigin.position.y*.05*i;
-						points.push_back(p); 
-					}
-				}
-			}
-			PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
-			//cout<<"publishing\n";
-			path_pub.publish(turns);
-			//cout<<"3published"<<"\n";	
-		}
-		else
-		{
-			if(!LIDARcalled)cout<<"No LIDAR\n";
-			if(!poseDescalled)cout<<"No poseDes\n";
-			if(!goalPosecalled)cout<<"No goalPose\n";
-			//if(!poseActualcalled)cout<<"No poseActual\n";
-		}
-		naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
-		//thus enforcing that we achieve the desired update rate (10Hz)
-	}
+    ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
+    ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
+    ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
+    ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
+	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
+    // hax to test
+    if (argc >= 2 ){    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
+        cout << "TESTING\n";
+        
+        // let's make some fake points for a path WOO
+        sensor_msgs::PointCloud pointList;
+        double offset = 50.0; // padding
+        for (int i=0; i < 4; i++)
+        {
+            geometry_msgs::Point32 p;
+            p.x = (i/2)*50 + offset;
+            p.y = ((i+1)/2)*50 + offset;
+            //p.y = i*50 + offset;
+            p.z = 0.0;
+            pointList.points.push_back(p);
+            cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
+        }
+	    
+	    PathList turns = joinPoints(pointList);
+	    
+	    // and print them out
+	    cout << "\nPathList!\n";
+	    for (int i=0; i<turns.path_list.size(); i++)
+	    {
+	        cout << turns.path_list[i] << "\n";
+	    }
+	    
+	    cout << "PRETTY PICTURE TIME\n";
+	    // and put a pretty picture
+	    Mat img = Mat::zeros(500, 500, CV_32F);
+	    cvNamedWindow("path");
+	    
+	    // woo get the lines
+	    for (int i=0; i<turns.path_list.size(); i++)
+	    {
+	        PathSegment seg = turns.path_list[i];
+	        switch(seg.seg_type) {
+	            case 1: // line
+	            {
+	                double angle = tf::getYaw(seg.init_tan_angle);
+	                double endx = seg.ref_point.x+seg.seg_length*cos(angle);
+	                double endy = seg.ref_point.y+seg.seg_length*sin(angle);
+	                Point refpt;
+	                refpt.x = seg.ref_point.x;
+	                refpt.y = seg.ref_point.y;
+	                line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
+	                cout << "hey I made a line\n";
+	                cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
+	                break;
+                }
+                case 2: // arc
+                {
+                    double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
+	                Point refpt;
+	                refpt.x = seg.ref_point.x;
+	                refpt.y = seg.ref_point.y;
+	                
+	                Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
+	                
+                    double angle1 = angle;
+                    double angle2;
+                    if (seg.curvature >= 0) { // left
+                        cout << "ellipse turns left woo\n";
+                        angle2 = angle+seg.seg_length*180/PI;
+                    } else { // right
+                        cout << "ellipse turns right woo\n";
+                        angle2 = angle-seg.seg_length*180/PI;
+                    }
+                    
+                    cout << "makin a ellipse\n";
+	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
+	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
+                    cout << "angles="<<angle1<<" to "<<angle2<<"\n";
+                    
+	                // Not sure if the angles are measured the same
+                    ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
+                    cout << "yay i maded oen\n";
+                    break;
+                }
+	        }
+    	}
+	    
+	    imshow("path", img);
+	    waitKey(-1);
+	    cout << "yay pretty pictures\n";
+	    
+    } else {
+	    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
+	    ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
+	
+	    cout<<"3\n";
+	    ros::Duration elapsed_time; // define a variable to hold elapsed time
+	    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+	    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
+          	cout<<"3\n";
+	    ros::Time birthday = ros::Time::now();
+	    //desired_pose.header.stamp = birthday;
+	    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+	    cout<<"3\n";
+	    ROS_INFO("birthday started as %f", birthday.toSec());
+      
+	    while (ros::ok()) // do work here
+	    {
+		    ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
+		    ros::Time current_time = ros::Time::now();
+		    elapsed_time= ros::Time::now()-birthday;
+
+		    if(LIDARcalled && goalPosecalled) {
+			    if(!poseDescalled) {
+				    //this means we haven't used yet, so use our actual pose
+				    poseDes.pose.position.x = 7.57;
+				    poseDes.pose.position.y = 14.26;
+				    poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
+			    }
+		
+			    list<geometry_msgs::Point> points;
+			    geometry_msgs::Point p;
+			    for(int i=0;i<lastCSpace_Map->size().height; i++)
+			    {
+				    for(int j =0; j<lastCSpace_Map->size().width; j++)
+				    {
+					    if((*lastCSpace_Map)(i,j)) {
+						    p.x = mapOrigin.position.x+.05*j;
+						    p.y = mapOrigin.position.y*.05*i;
+						    points.push_back(p); 
+					    }
+				    }
+			    }
+			
+			    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+			    PathList turns = joinPoints(pointList);
+			
+			    PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
+			
+			    cout<<"publishing\n";
+			    path_pub.publish(turns);
+			    cout<<"3published"<<"\n";	
+		    }
+		    else
+		    {
+			    if(!LIDARcalled)cout<<"No LIDAR\n";
+			    if(!poseDescalled)cout<<"No poseDes\n";
+			    if(!goalPosecalled)cout<<"No goalPose\n";
+			    //if(!poseActualcalled)cout<<"No poseActual\n";
+		    }
+		    naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+		    //thus enforcing that we achieve the desired update rate (10Hz)
+	    }
+    }
 	return 0; // this code will only get here if this node was told to shut down, which is
 	// reflected in ros::ok() is false 
 }
