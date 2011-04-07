@@ -468,6 +468,7 @@ int main(int argc,char **argv)
   ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
   ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
   ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
+
   // hax to test
   if (argc >= 2 )
   {    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
@@ -557,25 +558,25 @@ int main(int argc,char **argv)
     cout << "yay pretty pictures\n";
 
   }
+
   else
   {
     ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
     ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
-
-    cout<<"3\n";
     ros::Duration elapsed_time; // define a variable to hold elapsed time
     ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-    cout<<"3\n";
+
+    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // Wait for sim time
+
+
+    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // Wait until you can transform
+
     ros::Time birthday = ros::Time::now();
-    //desired_pose.header.stamp = birthday;
-    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
-    cout<<"3\n";
-    ROS_INFO("birthday started as %f", birthday.toSec());
+    ROS_INFO("Planner started at %f", birthday.toSec());
 
     while (ros::ok()) // do work here
     {
-      ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
+      ros::spinOnce(); // allow subscriber callbacks
       ros::Time current_time = ros::Time::now();
       elapsed_time= ros::Time::now()-birthday;
 
@@ -605,6 +606,7 @@ int main(int argc,char **argv)
         }
 
         //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+
         PathList turns = joinPoints(pointList);
 
         PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
