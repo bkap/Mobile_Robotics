@@ -57,7 +57,7 @@ void PlotMap(list<geometry_msgs::Point> PointsToPlot, ros::Publisher *vis_pub, f
 	marker.scale.x = cubesize;
 	marker.scale.y = cubesize;
 	marker.scale.z = cubesize;
-	marker.color.a = 0.0;
+	marker.color.a = 1.0;
 	marker.color.r =  r;
 	marker.color.g = g;
 	marker.color.b = b;
