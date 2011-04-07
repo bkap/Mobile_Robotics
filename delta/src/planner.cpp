@@ -17,6 +17,7 @@
 #include <iostream>
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
+#include <eecs376_msgs/CrawlerDesiredState.h>
 #include <visualization_msgs/Marker.h>
 #include "CSpaceFuncs.h"
 
@@ -42,6 +43,7 @@ using namespace std;
 using namespace eecs376_msgs;
 tf::TransformListener *tfl;
 
+int segnum = 0;
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -276,7 +278,22 @@ void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, 
 	}
 }
 */
+
 vector<PathSegment> oldPath;
+int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
+	Point3f p = convertGeoPointToPoint3f(oldPath[segnum].ref_point);
+	double tan_angle = tf::getYaw(oldPath[segnum].init_tan_angle);
+	p.x += oldPath[segnum].seg_length * cos(tan_angle);
+	p.y += oldPath[segnum].seg_length * sin(tan_angle);
+    for(int i = 0; i < size; i++) {
+		//threshold = 0.5 meters
+		if(getDistance(p, PointList[i]) > 0.5) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
@@ -307,20 +324,30 @@ else
 {
 	//get the first point on the suggested path list which is not too close to the current pose
 	//TODO make this function and get the current segment by subscribing to it
-	int StartIndex = getFirstNotTooClose(currentPathSeg, PointList);
-	path = vector<PathSegment>(pointListSize-StartIndex+currentPathSeg.segNum+1); //the +1 is because segNum's start at 0
-	for(int i = 0; i<currentPathSeg.segNum+1; i++)
-	{
-		path[i] = oldPath[i];
-	}
-	for(int i = currentPathSeg.segNum+1;
+	int StartIndex = getFirstNotTooClose(segnum, PointList, pointCloud.points.size());
+	if(StartIndex != -1) {
+		
 	
+		path = vector<PathSegment>(pointListSize-StartIndex+segnum+1); //the +1 is because segNum's start at 0
+		for(int i = 0; i<segnum+1; i++)
+		{
+			path[i] = oldPath[i];
+		}
+		for(int i = 0; i < pointListSize - StartIndex; ++i) {
+	
+		     path[i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
+		}
+	} else {
+		path = oldPath;
+	}
+	
+	oldPath = path;
+	ReturnVal.path_list.assign(path.begin(), path.end());
 }
 	
-	
+    free(PointList);	
 	return ReturnVal;//return the pathlist
 }
-
 //finds a point along a curve given initial parameters
 Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double change_in_heading, double radius) {
 		double heading = initial_heading;
@@ -371,6 +398,7 @@ geometry_msgs::Pose mapOrigin;
 geometry_msgs::PoseStamped poseActual;
 sensor_msgs::PointCloud pointList;
 
+
 bool LIDARcalled = false;
 bool poseDescalled = false;
 bool goalPosecalled = false;
@@ -387,7 +415,9 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	mapOrigin = (*CSpace_Map).info.origin;
 	LIDARcalled = true;
 }
-
+void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
+	segnum = (*crawledState).seg_number+1;
+} 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
 {
@@ -437,7 +467,7 @@ int main(int argc,char **argv)
     ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
     ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
     ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
-
+	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
     // hax to test
     if (argc >= 2 ){    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
         cout << "TESTING\n";
