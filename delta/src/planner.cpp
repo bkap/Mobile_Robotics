@@ -453,170 +453,178 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 
 int main(int argc,char **argv)
 {
-	cout<<argc<<"=argc, argv's=\n";
-	for (int i=0;i<argc;i++)
-	    cout <<i<<": "<< *argv[i] << "\n";
-    
-    ros::init(argc,argv,"pathPlanner");//name of this node
-    tfl = new tf::TransformListener();
-      	double amount_to_change = 0.0;    
-      	cout<<"3\n";
-    ros::NodeHandle n;
+  cout<<argc<<"=argc, argv's=\n";
+  for (int i=0;i<argc;i++)
+    cout <<i<<": "<< *argv[i] << "\n";
 
-    ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
-    ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
-    ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
-    ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
-	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
-    // hax to test
-    if (argc >= 2 ){    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
-        cout << "TESTING\n";
-        
-        // let's make some fake points for a path WOO
-        sensor_msgs::PointCloud pointList;
-        double offset = 50.0; // padding
-        for (int i=0; i < 4; i++)
-        {
-            geometry_msgs::Point32 p;
-            p.x = (i/2)*50 + offset;
-            p.y = ((i+1)/2)*50 + offset;
-            //p.y = i*50 + offset;
-            p.z = 0.0;
-            pointList.points.push_back(p);
-            cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
-        }
-	    
-	    PathList turns = joinPoints(pointList);
-	    
-	    // and print them out
-	    cout << "\nPathList!\n";
-	    for (int i=0; i<turns.path_list.size(); i++)
-	    {
-	        cout << turns.path_list[i] << "\n";
-	    }
-	    
-	    cout << "PRETTY PICTURE TIME\n";
-	    // and put a pretty picture
-	    Mat img = Mat::zeros(500, 500, CV_32F);
-	    cvNamedWindow("path");
-	    
-	    // woo get the lines
-	    for (int i=0; i<turns.path_list.size(); i++)
-	    {
-	        PathSegment seg = turns.path_list[i];
-	        switch(seg.seg_type) {
-	            case 1: // line
-	            {
-	                double angle = tf::getYaw(seg.init_tan_angle);
-	                double endx = seg.ref_point.x+seg.seg_length*cos(angle);
-	                double endy = seg.ref_point.y+seg.seg_length*sin(angle);
-	                Point refpt;
-	                refpt.x = seg.ref_point.x;
-	                refpt.y = seg.ref_point.y;
-	                line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
-	                cout << "hey I made a line\n";
-	                cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
-	                break;
-                }
-                case 2: // arc
-                {
-                    double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
-	                Point refpt;
-	                refpt.x = seg.ref_point.x;
-	                refpt.y = seg.ref_point.y;
-	                
-	                Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
-	                
-                    double angle1 = angle;
-                    double angle2;
-                    if (seg.curvature >= 0) { // left
-                        cout << "ellipse turns left woo\n";
-                        angle2 = angle+seg.seg_length*180/PI;
-                    } else { // right
-                        cout << "ellipse turns right woo\n";
-                        angle2 = angle-seg.seg_length*180/PI;
-                    }
-                    
-                    cout << "makin a ellipse\n";
-	                cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
-	                cout << "axes="<<axes.width<<","<<axes.height<<"\n";
-                    cout << "angles="<<angle1<<" to "<<angle2<<"\n";
-                    
-	                // Not sure if the angles are measured the same
-                    ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
-                    cout << "yay i maded oen\n";
-                    break;
-                }
-	        }
-    	}
-	    
-	    imshow("path", img);
-	    waitKey(-1);
-	    cout << "yay pretty pictures\n";
-	    
-    } else {
-	    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
-	    ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
-	
-	    cout<<"3\n";
-	    ros::Duration elapsed_time; // define a variable to hold elapsed time
-	    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-	    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-          	cout<<"3\n";
-	    ros::Time birthday = ros::Time::now();
-	    //desired_pose.header.stamp = birthday;
-	    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
-	    cout<<"3\n";
-	    ROS_INFO("birthday started as %f", birthday.toSec());
-      
-	    while (ros::ok()) // do work here
-	    {
-		    ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-		    ros::Time current_time = ros::Time::now();
-		    elapsed_time= ros::Time::now()-birthday;
+  ros::init(argc,argv,"pathPlanner");//name of this node
+  tfl = new tf::TransformListener();
+  double amount_to_change = 0.0;    
+  cout<<"3\n";
+  ros::NodeHandle n;
 
-		    if(LIDARcalled && goalPosecalled) {
-			    if(!poseDescalled) {
-				    //this means we haven't used yet, so use our actual pose
-				    poseDes.pose.position.x = 7.57;
-				    poseDes.pose.position.y = 14.26;
-				    poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
-			    }
-		
-			    list<geometry_msgs::Point> points;
-			    geometry_msgs::Point p;
-			    for(int i=0;i<lastCSpace_Map->size().height; i++)
-			    {
-				    for(int j =0; j<lastCSpace_Map->size().width; j++)
-				    {
-					    if((*lastCSpace_Map)(i,j)) {
-						    p.x = mapOrigin.position.x+.05*j;
-						    p.y = mapOrigin.position.y*.05*i;
-						    points.push_back(p); 
-					    }
-				    }
-			    }
-			
-			    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			    PathList turns = joinPoints(pointList);
-			
-			    PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
-			
-			    cout<<"publishing\n";
-			    path_pub.publish(turns);
-			    cout<<"3published"<<"\n";	
-		    }
-		    else
-		    {
-			    if(!LIDARcalled)cout<<"No LIDAR\n";
-			    if(!poseDescalled)cout<<"No poseDes\n";
-			    if(!goalPosecalled)cout<<"No goalPose\n";
-			    //if(!poseActualcalled)cout<<"No poseActual\n";
-		    }
-		    naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
-		    //thus enforcing that we achieve the desired update rate (10Hz)
-	    }
+  ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
+  ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
+  ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
+  ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
+  ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
+  // hax to test
+  if (argc >= 2 )
+  {    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
+    cout << "TESTING\n";
+
+    // let's make some fake points for a path WOO
+    sensor_msgs::PointCloud pointList;
+    double offset = 50.0; // padding
+    for (int i=0; i < 4; i++)
+    {
+      geometry_msgs::Point32 p;
+      p.x = (i/2)*50 + offset;
+      p.y = ((i+1)/2)*50 + offset;
+      //p.y = i*50 + offset;
+      p.z = 0.0;
+      pointList.points.push_back(p);
+      cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
     }
-	return 0; // this code will only get here if this node was told to shut down, which is
-	// reflected in ros::ok() is false 
+
+    PathList turns = joinPoints(pointList);
+
+    // and print them out
+    cout << "\nPathList!\n";
+    for (int i=0; i<turns.path_list.size(); i++)
+    {
+      cout << turns.path_list[i] << "\n";
+    }
+
+    cout << "PRETTY PICTURE TIME\n";
+    // and put a pretty picture
+    Mat img = Mat::zeros(500, 500, CV_32F);
+    cvNamedWindow("path");
+
+    // woo get the lines
+    for (int i=0; i<turns.path_list.size(); i++)
+    {
+      PathSegment seg = turns.path_list[i];
+      switch(seg.seg_type)
+      {
+        case 1: // line
+        {
+          double angle = tf::getYaw(seg.init_tan_angle);
+          double endx = seg.ref_point.x+seg.seg_length*cos(angle);
+          double endy = seg.ref_point.y+seg.seg_length*sin(angle);
+          Point refpt;
+          refpt.x = seg.ref_point.x;
+          refpt.y = seg.ref_point.y;
+          line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
+          cout << "hey I made a line\n";
+          cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
+          break;
+        }
+        case 2: // arc
+        {
+          double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
+          Point refpt;
+          refpt.x = seg.ref_point.x;
+          refpt.y = seg.ref_point.y;
+
+          Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
+
+          double angle1 = angle;
+          double angle2;
+          if (seg.curvature >= 0) { // left
+            cout << "ellipse turns left woo\n";
+            angle2 = angle+seg.seg_length*180/PI;
+          } else { // right
+            cout << "ellipse turns right woo\n";
+            angle2 = angle-seg.seg_length*180/PI;
+          }
+
+          cout << "makin a ellipse\n";
+          cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
+          cout << "axes="<<axes.width<<","<<axes.height<<"\n";
+          cout << "angles="<<angle1<<" to "<<angle2<<"\n";
+
+          // Not sure if the angles are measured the same
+          ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
+          cout << "yay i maded oen\n";
+          break;
+        }
+      }
+    }
+
+    imshow("path", img);
+    waitKey(-1);
+    cout << "yay pretty pictures\n";
+
+  }
+  else
+  {
+    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
+    ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
+
+    cout<<"3\n";
+    ros::Duration elapsed_time; // define a variable to hold elapsed time
+    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
+    cout<<"3\n";
+    ros::Time birthday = ros::Time::now();
+    //desired_pose.header.stamp = birthday;
+    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+    cout<<"3\n";
+    ROS_INFO("birthday started as %f", birthday.toSec());
+
+    while (ros::ok()) // do work here
+    {
+      ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
+      ros::Time current_time = ros::Time::now();
+      elapsed_time= ros::Time::now()-birthday;
+
+      if(LIDARcalled && goalPosecalled)
+      {
+        if(!poseDescalled)
+        {
+          //this means we haven't used yet, so use our actual pose
+          poseDes.pose.position.x = 7.57;
+          poseDes.pose.position.y = 14.26;
+          poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
+        }
+
+        list<geometry_msgs::Point> points;
+        geometry_msgs::Point p;
+        for(int i=0;i<lastCSpace_Map->size().height; i++)
+        {
+          for(int j =0; j<lastCSpace_Map->size().width; j++)
+          {
+            if((*lastCSpace_Map)(i,j))
+            {
+              p.x = mapOrigin.position.x+.05*j;
+              p.y = mapOrigin.position.y*.05*i;
+              points.push_back(p); 
+            }
+          }
+        }
+
+        //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+        PathList turns = joinPoints(pointList);
+
+        PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
+
+        cout<<"publishing\n";
+        path_pub.publish(turns);
+        cout<<"3published"<<"\n";	
+      }
+      else
+      {
+        if(!LIDARcalled)cout<<"No LIDAR\n";
+        if(!poseDescalled)cout<<"No poseDes\n";
+        if(!goalPosecalled)cout<<"No goalPose\n";
+        //if(!poseActualcalled)cout<<"No poseActual\n";
+      }
+      naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+      //thus enforcing that we achieve the desired update rate (10Hz)
+    }
+  }
+
+  return 0; // this code will only get here if this node was told to shut down, which is
+  // reflected in ros::ok() is false 
 }
