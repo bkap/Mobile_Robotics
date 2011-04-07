@@ -154,13 +154,21 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     list<Point2d> crtPts = transformPts(imPts); 
     crtPts = linesToNastyPolyLine(crtPts, 0, 0, .3);
     crtPts = cleanNastyPolyLine(crtPts, 5);
+
+    // Spit out the coordinates of the points
+    ROS_INFO("Created a path %d points long",crtPts.size());
+    for( int i=0; i<crtPts.size(); i++ )
+    {
+      ROS_INFO("(%d,%d)",crtPts[i].x,crtPts[i].y);
+    }
+
     if(vickyTheVector.size()==0)
     {
-	this->publishNavLoc(crtPts);
+	    this->publishNavLoc(crtPts);
     }
     else
     {
-	ROS_INFO("CAM: LOLWUT< I DIDN'T SEE ANY LINES!!!!!!\n");
+	    ROS_INFO("Camera: no lines detected\n");
     }
   }
   catch (sensor_msgs::CvBridgeException& e)
