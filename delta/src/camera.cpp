@@ -94,10 +94,9 @@ DemoNode::DemoNode():
   it_(nh_)
 {
   // Read the extrinsic calibration parameters
-	cout << "reading mats" << endl;
 	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
 	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
-	cout << "read mats" << endl;
+	ROS_INFO("Camera got extrinsic calibration");
 
   // Subscribe to the image and camera info
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
@@ -110,9 +109,7 @@ DemoNode::DemoNode():
 	
 	//rvec_ = Mat(&rvec);
 	//tvec_ = Mat(&tvec);
-	cout<<"Pre-Rodrigues\n";
 	Rodrigues(rvec, R2);
-	cout<<"Post-Rodrigues\n";
 	R2.col(1) = R2.col(2);
 	R2.col(2) = tvec;
 
@@ -126,8 +123,6 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
 	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
 	cameraCalled = true;
-	//cout<<"I GOT CAMERA INFO!!!!!!!!!!!!\n";
-	cout<<"Projector\n";
 	projector = Mat_<double>((Mat_<double>(cameraMat) *Mat_<double>( R2)).inv());
 }
 
@@ -210,7 +205,6 @@ void ReadMat(Mat_<float> *mat, char* file)
 	//cout<<"camout4\n";
 	infile->close();
 }
-
 
 int main(int argc, char **argv)
 {
