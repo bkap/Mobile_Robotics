@@ -9,131 +9,73 @@
 using namespace cv;
 using namespace geometry_msgs;
 
-// Opencv kalman filter object
-// Documentation at 
-//http://opencv.willowgarage.com/documentation/cpp/video_motion_analysis_and_object_tracking.html?highlight=kalman#KalmanFilter
-//http://www710.univ-lyon1.fr/~eguillou/documentation/opencv2/classcv_1_1_kalman_filter.html
-KalmanFilter kalman;
-Mat latest_kalman;
+// Two state vectors: one only from open loop odometry, and the other from both odometry and GPS.
+Mat state_odom_only;
+Mat state_inc_GPS;
 
-void initKalmanFilter()
+// TODO: Get correct value for track width
+double TRACK_WIDTH = 0.5;
+// The robot travels this far in between each virtual heading update
+double DIST_BETWEEN_HEADING_UPDATES = 1.0;
+double LOOP_RATE = 10;
+
+// Initializes data
+void initFilters()
 {
-	// Dimensionality of state vector, measurement vector, and control vector
-	int dynam_params = 3;
-  int measure_params = 3;
-  int control_params = 2;
-	kalman = KalmanFilter(dynam_params, measure_params, control_params);
+	// Initialize the state vectors to 3x1 floating point
+	state_odom_only = Mat::zeros(3, 1, CV_32F);
+	state_inc_gps = Mat::zeros(3, 1, CV_32F);
 	
-	/*
-	ROS_INFO("statePre is size [%d,%d]",kalman.statePre.rows,kalman.statePre.cols);
-	ROS_INFO("errorCovPost is size [%d,%d]",kalman.errorCovPost.rows,kalman.errorCovPost.cols);
-	ROS_INFO("measurementMatrix is size [%d,%d]",kalman.measurementMatrix.rows,kalman.measurementMatrix.cols);
-	ROS_INFO("processNoiseCov is size [%d,%d]",kalman.processNoiseCov.rows,kalman.processNoiseCov.cols);
-	ROS_INFO("measurementNoiseCov is size [%d,%d]",kalman.measurementNoiseCov.rows,kalman.measurementNoiseCov.cols);
-	*/
-	
-	// TODO: find out the correct values for the state transition matrix (A)
-	float A[3][3] = {{1, 0, 0},{0, 1, 0},{0, 0, 1}};
-	kalman.transitionMatrix = Mat(3, 3, CV_32F, A);
-	
-	// TODO: find out the correct values for the control matrix (B)
-	float B[3][2] = {{1,0},{0,1},{0,0}};
-	kalman.controlMatrix = Mat(3, 2, CV_32F, B);
-	
-	// TODO: find out the correct values for process noise (Q)
-  setIdentity(kalman.processNoiseCov, Scalar(1e-3));
-  
-	// Initial state vector
-	kalman.statePre = Mat::zeros(3, 1, CV_32F);
-	kalman.statePre.at<float>(0,0)=1;
-	kalman.statePre.at<float>(1,0)=2;
-	kalman.statePre.at<float>(2,0)=3;
-	
-	// A priori error estimate
-	setIdentity(kalman.measurementMatrix, Scalar(1));
-	setIdentity(kalman.processNoiseCov, Scalar(1e-5));
-	setIdentity(kalman.measurementNoiseCov, Scalar(.1));
-	setIdentity(kalman.errorCovPost,3);
-	
-	// Start off the filter by simulating zero input
-	latest_kalman = Mat(kalman.predict(Mat::zeros(2, 1, CV_32F)));
 }
 
-// Corrects the kalman filter with a GPS estimate
-void updateKalmanFilterGPS(geometry_msgs::Pose gps_estimate, double gps_covariance)
+void GPSCallback(/* TODO: arguments */)
 {
-	// Generate the measurement (note heading is not used)
-	Mat measurement = Mat::zeros(3, 1, CV_32F);
-	measurement.at<float>(0,0) = gps_estimate.position.x;
-	measurement.at<float>(1,0) = gps_estimate.position.y;
+	// Calculate the weighting factor for the filter
 	
-	// There is no control input for this measurement
-	kalman.controlMatrix = Mat::zeros(3, 1, CV_32F);
-	
-	// Set the measurement covariance.  The GPS measurement gives an X and a Y coordinate with known variances.  Because the heading is unknown, set it to an arbitrary, large variance.
-	kalman.measurementNoiseCov.at<float>(0,0) = gps_covariance;
-	kalman.measurementNoiseCov.at<float>(1,1) = gps_covariance;
-	kalman.measurementNoiseCov.at<float>(2,2) = 99.9;
-	
-	// Correct the model based on the latest measurement
-	latest_kalman = Mat(kalman.correct(measurement));
+	// Apply the filter to state_inc_GPS
 }
 
-// Updates the kalman filter with an encoder movement
-void updateKalmanFilterEnc(float left_delta, float right_delta)
+void odomCallback(/*TODO: arguments */)
 {
-	ROS_INFO("Encoder update (%f,%f)",left_delta,right_delta);
-	
-	// Assume a constant 5% error in encoder values due to wheel slippage
-	const float ENCODER_ERROR = 0.05;
 
-	// Set the control input
-	float u[2][1] = {{left_delta},{right_delta}};
-	Mat u_mat = Mat(2, 1, CV_32F, u);
+	// Update the state of the robot with the latest odometry
+	state_odom_only = updateState(state_odom_only, s_right, s_left);
+	state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
 	
-	//TODO: Come up with reliable values for the control covariance
-	float var = ENCODER_ERROR * ((float)left_delta + (float)right_delta)/2;
-	kalman.measurementNoiseCov.at<float>(0,0) = var;
-	kalman.measurementNoiseCov.at<float>(1,1) = var;
-	kalman.measurementNoiseCov.at<float>(2,2) = .2;
-	
-	// Predict the next state given the wheel encoder movements
-	latest_kalman = Mat(kalman.predict(u_mat));
+	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
 }
 
-// Returns the pose estimated by the kalman filter
+// Given  a state [x;y;psi] and wheel movements in meters (s_right and s_left) returns a state updated according to the linear system x(k+1) = A*x(k) + B*u(k)
+Mat updateState(Mat state, float s_right, float s_left)
+{
+	// For convenience, grab the current angle
+	double psi = state.at<float>(2,0);
+	
+	// Generate the control matrix B
+	float B_temp[3][2] = {{0.5*cos(psi),0.5*cos(psi)},{0.5*sin(psi),0.5*cos(psi)},{1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH}};
+	Mat B = Mat(3, 2, CV_32F, B);
+	
+	// Generate input vector u
+	float u_temp[2][1] = {{s_right},{s_left}};
+	Mat u = Mat(2, 1, CV_32F, u_temp);
+	
+	// Update the linear system according to the control law (note that A is the identity matrix in this case)
+	Mat new_state = state + B*u;
+	
+	return(new_state);
+}
+
+// Returns the latest pose estimate incorporating both odometry and GPS
 geometry_msgs::Pose getPositionEstimate()
 {
-	Mat state = Mat(latest_kalman);
+	Mat state = Mat(state_inc_gps);
 	
-	// Load the state from the kalman filter
+	// Load the state from the matrix, and return it as a pose
 	geometry_msgs::Pose p;
 	p.position.x = state.at<float>(0,0);
 	p.position.y = state.at<float>(1,0);
 	p.orientation = tf::createQuaternionMsgFromYaw(state.at<float>(2,0));
 	return(p);
-}
-
-// Returns the estimated variance of x and y (assumes they are the same, just returns x)
-float getPositionVariance()
-{
-	return( kalman.errorCovPost.at<float>(0,0) );
-}
-
-// Returns the estimated error in heading
-float getHeadingVariance()
-{
-	return( kalman.errorCovPost.at<float>(2,2) );
-}
-
-// Spits out the kalman filter's estimated position (for debugging)
-void kalmanPrintState()
-{
-	Pose p = getPositionEstimate();
-	float pos_var = getPositionVariance();
-	float head_var = getHeadingVariance();
-	ROS_INFO( "Kalman: (%.2f,%.2f), head:%.2f, pos var:%f, head var:%f",p.position.x, p.position.y, tf::getYaw(p.orientation), pos_var, head_var);
-	
 }
 
 int main(int argc, char **argv)
@@ -142,36 +84,21 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
 	
+	// TODO: Create subscribers for GPS and odom, create publisher for position
+	
+	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
 	
-	initKalmanFilter();
-	ROS_INFO("Kalman filter created");
-	kalmanPrintState();
-	
-	updateKalmanFilterEnc(0,1);
-	kalmanPrintState();
-	
-	updateKalmanFilterEnc(1,1);
-	kalmanPrintState();
 
-	updateKalmanFilterEnc(3,2);
-	kalmanPrintState();
-	
-/*
-	geometry_msgs::Pose p;
-	p.orientation = tf::createQuaternionMsgFromYaw(5.0);
-	p.position.x = 10.0;
-	p.position.y = 10.0;
-	
-	for( int i=0; i<5; i++ )
+
+	ros::Rate loopTimer(LOOP_RATE);
+	while(ros::ok())
 	{
-		updateKalmanFilterGPS(p,2.0);
-		ROS_INFO("Updated with GPS");
-		kalmanPrintState();
+		ros::spinOnce();
+		
+		// TODO: Publish the pose returned by getPositionEstimate
+		
+		loopTimer.sleep();
 	}
-	//ROS_INFO("Done printing");
-*/
-	ros::Rate loopTimer(10);
-	while(ros::ok()){ros::spinOnce();loopTimer.sleep();}
 	return 0;
 }
