@@ -80,8 +80,10 @@ void updateKalmanFilterGPS(geometry_msgs::Pose gps_estimate, double gps_covarian
 }
 
 // Updates the kalman filter with an encoder movement
-void updateKalmanFilterEnc(int left_delta, int right_delta)
+void updateKalmanFilterEnc(float left_delta, float right_delta)
 {
+	ROS_INFO("Encoder update (%f,%f)",left_delta,right_delta);
+	
 	// Assume a constant 5% error in encoder values due to wheel slippage
 	const float ENCODER_ERROR = 0.05;
 
@@ -91,9 +93,9 @@ void updateKalmanFilterEnc(int left_delta, int right_delta)
 	
 	//TODO: Come up with reliable values for the control covariance
 	float var = ENCODER_ERROR * ((float)left_delta + (float)right_delta)/2;
-	kalman.processNoiseCov.at<float>(0,0) = var;
-	kalman.processNoiseCov.at<float>(1,1) = var;
-	kalman.processNoiseCov.at<float>(2,2) = .2;
+	kalman.measurementNoiseCov.at<float>(0,0) = var;
+	kalman.measurementNoiseCov.at<float>(1,1) = var;
+	kalman.measurementNoiseCov.at<float>(2,2) = .2;
 	
 	// Predict the next state given the wheel encoder movements
 	latest_kalman = Mat(kalman.predict(u_mat));
@@ -146,19 +148,20 @@ int main(int argc, char **argv)
 	ROS_INFO("Kalman filter created");
 	kalmanPrintState();
 	
+	updateKalmanFilterEnc(0,1);
+	kalmanPrintState();
+	
 	updateKalmanFilterEnc(1,1);
-	ROS_INFO("Updated with encoders at (1,1)");
 	kalmanPrintState();
 
 	updateKalmanFilterEnc(3,2);
-	ROS_INFO("Updated with encoders (3,2)");
 	kalmanPrintState();
 	
-
+/*
 	geometry_msgs::Pose p;
 	p.orientation = tf::createQuaternionMsgFromYaw(5.0);
-	p.position.x = 11.0;
-	p.position.y = 12.0;
+	p.position.x = 10.0;
+	p.position.y = 10.0;
 	
 	for( int i=0; i<5; i++ )
 	{
@@ -167,7 +170,7 @@ int main(int argc, char **argv)
 		kalmanPrintState();
 	}
 	//ROS_INFO("Done printing");
-
+*/
 	ros::Rate loopTimer(10);
 	while(ros::ok()){ros::spinOnce();loopTimer.sleep();}
 	return 0;
