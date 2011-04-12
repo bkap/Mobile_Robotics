@@ -24,7 +24,7 @@ void initFilters()
 {
 	// Initialize the state vectors to 3x1 floating point
 	state_odom_only = Mat::zeros(3, 1, CV_32F);
-	state_inc_gps = Mat::zeros(3, 1, CV_32F);
+	state_inc_GPS = Mat::zeros(3, 1, CV_32F);
 	
 }
 
@@ -39,8 +39,8 @@ void odomCallback(/*TODO: arguments */)
 {
 
 	// Update the state of the robot with the latest odometry
-	state_odom_only = updateState(state_odom_only, s_right, s_left);
-	state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
+	//state_odom_only = updateState(state_odom_only, s_right, s_left);
+	//state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
 	
 	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
 }
@@ -53,7 +53,7 @@ Mat updateState(Mat state, float s_right, float s_left)
 	
 	// Generate the control matrix B
 	float B_temp[3][2] = {{0.5*cos(psi),0.5*cos(psi)},{0.5*sin(psi),0.5*cos(psi)},{1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH}};
-	Mat B = Mat(3, 2, CV_32F, B);
+	Mat B = Mat(3, 2, CV_32F, B_temp);
 	
 	// Generate input vector u
 	float u_temp[2][1] = {{s_right},{s_left}};
@@ -68,7 +68,7 @@ Mat updateState(Mat state, float s_right, float s_left)
 // Returns the latest pose estimate incorporating both odometry and GPS
 geometry_msgs::Pose getPositionEstimate()
 {
-	Mat state = Mat(state_inc_gps);
+	Mat state = Mat(state_inc_GPS);
 	
 	// Load the state from the matrix, and return it as a pose
 	geometry_msgs::Pose p;
