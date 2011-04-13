@@ -104,6 +104,16 @@ Mat odomUpdateState(Mat state, float s_right, float s_left)
 	return(new_state);
 }
 
+// input is [x,y,heading]
+nav_msgs::Odometry stateToOdom(Mat gpsState)
+{
+	nav_msgs::Odometry odomState;
+	odomState.pose.pose.position.x = gpsState.at<float>(0,0);
+	odomState.pose.pose.position.y = gpsState.at<float>(1,0);
+	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState.at<float>(2,0));
+	return odomState;
+}
+
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
 	//see the cRIOSensors.msg in cwru_semi_stable
@@ -123,7 +133,7 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	if(dist>DIST_THRESHOLD) applyCorrection(state_odom_only, state_inc_GPS);
 
 	// the final output should have this type and call the publish function on pose_pub
-	nav_msgs::Odometry odom = stateToOdom(state_inc_gps); 
+	nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
 	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
 	pose_pub.publish(odom);
 }
