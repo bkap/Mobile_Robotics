@@ -26,6 +26,8 @@ double TRACK_WIDTH = 0.5;
 // The robot travels this far in between each virtual heading update
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
 double LOOP_RATE = 10;
+// Trust the virtual heading sensor this much
+double HEADING_WEIGHT = 0.5;
 
 ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
@@ -44,7 +46,7 @@ void initFilters()
 void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
 	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
-	state_estimate[2] += 0.5 * (theta_gps - theta_squiggle);
+	state_estimate[2] += HEADING_WEIGHT * (theta_gps - theta_squiggle);
 	state_last_fix = state_estimate;
 	state_odom_only = state_estimate;
 }
