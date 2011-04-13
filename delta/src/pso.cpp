@@ -119,6 +119,8 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	int s_right = cRIO->right_wheel_encoder;
 	int s_left = cRIO->left_wheel_encoder;
 
+	// TODO: Convert from encoder ticks to meters
+	
 	// Update the state of the robot with the latest odometry
 	//be aware that these are all ints and need to be converted to sensible units before use.
 	state_odom_only = odomUpdateState(state_odom_only, s_right, s_left);
@@ -158,6 +160,19 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "pso");
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
+	
+	// Load parameters from server
+	if (n.getParam("/pso/heading_weight", HEADING_WEIGHT)){
+		ROS_INFO("PSO: loaded heading_weight=%f", HEADING_WEIGHT);
+	} else{
+		ROS_INFO("PSO: error loading heading_weight");
+	}
+	if (n.getParam("/pso/loop_rate", LOOP_RATE)){ //Frequency of main loop
+		ROS_INFO("PSO: loaded loop_rate=%f", LOOP_RATE);
+	} else{
+		ROS_INFO("PSO: error loading loop_rate");
+	}
+	
 	
 	// TODO: Create subscribers for GPS and odom, create publisher for position
 	
