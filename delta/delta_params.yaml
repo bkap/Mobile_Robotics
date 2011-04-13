@@ -14,3 +14,9 @@ mapper:
 
 crawler:
  REFRESH_RATE: 20
+ dist_threshold: 1.0
+
+pso:
+ heading_weight: 0.5
+ loop_rate: 10
+ dist_threshold: 1.0

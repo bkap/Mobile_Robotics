@@ -10,10 +10,6 @@
 #include <cwru_base/cRIOSensors.h>
 #include<nav_msgs/Odometry.h>
 
-
-
-#define DIST_THRESHOLD 1//meter
-
 using namespace cv;
 using namespace geometry_msgs;
 
@@ -172,10 +168,17 @@ int main(int argc, char **argv)
 	} else{
 		ROS_INFO("PSO: error loading heading_weight");
 	}
+	
 	if (n.getParam("/pso/loop_rate", LOOP_RATE)){ //Frequency of main loop
 		ROS_INFO("PSO: loaded loop_rate=%f", LOOP_RATE);
 	} else{
 		ROS_INFO("PSO: error loading loop_rate");
+	}
+	
+	if (n.getParam("/pso/dist_threshold", DIST_BETWEEN_HEADING_UPDATES)){ //Frequency of main loop
+		ROS_INFO("PSO: loaded dist_threshold=%f", DIST_BETWEEN_HEADING_UPDATES);
+	} else{
+		ROS_INFO("PSO: error loading dist_threshold");
 	}
 	
 	
