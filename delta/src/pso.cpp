@@ -18,9 +18,9 @@ using namespace cv;
 using namespace geometry_msgs;
 
 // Two state vectors: one only from open loop odometry, and the other from both odometry and GPS.
-Mat state_odom_only;
-Mat state_inc_GPS;
-
+Vec3f state_odom_only;
+Vec3f state_inc_GPS;
+Vec3f state_last_fix;	//best-guess state at last heading update
 // TODO: Get correct value for track width
 double TRACK_WIDTH = 0.5;
 // The robot travels this far in between each virtual heading update
@@ -31,20 +31,32 @@ ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
 ros::Subscriber odom_sub;
 
+
 // Initializes data
 void initFilters()
 {
 	// Initialize the state vectors to 3x1 floating point
-	state_odom_only = Mat::zeros(3, 1, CV_32F);
-	state_inc_GPS = Mat::zeros(3, 1, CV_32F);
-	
+	state_odom_only = Vec3f(0,0,0);
+	state_inc_GPS = Vec3f(0,0,0);
+	state_last_fix = Vec3f(0,0,0);
 }
 
-void gpsUpdateState(Mat& state, Mat gpsAllegedState, float alpha)
-{
-	float heading = state.at<float>(2);
-	state = alpha*state+(1-alpha)*gpsAllegedState;
-	state.at<float>(2) = heading;
+void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
+	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
+	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
+	state_estimate[2] += 0.5 * (theta_gps - theta_squiggle);
+	state_last_fix = state_estimate;
+	state_odom_only = state_estimate;
+}
+
+
+void gpsUpdateState(Vec3f gpsFix, float a){
+	gpsFix[2] = (1-a) * state_inc_GPS[2];	//hack to preserve heading
+	Vec3f bestGuess = a * state_inc_GPS + (1-a) * gpsFix;
+	if(norm(bestGuess-state_last_fix)>=DIST_BETWEEN_HEADING_UPDATES && a<1){
+		applyCorrection(bestGuess,gpsFix);
+	}
+	state_inc_GPS = bestGuess;
 }
 
 Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
@@ -59,59 +71,36 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
-	bool goodCoords;
-	if(gps_world_coords->status.status>0) goodCoords = true;
-	else goodCoords = false;
+	bool goodCoords = (gps_world_coords->status.status>0);
 
-	Mat gpsAllegedState = Mat(gpsToReasonableCoords(*gps_world_coords)); //should convert to a reasonable mat in meters
+	Vec3f gpsAllegedState = gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
 
 	// Calculate the weighting factor for the filter
 	//newman said this might be good in class.  
 	//If it isn't, use gps_world_coords.position_covariance, which should be a 9 element 1D array.
-	float alpha;
-	if(goodCoords) alpha = .1; 
-	else alpha = 1;
+	float alpha = goodCoords? 0.9:1;
 	
 	// Apply the filter to state_inc_GPS
-	gpsUpdateState(state_inc_GPS, gpsAllegedState, alpha);
+	gpsUpdateState(gpsAllegedState, alpha);
 	
-}
-// Given  a state [x;y;psi] and wheel movements in meters (s_right and s_left) returns a state updated according to the linear system x(k+1) = A*x(k) + B*u(k)
-Mat odomUpdateState(Mat state, float s_right, float s_left)
-{
-	// For convenience, grab the current angle
-	double psi = state.at<float>(2,0);
-	
-	// Generate the control matrix B
-	float B_temp[3][2];//{{0.5*cos(psi),0.5*cos(psi)},{0.5*sin(psi),0.5*cos(psi)},{1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH}};
-	B_temp[0][0] = 0.5*cos(psi);//are you sure this is right? I didn't pay attention in class, but the 3 cosines of psi make me think it is wrong.  -wes
-	B_temp[0][1] = 0.5f*cos(psi);
-	B_temp[1][0] = 0.5f*sin(psi);
-	B_temp[1][1] = 0.5f*cos(psi);
-	B_temp[2][0] = 1.0f/TRACK_WIDTH;
-	B_temp[2][1] = -1.0f/TRACK_WIDTH;
-	Mat B = Mat(3, 2, CV_32F, B_temp);
-	
-	// Generate input vector u
-	float u_temp[2][1];// = {{s_right},{s_left}};
-	u_temp[0][0] = s_right;
-	u_temp[1][0] = s_left;
-	Mat u = Mat(2, 1, CV_32F, u_temp);
-	
-	// Update the linear system according to the control law (note that A is the identity matrix in this case)
-	Mat new_state = state + B*u;
-	
-	return(new_state);
 }
 
-// input is [x,y,heading]
-nav_msgs::Odometry stateToOdom(Mat gpsState)
+// Given  a state [x;y;psi] and wheel movements in meters (s_right and s_left) returns a state updated according to the linear system x(k+1) = A*x(k) + B*u(k)
+Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 {
-	nav_msgs::Odometry odomState;
-	odomState.pose.pose.position.x = gpsState.at<float>(0,0);
-	odomState.pose.pose.position.y = gpsState.at<float>(1,0);
-	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState.at<float>(2,0));
-	return odomState;
+	// For convenience, grab the current angle
+	double psi = state[2];
+	
+	// Generate the control matrix B
+	Mat B = (Mat_<float>(3,2) << 0.5*cos(psi),0.5*cos(psi),0.5*sin(psi),0.5*sin(psi),1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH);
+	
+	// Generate input vector u
+	Mat u = (Mat_<float>(2,1) << s_right,s_left);
+	// Update the linear system according to the control law (note that A is the identity matrix in this case)
+	Mat_<float> new_state = Mat(state) + B*u;
+	
+	Vec3f newstate(new_state(0),new_state(1),new_state(2));
+	return(newstate);
 }
 
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
@@ -126,16 +115,19 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	state_inc_GPS = odomUpdateState(state_inc_GPS, s_right, s_left);
 	
 	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
-	double x = state_odom_only.at<float>(0,0)-state_inc_GPS.at<float>(0,0);
-	double y = state_odom_only.at<float>(1,0)-state_inc_GPS.at<float>(1,0);
-	double dist = sqrt(x*x+y*y);
-
-	if(dist>DIST_THRESHOLD) applyCorrection(state_odom_only, state_inc_GPS);
 
 	// the final output should have this type and call the publish function on pose_pub
 	nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
 	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
 	pose_pub.publish(odom);
+}
+
+nav_msgs::Odometry stateToOdom(Mat gpsState){
+	nav_msgs::Odometry odomState;
+	odomState.pose.pose.position.x = gpsState.at<float>(0,0);
+	odomState.pose.pose.position.y = gpsState.at<float>(1,0);
+	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState.at<float>(2,0));
+	return odomState;
 }
 
 // Returns the latest pose estimate incorporating both odometry and GPS
