@@ -43,7 +43,8 @@ using namespace std;
 using namespace eecs376_msgs;
 tf::TransformListener *tfl;
 
-int segnum = 0;
+int curSegNum = 0; //crawler tells us where we are
+
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -296,7 +297,8 @@ int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
-// the pattern (line, turn, line, line, turn, line ...)
+// the pattern (line, arc, line, arc, line ...)
+// instead it is doing (line, rotate, line, rotate, line ...)
 PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 {
     int pointListSize = pointCloud.points.size();
@@ -312,32 +314,60 @@ PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 	
 	if(FirstTime) {
 		FirstTime = false;
-		path = vector<PathSegment>(pointListSize);
-	
-		for(int i =0; i<pointListSize-1; i++) {
-			 path[i] = MakeLine(PointList[i], PointList[i+1], i);
+		path = vector<PathSegment>(2*pointListSize);
+		int segNum = 0;
+		for(int i =0; i<pointListSize-2; i++) {
+			path[segNum] = MakeLine(PointList[i], PointList[i+1], segNum++);
+			//cout << "made a line from "<<PointList[i].x<<","<<PointList[i].y<<" to "<<PointList[i+1].x<<","<<PointList[i+1].y<<"\n";
+			
+			// get headings (this is actually the same as in MakeLine)
+			Point3f vec1 = PointList[i+1] - PointList[i];
+			double initAngle = atan2(vec1.y, vec1.x);
+			Point3f vec2 = PointList[i+2] - PointList[i+1];
+			double finalAngle = atan2(vec2.y, vec2.x);
+			
+			path[segNum] = MakeTurnInPlace(initAngle, finalAngle, PointList[i+1], segNum++);
+			//cout << "made a turn in place at"<<PointList[i+1].x<<","<<PointList[i+1].y<<" from "<<initAngle<<" to "<<finalAngle<<"\n";
 		}
+		// add last line segment
+		int i = pointListSize-2;
+		path[segNum] = MakeLine(PointList[i], PointList[i+1], segNum++);
+		//cout << "made last line from "<<PointList[i].x<<","<<PointList[i].y<<" to "<<PointList[i+1].x<<","<<PointList[i+1].y<<"\n";
+		
 		oldPath = path;
 		ReturnVal.path_list.assign(path.begin(), path.end());
 	} else {
 		//get the first point on the suggested path list which is not too close to the current pose
 		//TODO make this function and get the current segment by subscribing to it
-		int StartIndex = getFirstNotTooClose(segnum, PointList, pointCloud.points.size());
+		int StartIndex = getFirstNotTooClose(curSegNum, PointList, pointCloud.points.size());
 		if(StartIndex != -1) {
-			path = vector<PathSegment>(pointListSize-StartIndex+segnum+1); //the +1 is because segNum's start at 0
-			for(int i = 0; i<segnum+1; i++)	{
+			path = vector<PathSegment>(pointListSize-StartIndex+curSegNum+1); //the +1 is because segNum's start at 0
+			
+			// copy old path so crawler doesn't freak out
+			for(int i = 0; i<curSegNum+1; i++)	{
 				path[i] = oldPath[i];
 			}
-			for(int i = 0; i < pointListSize - StartIndex; ++i) {
-				 path[i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
+			
+			// new path timez
+			int newSegNum = curSegNum+1;
+			for(int i = 0; i < pointListSize-StartIndex-1; ++i) {
+				path[newSegNum] = MakeLine(PointList[i], PointList[i+1], newSegNum++);
+			
+				Point3f vec1 = PointList[i+1] - PointList[i];
+				double initAngle = atan2(vec1.y, vec1.x);
+				Point3f vec2 = PointList[i+2] - PointList[i+1];
+				double finalAngle = atan2(vec2.y, vec2.x);
+				path[newSegNum] = MakeTurnInPlace(initAngle, finalAngle, PointList[i+1], newSegNum++);
 			}
+			int i = pointListSize-StartIndex-1;
+			path[newSegNum] = MakeLine(PointList[i], PointList[i+1], newSegNum++);
 		} else {
 			path = oldPath;
 		}
 		oldPath = path;
 		ReturnVal.path_list.assign(path.begin(), path.end());
 	}
-	free(PointList);	
+	free(PointList);
 	return ReturnVal;//return the pathlist
 }
 	
@@ -407,7 +437,7 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	LIDARcalled = true;
 }
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
-	segnum = (*crawledState).seg_number+1;
+	curSegNum = (*crawledState).seg_number+1;
 } 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
