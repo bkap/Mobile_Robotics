@@ -37,7 +37,10 @@ void GPSCallback(/* TODO: arguments */)
 
 void odomCallback(/*TODO: arguments */)
 {
-
+	double s_right, s_left;
+	
+	// TODO: Calculate s_right and s_left, the wheel movements in meters, from odometry.
+	
 	// Update the state of the robot with the latest odometry
 	//state_odom_only = updateState(state_odom_only, s_right, s_left);
 	//state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
