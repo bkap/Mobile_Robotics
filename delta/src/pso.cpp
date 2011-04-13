@@ -26,6 +26,8 @@ double TRACK_WIDTH = 0.56515;
 // The robot travels this far in between each virtual heading update
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
 double LOOP_RATE = 10;
+// Trust the virtual heading sensor this much
+double HEADING_WEIGHT = 0.5;
 
 ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
@@ -52,7 +54,7 @@ nav_msgs::Odometry stateToOdom(Vec3f gpsState){
 void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
 	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
-	state_estimate[2] += 0.5 * (theta_gps - theta_squiggle);
+	state_estimate[2] += HEADING_WEIGHT * (theta_gps - theta_squiggle);
 	state_last_fix = state_estimate;
 	state_odom_only = state_estimate;
 }
@@ -77,6 +79,14 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 }
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
+	double s_right, s_left;
+	
+	// TODO: Calculate s_right and s_left, the wheel movements in meters, from odometry.
+	
+	// Update the state of the robot with the latest odometry
+	//state_odom_only = updateState(state_odom_only, s_right, s_left);
+	//state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
+
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
 	bool goodCoords = (gps_world_coords->status.status>0);
 
