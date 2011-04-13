@@ -43,7 +43,8 @@ using namespace std;
 using namespace eecs376_msgs;
 tf::TransformListener *tfl;
 
-int segnum = 0;
+int curSegNum = 0; //crawler tells us where we are
+
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -296,71 +297,93 @@ int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
-// the pattern (line, turn, line, line, turn, line ...)
+// the pattern (line, arc, line, arc, line ...)
+// instead it is doing (line, rotate, line, rotate, line ...)
 PathList insertTurns(sensor_msgs::PointCloud pointCloud)
 {
     int pointListSize = pointCloud.points.size();
 	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),pointCloud.points.size());
+	
 	// convert pointCloud to PointList
 	for (int i=0; i<pointListSize; i++) {
 	    PointList[i] = convertGeoPointToPoint3f(pointCloud.points[i]);
 	}
-PathList ReturnVal; //the path list that we will eventually return
-vector<PathSegment> path; 
-if(FirstTime)
-{
-	FirstTime = false;
 	
-	path = vector<PathSegment>(pointListSize);
+	PathList ReturnVal; //the path list that we will eventually return
+	vector<PathSegment> path; 
 	
-	for(int i =0; i<pointListSize-1; i++)
-	{
-	     path[i] = MakeLine(PointList[i], PointList[i+1], i);
-	}
-	oldPath = path;
-	ReturnVal.path_list.assign(path.begin(), path.end());
-}
-else
-{
-	//get the first point on the suggested path list which is not too close to the current pose
-	//TODO make this function and get the current segment by subscribing to it
-	int StartIndex = getFirstNotTooClose(segnum, PointList, pointCloud.points.size());
-	if(StartIndex != -1) {
+	if(FirstTime) {
+		FirstTime = false;
+		path = vector<PathSegment>(2*pointListSize);
+		int segNum = 0;
+		for(int i =0; i<pointListSize-2; i++) {
+			path[segNum] = MakeLine(PointList[i], PointList[i+1], segNum++);
+			//cout << "made a line from "<<PointList[i].x<<","<<PointList[i].y<<" to "<<PointList[i+1].x<<","<<PointList[i+1].y<<"\n";
+			
+			// get headings (this is actually the same as in MakeLine)
+			Point3f vec1 = PointList[i+1] - PointList[i];
+			double initAngle = atan2(vec1.y, vec1.x);
+			Point3f vec2 = PointList[i+2] - PointList[i+1];
+			double finalAngle = atan2(vec2.y, vec2.x);
+			
+			path[segNum] = MakeTurnInPlace(initAngle, finalAngle, PointList[i+1], segNum++);
+			//cout << "made a turn in place at"<<PointList[i+1].x<<","<<PointList[i+1].y<<" from "<<initAngle<<" to "<<finalAngle<<"\n";
+		}
+		// add last line segment
+		int i = pointListSize-2;
+		path[segNum] = MakeLine(PointList[i], PointList[i+1], segNum++);
+		//cout << "made last line from "<<PointList[i].x<<","<<PointList[i].y<<" to "<<PointList[i+1].x<<","<<PointList[i+1].y<<"\n";
 		
-	
-		path = vector<PathSegment>(pointListSize-StartIndex+segnum+1); //the +1 is because segNum's start at 0
-		for(int i = 0; i<segnum+1; i++)
-		{
-			path[i] = oldPath[i];
-		}
-		for(int i = 0; i < pointListSize - StartIndex; ++i) {
-	
-		     path[i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
-		}
+		oldPath = path;
+		ReturnVal.path_list.assign(path.begin(), path.end());
 	} else {
-		path = oldPath;
+		//get the first point on the suggested path list which is not too close to the current pose
+		//TODO make this function and get the current segment by subscribing to it
+		int StartIndex = getFirstNotTooClose(curSegNum, PointList, pointCloud.points.size());
+		if(StartIndex != -1) {
+			path = vector<PathSegment>(pointListSize-StartIndex+curSegNum+1); //the +1 is because segNum's start at 0
+			
+			// copy old path so crawler doesn't freak out
+			for(int i = 0; i<curSegNum+1; i++)	{
+				path[i] = oldPath[i];
+			}
+			
+			// new path timez
+			int newSegNum = curSegNum+1;
+			for(int i = 0; i < pointListSize-StartIndex-1; ++i) {
+				path[newSegNum] = MakeLine(PointList[i], PointList[i+1], newSegNum++);
+			
+				Point3f vec1 = PointList[i+1] - PointList[i];
+				double initAngle = atan2(vec1.y, vec1.x);
+				Point3f vec2 = PointList[i+2] - PointList[i+1];
+				double finalAngle = atan2(vec2.y, vec2.x);
+				path[newSegNum] = MakeTurnInPlace(initAngle, finalAngle, PointList[i+1], newSegNum++);
+			}
+			int i = pointListSize-StartIndex-1;
+			path[newSegNum] = MakeLine(PointList[i], PointList[i+1], newSegNum++);
+		} else {
+			path = oldPath;
+		}
+		oldPath = path;
+		ReturnVal.path_list.assign(path.begin(), path.end());
 	}
-	
-	oldPath = path;
-	ReturnVal.path_list.assign(path.begin(), path.end());
-}
-	
-    free(PointList);	
+	free(PointList);
 	return ReturnVal;//return the pathlist
 }
+	
 //finds a point along a curve given initial parameters
 Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double change_in_heading, double radius) {
-		double heading = initial_heading;
-		if(change_in_heading > 0) {
-			//we are going positive angle, add 90
-			heading += 3.14159 / 2;
-		} else {
-			heading -= 3.14159/2;
-		}
-		Point3f center = Point3f(startPoint.x + cos(heading)*radius, startPoint.y + sin(heading)*radius,0.0);
-		//now invert heading and adjust it by by change_in_heading
-		heading = heading - 3.14159 + change_in_heading;
-		return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
+	double heading = initial_heading;
+	if(change_in_heading > 0) {
+		//we are going positive angle, add 90
+		heading += 3.14159 / 2;
+	} else {
+		heading -= 3.14159/2;
+	}
+	Point3f center = Point3f(startPoint.x + cos(heading)*radius, startPoint.y + sin(heading)*radius,0.0);
+	//now invert heading and adjust it by by change_in_heading
+	heading = heading - 3.14159 + change_in_heading;
+	return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
 }
 
 // Takes the list of points and joins them into lines with orientation, etc
@@ -379,10 +402,8 @@ PathList joinPoints(sensor_msgs::PointCloud pointList)
     }
     */
     
-    // with smoothing, oh hey, this was already written
+    // With arcs
     PathList pathList = insertTurns(pointList);
-    // write mah own
-    //pathList = smoothLine(pointList);
     return pathList;
 }
 
@@ -416,7 +437,7 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	LIDARcalled = true;
 }
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
-	segnum = (*crawledState).seg_number+1;
+	curSegNum = (*crawledState).seg_number+1;
 } 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
@@ -453,180 +474,174 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 
 int main(int argc,char **argv)
 {
-  cout<<argc<<"=argc, argv's=\n";
-  for (int i=0;i<argc;i++)
-    cout <<i<<": "<< *argv[i] << "\n";
+	cout<<argc<<"=argc, argv's=\n";
+	for (int i=0;i<argc;i++)
+		cout <<i<<": "<< *argv[i] << "\n";
 
-  ros::init(argc,argv,"pathPlanner");//name of this node
-  tfl = new tf::TransformListener();
-  double amount_to_change = 0.0;    
-  cout<<"3\n";
-  ros::NodeHandle n;
+	ros::init(argc,argv,"pathPlanner");//name of this node
+	tfl = new tf::TransformListener();
+	double amount_to_change = 0.0;    
+	cout<<"3\n";
+	ros::NodeHandle n;
 
-  ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
-  ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
-  ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
-  ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
-  ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
+	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
+	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseDes", 10, poseDes_Callback);
+	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
+	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
+	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
 
-  // hax to test
-  if (argc >= 2 )
-  {    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
-    cout << "TESTING\n";
-
-    // let's make some fake points for a path WOO
+	// hax to test
+	// let's make some fake points for a path WOO
     sensor_msgs::PointCloud pointList;
     double offset = 50.0; // padding
     for (int i=0; i < 4; i++)
     {
-      geometry_msgs::Point32 p;
-      p.x = (i/2)*50 + offset;
-      p.y = ((i+1)/2)*50 + offset;
-      //p.y = i*50 + offset;
-      p.z = 0.0;
-      pointList.points.push_back(p);
-      cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
+		geometry_msgs::Point32 p;
+		p.x = (i/2)*50 + offset;	// 45 degree angles WOO
+		//p.y = ((i+1)/2)*50 + offset;  // 90 degree turns
+		p.y = i*50 + offset;
+		p.z = 0.0;
+		pointList.points.push_back(p);
+		cout << "Point "<<i<<": x="<<p.x<<", y="<<p.y<<"\n";
     }
 
     PathList turns = joinPoints(pointList);
 
-    // and print them out
-    cout << "\nPathList!\n";
-    for (int i=0; i<turns.path_list.size(); i++)
-    {
-      cout << turns.path_list[i] << "\n";
-    }
+	// print out path
+	cout << "\nPathList!\n";
+	for (int i=0; i<turns.path_list.size(); i++)
+	{
+		cout << turns.path_list[i] << "\n";
+	}
 
-    cout << "PRETTY PICTURE TIME\n";
-    // and put a pretty picture
-    Mat img = Mat::zeros(500, 500, CV_32F);
-    cvNamedWindow("path");
+	if (argc >= 2 ) // TURN THIS OFF WHEN TESTING
+	{    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
+    	cout << "PRETTY PICTURE TIME\n";
+		// and put a pretty picture
+		Mat img = Mat::zeros(500, 500, CV_32F);
+		cvNamedWindow("path");
 
-    // woo get the lines
-    for (int i=0; i<turns.path_list.size(); i++)
-    {
-      PathSegment seg = turns.path_list[i];
-      switch(seg.seg_type)
-      {
-        case 1: // line
-        {
-          double angle = tf::getYaw(seg.init_tan_angle);
-          double endx = seg.ref_point.x+seg.seg_length*cos(angle);
-          double endy = seg.ref_point.y+seg.seg_length*sin(angle);
-          Point refpt;
-          refpt.x = seg.ref_point.x;
-          refpt.y = seg.ref_point.y;
-          line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
-          cout << "hey I made a line\n";
-          cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
-          break;
-        }
-        case 2: // arc
-        {
-          double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
-          Point refpt;
-          refpt.x = seg.ref_point.x;
-          refpt.y = seg.ref_point.y;
+		// woo get the lines
+		for (int i=0; i<turns.path_list.size(); i++)
+		{
+			PathSegment seg = turns.path_list[i];
+			switch(seg.seg_type)
+			{
+				case 1: // line
+				{
+					double angle = tf::getYaw(seg.init_tan_angle);
+					double endx = seg.ref_point.x+seg.seg_length*cos(angle);
+					double endy = seg.ref_point.y+seg.seg_length*sin(angle);
+					Point refpt;
+					refpt.x = seg.ref_point.x;
+					refpt.y = seg.ref_point.y;
+					line(img, refpt, Point(endx, endy), Scalar(255, 0, 0), 1, CV_AA);
+					cout << "hey I made a line\n";
+					cout << "start="<<refpt.x<<","<<refpt.y<<", end="<<endx<<","<<endy<<", angle="<<angle<<"\n";
+					break;
+		    	}
+				case 2: // arc
+				{
+					double angle = tf::getYaw(seg.init_tan_angle)*180/PI;
+					Point refpt;
+					refpt.x = seg.ref_point.x;
+					refpt.y = seg.ref_point.y;
 
-          Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
+					Size axes = Size(fabs(1.0/seg.curvature), fabs(1.0/seg.curvature));
 
-          double angle1 = angle;
-          double angle2;
-          if (seg.curvature >= 0) { // left
-            cout << "ellipse turns left woo\n";
-            angle2 = angle+seg.seg_length*180/PI;
-          } else { // right
-            cout << "ellipse turns right woo\n";
-            angle2 = angle-seg.seg_length*180/PI;
-          }
+					double angle1 = angle;
+					double angle2;
+					if (seg.curvature >= 0) { // left
+						cout << "ellipse turns left woo\n";
+						angle2 = angle+seg.seg_length*180/PI;
+					} else { // right
+						cout << "ellipse turns right woo\n";
+						angle2 = angle-seg.seg_length*180/PI;
+					}
 
-          cout << "makin a ellipse\n";
-          cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
-          cout << "axes="<<axes.width<<","<<axes.height<<"\n";
-          cout << "angles="<<angle1<<" to "<<angle2<<"\n";
+					cout << "makin a ellipse\n";
+					cout << "refpt="<<refpt.x<<","<<refpt.y<<"\n";
+					cout << "axes="<<axes.width<<","<<axes.height<<"\n";
+					cout << "angles="<<angle1<<" to "<<angle2<<"\n";
 
-          // Not sure if the angles are measured the same
-          ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
-          cout << "yay i maded oen\n";
-          break;
-        }
-      }
-    }
+					// Not sure if the angles are measured the same
+					ellipse(img, refpt, axes, 90.0, angle1, angle2, Scalar(255, 0, 0), 1, CV_AA, 0);
+					cout << "yay i maded oen\n";
+					break;
+				}
+			}
+		}
+		imshow("path", img);
+		waitKey(-1);
+		cout << "yay pretty pictures\n";
+	}
+	else
+	{
+		ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
+		ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
+		ros::Duration elapsed_time; // define a variable to hold elapsed time
+		ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
 
-    imshow("path", img);
-    waitKey(-1);
-    cout << "yay pretty pictures\n";
-
-  }
-
-  else
-  {
-    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
-    ros::Publisher vis_pub = n.advertise<visualization_msgs::Marker>("visualization_marker",10);
-    ros::Duration elapsed_time; // define a variable to hold elapsed time
-    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-
-    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // Wait for sim time
+		while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // Wait for sim time
 
 
-    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // Wait until you can transform
+		while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // Wait until you can transform
 
-    ros::Time birthday = ros::Time::now();
-    ROS_INFO("Planner started at %f", birthday.toSec());
+		ros::Time birthday = ros::Time::now();
+		ROS_INFO("Planner started at %f", birthday.toSec());
 
-    while (ros::ok()) // do work here
-    {
-      ros::spinOnce(); // allow subscriber callbacks
-      ros::Time current_time = ros::Time::now();
-      elapsed_time= ros::Time::now()-birthday;
+		while (ros::ok()) // do work here
+		{
+			ros::spinOnce(); // allow subscriber callbacks
+			ros::Time current_time = ros::Time::now();
+			elapsed_time= ros::Time::now()-birthday;
 
-      if(LIDARcalled && goalPosecalled)
-      {
-        if(!poseDescalled)
-        {
-          //this means we haven't used yet, so use our actual pose
-          poseDes.pose.position.x = 7.57;
-          poseDes.pose.position.y = 14.26;
-          poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
-        }
+			if(LIDARcalled && goalPosecalled)
+			{
+				if(!poseDescalled)
+				{
+					//this means we haven't used yet, so use our actual pose
+					poseDes.pose.position.x = 7.57;
+					poseDes.pose.position.y = 14.26;
+					poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
+				}
 
-        list<geometry_msgs::Point> points;
-        geometry_msgs::Point p;
-        for(int i=0;i<lastCSpace_Map->size().height; i++)
-        {
-          for(int j =0; j<lastCSpace_Map->size().width; j++)
-          {
-            if((*lastCSpace_Map)(i,j))
-            {
-              p.x = mapOrigin.position.x+.05*j;
-              p.y = mapOrigin.position.y*.05*i;
-              points.push_back(p); 
-            }
-          }
-        }
+				list<geometry_msgs::Point> points;
+				geometry_msgs::Point p;
+				for(int i=0;i<lastCSpace_Map->size().height; i++)
+				{
+					for(int j =0; j<lastCSpace_Map->size().width; j++)
+					{
+						if((*lastCSpace_Map)(i,j))
+						{
+							p.x = mapOrigin.position.x+.05*j;
+							p.y = mapOrigin.position.y*.05*i;
+							points.push_back(p); 
+						}
+					}
+				}
+				
+				//PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 
-        //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+				PathList turns = joinPoints(pointList);
 
-        PathList turns = joinPoints(pointList);
+				PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
 
-        PlotMap(points, &vis_pub, 0.0,1.0,0.0, .05);
-
-        cout<<"publishing\n";
-        path_pub.publish(turns);
-        cout<<"3published"<<"\n";	
-      }
-      else
-      {
-        if(!LIDARcalled)cout<<"No LIDAR\n";
-        if(!poseDescalled)cout<<"No poseDes\n";
-        if(!goalPosecalled)cout<<"No goalPose\n";
-        //if(!poseActualcalled)cout<<"No poseActual\n";
-      }
-      naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
-      //thus enforcing that we achieve the desired update rate (10Hz)
-    }
-  }
-
-  return 0; // this code will only get here if this node was told to shut down, which is
-  // reflected in ros::ok() is false 
+				cout<<"publishing\n";
+				path_pub.publish(turns);
+				cout<<"3published"<<"\n";	
+			}
+			else
+			{
+				if(!LIDARcalled)	cout<<"No LIDAR\n";
+				if(!poseDescalled)	cout<<"No poseDes\n";
+				if(!goalPosecalled)	cout<<"No goalPose\n";
+				//if(!poseActualcalled)	cout<<"No poseActual\n";
+			}
+			naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+			//thus enforcing that we achieve the desired update rate (10Hz)
+		}
+	}
+	return 0; // this code will only get here if this node was told to shut down, which is
+	// reflected in ros::ok() is false 
 }

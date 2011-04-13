@@ -226,10 +226,12 @@ cout<<"I drawed good stuffs\n";
 	 
 	  cout<<it->x<<","<<it->y<<"\n";
   }
-
+ cout << "First part" << endl;
   vector<Point2d> tempVec (PL2.begin(), PL2.end());
-  for(int i =0; i<tempVec.size()-1; i++)
+  cout << tempVec.size() << endl;
+  for(int i =0; i<(int)tempVec.size()-1; i++)
   {
+	cout << "WTF?????" << endl;
 	line(img2, tempVec[i], tempVec[i+1], Scalar(0,greenness,0),3, CV_AA);
 	   greenness = greenness + 255.0/PL2.size();
   }
