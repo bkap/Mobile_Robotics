@@ -33,6 +33,7 @@ rosbuild_add_library(Vision src/vision/cvblob.cpp src/vision/cvaux.cpp src/visio
 
 #rosbuild_add_executable(command_publisher src/command_publisher.cpp)
 rosbuild_add_executable(goalpublisher src/goalpublisher.cpp)
+rosbuild_add_executable(pso src/pso.cpp)
 rosbuild_add_executable(planner src/planner.cpp)
 rosbuild_add_executable(profiler src/profiler.cpp)
 rosbuild_add_executable(mapper src/mapper.cpp)

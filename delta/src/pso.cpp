@@ -10,6 +10,10 @@
 #include <cwru_base/cRIOSensors.h>
 #include<nav_msgs/Odometry.h>
 
+
+
+#define DIST_THRESHOLD 1//meter
+
 using namespace cv;
 using namespace geometry_msgs;
 
@@ -95,8 +99,8 @@ Mat odomUpdateState(Mat state, float s_right, float s_left)
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
 	//see the cRIOSensors.msg in cwru_semi_stable
-	int s_right = cRIO.right_wheel_encoder;
-	int s_left = cRIO.left_wheel_encoder
+	int s_right = cRIO->right_wheel_encoder;
+	int s_left = cRIO->left_wheel_encoder
 
 	// Update the state of the robot with the latest odometry
 	//be aware that these are all ints and need to be converted to sensible units before use.
@@ -108,7 +112,6 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	double y = state_odom_only.at<float>(1,0)-state_inc_GPS.at<float>(1,0);
 	double dist = sqrt(x*x+y*y);
 
-	#define DIST_THRESHOLD 1//meter
 	if(dist>DIST_THRESHOLD) applyCorrection(state_odom_only, state_inc_GPS);
 
 	// the final output should have this type and call the publish function on pose_pub
