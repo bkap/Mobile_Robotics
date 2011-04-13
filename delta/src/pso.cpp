@@ -17,18 +17,22 @@ using namespace geometry_msgs;
 Vec3f state_odom_only;
 Vec3f state_inc_GPS;
 Vec3f state_last_fix;	//best-guess state at last heading update
+
 // TODO: Get correct value for track width
 double TRACK_WIDTH = 0.56515;
+
 // The robot travels this far in between each virtual heading update
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
+
+// Rate (in Hz) of main loop
 double LOOP_RATE = 10;
+
 // Trust the virtual heading sensor this much
 double HEADING_WEIGHT = 0.5;
 
 ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
 ros::Subscriber odom_sub;
-
 
 // Initializes data
 void initFilters()
@@ -180,9 +184,6 @@ int main(int argc, char **argv)
 	} else{
 		ROS_INFO("PSO: error loading dist_threshold");
 	}
-	
-	
-	// TODO: Create subscribers for GPS and odom, create publisher for position
 	
 	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
