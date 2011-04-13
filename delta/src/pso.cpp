@@ -47,14 +47,23 @@ void gpsUpdateState(Mat& state, Mat gpsAllegedState, float alpha)
 	state.at<float>(2) = heading;
 }
 
+Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
+	double x_rad = CV_PI / 180. * (gps_world_coords.latitude - 41.5);
+	double y_rad = CV_PI / 180. * (gps_world_coords.longitude + 81.605); 
+	Vec3f coords;
+	coords[0] = (float)(x_rad * 6378100);
+	coords[1] = (float)(y_rad * 6378100);
+	coords[2] = 0;
+	return coords;
+}
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
 	bool goodCoords;
-	if(gps_world_coords.status.status>0) goodCoords = true;
+	if(gps_world_coords->status.status>0) goodCoords = true;
 	else goodCoords = false;
 
-	Mat gpsAllegedState = gpsToReasonableCoords(gps_world_coords); //should convert to a reasonable mat in meters
+	Mat gpsAllegedState = Mat(gpsToReasonableCoords(*gps_world_coords)); //should convert to a reasonable mat in meters
 
 	// Calculate the weighting factor for the filter
 	//newman said this might be good in class.  
@@ -67,7 +76,6 @@ void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 	gpsUpdateState(state_inc_GPS, gpsAllegedState, alpha);
 	
 }
-
 // Given  a state [x;y;psi] and wheel movements in meters (s_right and s_left) returns a state updated according to the linear system x(k+1) = A*x(k) + B*u(k)
 Mat odomUpdateState(Mat state, float s_right, float s_left)
 {
@@ -76,12 +84,12 @@ Mat odomUpdateState(Mat state, float s_right, float s_left)
 	
 	// Generate the control matrix B
 	float B_temp[3][2];//{{0.5*cos(psi),0.5*cos(psi)},{0.5*sin(psi),0.5*cos(psi)},{1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH}};
-	B_temp[0,0] = 0.5*cos(psi);//are you sure this is right? I didn't pay attention in class, but the 3 cosines of psi make me think it is wrong.  -wes
-	B_temp[0,1] = 0.5*cos(psi);
-	B_temp[1,0] = 0.5*sin(psi);
-	B_temp[1,1] = 0.5*cos(psi);
-	B_temp[2,0] = 1.0/TRACK_WIDTH;
-	B_temp[2,1] = -1.0/TRACK_WIDTH;
+	B_temp[0][0] = 0.5*cos(psi);//are you sure this is right? I didn't pay attention in class, but the 3 cosines of psi make me think it is wrong.  -wes
+	B_temp[0][1] = 0.5f*cos(psi);
+	B_temp[1][0] = 0.5f*sin(psi);
+	B_temp[1][1] = 0.5f*cos(psi);
+	B_temp[2][0] = 1.0f/TRACK_WIDTH;
+	B_temp[2][1] = -1.0f/TRACK_WIDTH;
 	Mat B = Mat(3, 2, CV_32F, B_temp);
 	
 	// Generate input vector u
@@ -100,7 +108,7 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
 	//see the cRIOSensors.msg in cwru_semi_stable
 	int s_right = cRIO->right_wheel_encoder;
-	int s_left = cRIO->left_wheel_encoder
+	int s_left = cRIO->left_wheel_encoder;
 
 	// Update the state of the robot with the latest odometry
 	//be aware that these are all ints and need to be converted to sensible units before use.
@@ -115,7 +123,7 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	if(dist>DIST_THRESHOLD) applyCorrection(state_odom_only, state_inc_GPS);
 
 	// the final output should have this type and call the publish function on pose_pub
-	nav_msgs::odometry odom = stateToOdom(state_inc_gps); 
+	nav_msgs::Odometry odom = stateToOdom(state_inc_gps); 
 	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
 	pose_pub.publish(odom);
 }
