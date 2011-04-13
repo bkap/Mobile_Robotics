@@ -22,7 +22,7 @@ Vec3f state_odom_only;
 Vec3f state_inc_GPS;
 Vec3f state_last_fix;	//best-guess state at last heading update
 // TODO: Get correct value for track width
-double TRACK_WIDTH = 0.5;
+double TRACK_WIDTH = 0.56515;
 // The robot travels this far in between each virtual heading update
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
 double LOOP_RATE = 10;
@@ -39,6 +39,14 @@ void initFilters()
 	state_odom_only = Vec3f(0,0,0);
 	state_inc_GPS = Vec3f(0,0,0);
 	state_last_fix = Vec3f(0,0,0);
+}
+
+nav_msgs::Odometry stateToOdom(Vec3f gpsState){
+	nav_msgs::Odometry odomState;
+	odomState.pose.pose.position.x = gpsState[0];
+	odomState.pose.pose.position.y = gpsState[1];
+	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState[2]);
+	return odomState;
 }
 
 void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
@@ -60,12 +68,11 @@ void gpsUpdateState(Vec3f gpsFix, float a){
 }
 
 Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
-	double x_rad = CV_PI / 180. * (gps_world_coords.latitude - 41.5);
-	double y_rad = CV_PI / 180. * (gps_world_coords.longitude + 81.605); 
-	Vec3f coords;
-	coords[0] = (float)(x_rad * 6378100);
-	coords[1] = (float)(y_rad * 6378100);
-	coords[2] = 0;
+	double x = (gps_world_coords.latitude - 41.5);
+	double y = (gps_world_coords.longitude + 81.605); 
+	Vec3f coords(x * 111090.0,
+		     y * 81968.0,
+		     0);
 	return coords;
 }
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
@@ -106,13 +113,19 @@ Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
 	//see the cRIOSensors.msg in cwru_semi_stable
-	int s_right = cRIO->right_wheel_encoder;
-	int s_left = cRIO->left_wheel_encoder;
+	static int s_right_prev = cRIO->right_wheel_encoder;
+	static int s_left_prev = cRIO->left_wheel_encoder;
+	float ds_left = (cRIO->left_wheel_encoder - s_left_prev) * 0.0006656;	//into meters
+	float ds_right = (cRIO->right_wheel_encoder - s_right_prev)* 0.00070311;//into meters
+
+	s_right_prev = cRIO->right_wheel_encoder;
+	s_left_prev  = cRIO->left_wheel_encoder;
+	
 
 	// Update the state of the robot with the latest odometry
 	//be aware that these are all ints and need to be converted to sensible units before use.
-	state_odom_only = odomUpdateState(state_odom_only, s_right, s_left);
-	state_inc_GPS = odomUpdateState(state_inc_GPS, s_right, s_left);
+	state_odom_only = odomUpdateState(state_odom_only, ds_right, ds_left);
+	state_inc_GPS = odomUpdateState(state_inc_GPS, ds_right, ds_left);
 	
 	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
 
@@ -120,14 +133,6 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
 	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
 	pose_pub.publish(odom);
-}
-
-nav_msgs::Odometry stateToOdom(Mat gpsState){
-	nav_msgs::Odometry odomState;
-	odomState.pose.pose.position.x = gpsState.at<float>(0,0);
-	odomState.pose.pose.position.y = gpsState.at<float>(1,0);
-	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState.at<float>(2,0));
-	return odomState;
 }
 
 // Returns the latest pose estimate incorporating both odometry and GPS
