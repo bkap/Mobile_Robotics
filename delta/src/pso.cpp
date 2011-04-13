@@ -5,6 +5,10 @@
 #include <tf/transform_listener.h>
 #include <math.h>
 #include <opencv/cv.h>
+#include <cwru_base/NavSatFix.h>
+#include <cwru_base/NavSatStatus.h>
+#include <cwru_base/cRIOSensors.h>
+#include<nav_msgs/Odometry.h>
 
 using namespace cv;
 using namespace geometry_msgs;
@@ -19,6 +23,10 @@ double TRACK_WIDTH = 0.5;
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
 double LOOP_RATE = 10;
 
+ros::Publisher pose_pub;
+ros::Subscriber gps_sub;
+ros::Subscriber odom_sub;
+
 // Initializes data
 void initFilters()
 {
@@ -28,21 +36,46 @@ void initFilters()
 	
 }
 
-void GPSCallback(/* TODO: arguments */)
+void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
+	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
+	bool goodCoords;
+	if(gps_world_coords.status.status>0) goodCoords = true;
+	else goodCoords = false;
+
+	Mat allegedCoords = gpsToReasonableCoords(gps_world_coords); //should convert to a reasonable mat in meters
+
 	// Calculate the weighting factor for the filter
+	//newman said this might be good in class.  
+	//If it isn't, use gps_world_coords.position_covariance, which should be a 9 element 1D array.
+	float alpha;
+	if(goodCoords) alpha = .9; 
+	else alpha = 0;
 	
 	// Apply the filter to state_inc_GPS
+	
 }
 
-void odomCallback(/*TODO: arguments */)
+void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
+	//see the cRIOSensors.msg in cwru_semi_stable
+	int s_right = cRIO.right_wheel_encoder;
+	int s_left = cRIO.left_wheel_encoder;
+	int yaw_rate = cRIO.yaw_rate;
+
 
 	// Update the state of the robot with the latest odometry
-	//state_odom_only = updateState(state_odom_only, s_right, s_left);
-	//state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
+	//I added yaw rate, but that may or may not be what you actuall need.
+	//be aware that these are all ints and need to be converted to sensible units before use.
+	state_odom_only = updateState(state_odom_only, s_right, s_left, yaw_rate);
+	state_inc_GPS = updateState(state_inc_GPS, s_right, s_left, yaw_rate);
 	
 	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
+
+	// the final output should have this type and call the publish function on pose_pub
+	nav_msgs::odometry odom; 
+	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
+	pose_pub.publish(odom);
 }
 
 // Given  a state [x;y;psi] and wheel movements in meters (s_right and s_left) returns a state updated according to the linear system x(k+1) = A*x(k) + B*u(k)
@@ -89,7 +122,9 @@ int main(int argc, char **argv)
 	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
 	
-
+	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
+	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
+	pose_pub = n.advertise<nav_msgs::Odometry>("odom", 1);
 
 	ros::Rate loopTimer(LOOP_RATE);
 	while(ros::ok())
