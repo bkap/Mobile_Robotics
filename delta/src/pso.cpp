@@ -48,6 +48,7 @@ nav_msgs::Odometry stateToOdom(Vec3f gpsState){
 	odomState.pose.pose.position.x = gpsState[0];
 	odomState.pose.pose.position.y = gpsState[1];
 	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState[2]);
+	odomState.header.frame = "map";
 	return odomState;
 }
 
@@ -63,7 +64,11 @@ void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 void gpsUpdateState(Vec3f gpsFix, float a){
 	gpsFix[2] = (1-a) * state_inc_GPS[2];	//hack to preserve heading
 	Vec3f bestGuess = a * state_inc_GPS + (1-a) * gpsFix;
-	if(norm(bestGuess-state_last_fix)>=DIST_BETWEEN_HEADING_UPDATES && a<1){
+
+	double x = (bestGuess[0]-state_last_fix[0]);
+	double y = (bestGuess[1]-state_last_fix[1]);
+
+	if(sqrt(x*x+y*y)>=DIST_BETWEEN_HEADING_UPDATES && a<1){
 		applyCorrection(bestGuess,gpsFix);
 	}
 	state_inc_GPS = bestGuess;
@@ -79,13 +84,6 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 }
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
-	double s_right, s_left;
-	
-	// TODO: Calculate s_right and s_left, the wheel movements in meters, from odometry.
-	
-	// Update the state of the robot with the latest odometry
-	//state_odom_only = updateState(state_odom_only, s_right, s_left);
-	//state_inc_GPS = updateState(state_inc_GPS, s_right, s_left);
 
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
 	bool goodCoords = (gps_world_coords->status.status>0);
@@ -136,8 +134,6 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	//be aware that these are all ints and need to be converted to sensible units before use.
 	state_odom_only = odomUpdateState(state_odom_only, ds_right, ds_left);
 	state_inc_GPS = odomUpdateState(state_inc_GPS, ds_right, ds_left);
-	
-	// Check if the robot has gone over DIST_BETWEEN_HEADING_UPDATES.  If so, apply heading correction.
 
 	// the final output should have this type and call the publish function on pose_pub
 	nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
