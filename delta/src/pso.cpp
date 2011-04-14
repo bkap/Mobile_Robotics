@@ -10,10 +10,6 @@
 #include <cwru_base/cRIOSensors.h>
 #include<nav_msgs/Odometry.h>
 
-
-
-#define DIST_THRESHOLD 1//meter
-
 using namespace cv;
 using namespace geometry_msgs;
 
@@ -21,18 +17,22 @@ using namespace geometry_msgs;
 Vec3f state_odom_only;
 Vec3f state_inc_GPS;
 Vec3f state_last_fix;	//best-guess state at last heading update
+
 // TODO: Get correct value for track width
 double TRACK_WIDTH = 0.56515;
+
 // The robot travels this far in between each virtual heading update
 double DIST_BETWEEN_HEADING_UPDATES = 1.0;
+
+// Rate (in Hz) of main loop
 double LOOP_RATE = 10;
+
 // Trust the virtual heading sensor this much
 double HEADING_WEIGHT = 0.5;
 
 ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
 ros::Subscriber odom_sub;
-
 
 // Initializes data
 void initFilters()
@@ -130,6 +130,8 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	s_left_prev  = cRIO->left_wheel_encoder;
 	
 
+	// TODO: Convert from encoder ticks to meters
+	
 	// Update the state of the robot with the latest odometry
 	//be aware that these are all ints and need to be converted to sensible units before use.
 	state_odom_only = odomUpdateState(state_odom_only, ds_right, ds_left);
@@ -160,7 +162,24 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
 	
-	// TODO: Create subscribers for GPS and odom, create publisher for position
+	// Load parameters from server
+	if (n.getParam("/pso/heading_weight", HEADING_WEIGHT)){
+		ROS_INFO("PSO: loaded heading_weight=%f", HEADING_WEIGHT);
+	} else{
+		ROS_INFO("PSO: error loading heading_weight");
+	}
+	
+	if (n.getParam("/pso/loop_rate", LOOP_RATE)){ //Frequency of main loop
+		ROS_INFO("PSO: loaded loop_rate=%f", LOOP_RATE);
+	} else{
+		ROS_INFO("PSO: error loading loop_rate");
+	}
+	
+	if (n.getParam("/pso/dist_threshold", DIST_BETWEEN_HEADING_UPDATES)){ //Frequency of main loop
+		ROS_INFO("PSO: loaded dist_threshold=%f", DIST_BETWEEN_HEADING_UPDATES);
+	} else{
+		ROS_INFO("PSO: error loading dist_threshold");
+	}
 	
 	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
@@ -169,12 +188,23 @@ int main(int argc, char **argv)
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<nav_msgs::Odometry>("odom", 1);
 
+	int debug_ctr = 0;
+	geometry_msgs::Pose temp_pose;
+
 	ros::Rate loopTimer(LOOP_RATE);
 	while(ros::ok())
 	{
 		ros::spinOnce();
 		
-		// TODO: Publish the pose returned by getPositionEstimate
+		// Publish the latest pose estimate
+		temp_pose = getPositionEstimate();
+		pose_pub.publish(temp_pose);
+		
+		// Every so often, spit out info for debugging
+		if( debug_ctr++ % 20 == 0 )
+		{
+			ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.position.x,temp_pose.position.y,tf::getYaw(temp_pose.orientation));
+		}
 		
 		loopTimer.sleep();
 	}
