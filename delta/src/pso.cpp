@@ -192,12 +192,23 @@ int main(int argc, char **argv)
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<nav_msgs::Odometry>("odom", 1);
 
+	int debug_ctr = 0;
+	geometry_msgs::Pose temp_pose;
+
 	ros::Rate loopTimer(LOOP_RATE);
 	while(ros::ok())
 	{
 		ros::spinOnce();
 		
-		// TODO: Publish the pose returned by getPositionEstimate
+		// Publish the latest pose estimate
+		temp_pose = getPositionEstimate();
+		pose_pub.publish(temp_pose);
+		
+		// Every so often, spit out info for debugging
+		if( debug_ctr++ % 20 == 0 )
+		{
+			ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.position.x,temp_pose.position.y,tf::getYaw(temp_pose.orientation));
+		}
 		
 		loopTimer.sleep();
 	}
