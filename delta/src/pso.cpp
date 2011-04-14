@@ -81,7 +81,7 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 		     y * 81968.0,
 		     0);
 	return coords;
-}
+} 
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 
