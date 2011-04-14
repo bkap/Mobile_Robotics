@@ -31,25 +31,13 @@ eecs376_msgs::CrawlerDesiredState desired;
 //nav_msgs::Odometry last_odom;
 tf::TransformListener *tfl;
 
-geometry_msgs::PoseStamped temp;
-void PSOCallback(const nav_msgs::Odometry::ConstPtr& odom) 
+//geometry_msgs::PoseStamped temp;
+void PSOCallback(const geometry_msgs::PoseStamped::ConstPtr& poseTemp) 
 {	
-//	cout<<"steering odom callback happened"<<endl;
-//	last_odom = *odom;
-
-	temp.pose = odom->pose.pose;
-	temp.header = odom->header;
-	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
-	try 
-	{
-		tfl->transformPose("map", temp, poseActual);
+		poseActual.pose.position = poseTemp->pose.position;
+		poseActual.pose.orientation = poseTemp->pose.orientation;
+		poseActual.header = poseTemp->header;
 		stalePos = false;
-	} 
-	catch (tf::TransformException ex) 
-	{
-		cout << "We caught an error!" << endl;
-		ROS_ERROR("%s", ex.what());
-	}
 }
 
 void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed) 
@@ -211,7 +199,7 @@ int main(int argc,char **argv)
 
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
 	tfl = new tf::TransformListener();
-	ros::Subscriber sub1 = n.subscribe<nav_msgs::Odometry>("odom", 1, PSOCallback);
+	ros::Subscriber sub1 = n.subscribe<geometry_msgs::PoseStamped>("poseActual", 1, PSOCallback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("NominalSpeed", 1, speedCallback);
 
 	geometry_msgs::Twist vel_object;
