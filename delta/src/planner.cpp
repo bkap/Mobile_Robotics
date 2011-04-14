@@ -30,10 +30,10 @@
 #define STD_TURN_RAD 6.0//.6 //given in the assignment but changed because it seemed to work better
 
 //define maximum speeds and accelerations
-#define MAX_LINEAR .5
+#define MAX_LINEAR .3
 #define MAX_ANGULAR .5
-#define MAX_LINEAR_ACC .1
-#define MAX_ANGULAR_ACC .1
+#define MAX_LINEAR_ACC .5
+#define MAX_ANGULAR_ACC .5
 
 #define PI 3.141592
 
@@ -317,6 +317,7 @@ if(FirstTime)
 	{
 	     path[i] = MakeLine(PointList[i], PointList[i+1], i);
 	}
+	path.pop_back();
 	oldPath = path;
 	ReturnVal.path_list.assign(path.begin(), path.end());
 }
@@ -340,11 +341,10 @@ else
 	} else {
 		path = oldPath;
 	}
-	
+	path.pop_back();
 	oldPath = path;
 	ReturnVal.path_list.assign(path.begin(), path.end());
 }
-	
     free(PointList);	
 	return ReturnVal;//return the pathlist
 }
@@ -469,7 +469,7 @@ int main(int argc,char **argv)
     ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
     // hax to test
-    if (argc >= 2 ){    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
+    if (false && argc >= 2 ){    //&& (*argv[1]).compare("test")==0) { // yeah I don't know how to make that compile
         cout << "TESTING\n";
         
         // let's make some fake points for a path WOO
@@ -575,7 +575,7 @@ int main(int argc,char **argv)
 		    ros::Time current_time = ros::Time::now();
 		    elapsed_time= ros::Time::now()-birthday;
 
-		    if(LIDARcalled && goalPosecalled) {
+		    if(LIDARcalled && goalPosecalled && pointListcalled) {
 			    if(!poseDescalled) {
 				    //this means we haven't used yet, so use our actual pose
 				    poseDes.pose.position.x = 7.57;
@@ -611,6 +611,7 @@ int main(int argc,char **argv)
 			    if(!LIDARcalled)cout<<"No LIDAR\n";
 			    if(!poseDescalled)cout<<"No poseDes\n";
 			    if(!goalPosecalled)cout<<"No goalPose\n";
+			    
 			    //if(!poseActualcalled)cout<<"No poseActual\n";
 		    }
 		    naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period

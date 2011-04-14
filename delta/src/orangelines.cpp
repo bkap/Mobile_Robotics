@@ -130,7 +130,7 @@ void createPathFromPoints(Point2i start, vector<Point2i>& points, vector<Point2i
   approxPolyDP(Mat(pathpoints),pathpoints,10,false);
 
 }
-
+/*
 void getOrangeLines(Mat& img, vector<Vec4i>& lines)
 {
   Mat src = img.clone();
@@ -186,7 +186,7 @@ void getOrangeLines(Mat& img, vector<Vec4i>& lines)
   HoughLinesP(dst, lines, 1, CV_PI/180, 60, 25, 10 );
 }
 
-
+*/
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "CameraNode");
@@ -198,7 +198,7 @@ int main(int argc, char **argv)
   
   // Get lines from the image
   vector<Vec4i> lines;
-  getOrangeLines(img,lines);
+  //getOrangeLines(img,lines);
   ROS_INFO("Found %d lines",lines.size());
 
   // Render the lines

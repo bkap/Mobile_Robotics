@@ -14,7 +14,7 @@ using namespace cv;
 using namespace std;
 
 
-#define PRECAL 1
+#define PRECAL 0
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR

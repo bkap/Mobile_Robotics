@@ -212,7 +212,7 @@ cout<<"I drawed good stuffs\n";
   cvNamedWindow("cleanLine");
   cout<<"linesToNastyPolyLine\n";
    list<Point2i> PL = getUnsortedPoints(lines);
-  list<Point2d> PL2 = noTransform(PL);
+  list<Point2f> PL2 = noTransform(PL);
   PL2 = linesToNastyPolyLine(PL2, 320, 479, 40);
   cout<<"can haz clean path\n";
   cout<<"there are "<<PL.size()<<" points in the nasty path.\n";
@@ -227,7 +227,7 @@ cout<<"I drawed good stuffs\n";
 	  cout<<it->x<<","<<it->y<<"\n";
   }
 
-  vector<Point2d> tempVec (PL2.begin(), PL2.end());
+  vector<Point2f> tempVec (PL2.begin(), PL2.end());
   for(int i =0; i<tempVec.size()-1; i++)
   {
 	line(img2, tempVec[i], tempVec[i+1], Scalar(0,greenness,0),3, CV_AA);

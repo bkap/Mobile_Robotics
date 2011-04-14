@@ -211,7 +211,8 @@ int main(int argc,char **argv)
 
 	ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
 	tfl = new tf::TransformListener();
-	ros::Subscriber sub1 = n.subscribe<nav_msgs::Odometry>("odom", 1, PSOCallback);
+	while(ros::ok&&!tfl->canTransform("map","odom",ros::Time::now())) ros::spinOnce();
+        ros::Subscriber sub1 = n.subscribe<nav_msgs::Odometry>("odom", 1, PSOCallback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("NominalSpeed", 1, speedCallback);
 
 	geometry_msgs::Twist vel_object;
