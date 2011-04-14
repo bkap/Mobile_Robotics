@@ -81,7 +81,7 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 		     y * 81968.0,
 		     0);
 	return coords;
-}
+} 
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 
@@ -144,12 +144,12 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 }
 
 // Returns the latest pose estimate incorporating both odometry and GPS
-geometry_msgs::Pose getPositionEstimate()
+geometry_msgs::PoseStamped getPositionEstimate()
 {
 	Mat state = Mat(state_inc_GPS);
 	
 	// Load the state from the matrix, and return it as a pose
-	geometry_msgs::Pose p;
+	geometry_msgs::PoseStamped p;
 	p.position.x = state.at<float>(0,0);
 	p.position.y = state.at<float>(1,0);
 	p.orientation = tf::createQuaternionMsgFromYaw(state.at<float>(2,0));
@@ -186,10 +186,10 @@ int main(int argc, char **argv)
 	
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
-	pose_pub = n.advertise<nav_msgs::Odometry>("odom", 1);
+	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
 
 	int debug_ctr = 0;
-	geometry_msgs::Pose temp_pose;
+	geometry_msgs::PoseStamped temp_pose;
 
 	ros::Rate loopTimer(LOOP_RATE);
 	while(ros::ok())
