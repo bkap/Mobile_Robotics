@@ -48,7 +48,7 @@ nav_msgs::Odometry stateToOdom(Vec3f gpsState){
 	odomState.pose.pose.position.x = gpsState[0];
 	odomState.pose.pose.position.y = gpsState[1];
 	odomState.pose.pose.orientation = tf::createQuaternionMsgFromYaw(gpsState[2]);
-	odomState.header.frame = "map";
+	odomState.header.frame_id = "map";
 	return odomState;
 }
 
