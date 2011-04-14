@@ -9,7 +9,8 @@
 #include <cwru_base/NavSatStatus.h>
 #include <cwru_base/cRIOSensors.h>
 #include<nav_msgs/Odometry.h>
-
+#include <iostream>
+using namespace std;
 using namespace cv;
 using namespace geometry_msgs;
 
@@ -34,6 +35,30 @@ ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
 ros::Subscriber odom_sub;
 
+void PrintMat(CvMat *A, FILE* f=stdout)
+{
+    int i, j;
+    for (i = 0; i < A->rows; i++)
+    {
+        fprintf(f,"\n");
+        switch (CV_MAT_DEPTH(A->type))
+        {
+            case CV_32F:
+            case CV_64F:
+                for (j = 0; j < A->cols; j++)
+                fprintf (f,"%8.6f ", (float)cvGetReal2D(A, i, j));
+                break;
+            case CV_8U:
+            case CV_16U:
+                for(j = 0; j < A->cols; j++)
+                fprintf (f,"%6d",(int)cvGetReal2D(A, i, j));
+                break;
+            default:
+                break;
+        }
+    }
+    fprintf(f,"\n");
+}
 // Initializes data
 void initFilters()
 {
@@ -56,13 +81,14 @@ void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
 	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
 	state_estimate[2] += HEADING_WEIGHT * (theta_gps - theta_squiggle);
+	cout<<"state_estimate 2 = "<<state_estimate[2]<<", "<<HEADING_WEIGHT*(theta_gps-theta_squiggle)<<"\n";
 	state_last_fix = state_estimate;
 	state_odom_only = state_estimate;
 }
 
 
 void gpsUpdateState(Vec3f gpsFix, float a){
-	gpsFix[2] = (1-a) * state_inc_GPS[2];	//hack to preserve heading
+	gpsFix[2] =  state_inc_GPS[2];	//hack to preserve heading
 	Vec3f bestGuess = a * state_inc_GPS + (1-a) * gpsFix;
 
 	double x = (bestGuess[0]-state_last_fix[0]);
@@ -105,7 +131,8 @@ Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 {
 	// For convenience, grab the current angle
 	double psi = state[2];
-	
+	CvMat stateOld = Mat(state);
+	PrintMat(&stateOld);	
 	// Generate the control matrix B
 	Mat B = (Mat_<float>(3,2) << 0.5*cos(psi),0.5*cos(psi),0.5*sin(psi),0.5*sin(psi),1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH);
 	
