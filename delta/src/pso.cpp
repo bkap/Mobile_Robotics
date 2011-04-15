@@ -8,6 +8,7 @@
 #include <cwru_base/NavSatFix.h>
 #include <cwru_base/NavSatStatus.h>
 #include <cwru_base/cRIOSensors.h>
+#include <geometry_msgs/PoseStamped.h>
 #include<nav_msgs/Odometry.h>
 #include <iostream>
 using namespace std;
@@ -107,7 +108,7 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 		     y * 81968.0,
 		     0);
 	return coords;
-}
+} 
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 
@@ -145,8 +146,11 @@ Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 	return(newstate);
 }
 
+int rolex = 0;//because clock is already taken
+#define ALARM_CLOCK 50*60
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 {
+	
 	//see the cRIOSensors.msg in cwru_semi_stable
 	static int s_right_prev = cRIO->right_wheel_encoder;
 	static int s_left_prev = cRIO->left_wheel_encoder;
@@ -164,22 +168,27 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	state_odom_only = odomUpdateState(state_odom_only, ds_right, ds_left);
 	state_inc_GPS = odomUpdateState(state_inc_GPS, ds_right, ds_left);
 
-	// the final output should have this type and call the publish function on pose_pub
-	nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
-	//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
-	pose_pub.publish(odom);
+	if(rolex<ALARM_CLOCK)rolex++;
+	else
+	{
+		// the final output should have this type and call the publish function on pose_pub
+		nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
+		//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
+		pose_pub.publish(odom);
+	}
+	
 }
 
 // Returns the latest pose estimate incorporating both odometry and GPS
-geometry_msgs::Pose getPositionEstimate()
+geometry_msgs::PoseStamped getPositionEstimate()
 {
 	Mat state = Mat(state_inc_GPS);
 	
 	// Load the state from the matrix, and return it as a pose
-	geometry_msgs::Pose p;
-	p.position.x = state.at<float>(0,0);
-	p.position.y = state.at<float>(1,0);
-	p.orientation = tf::createQuaternionMsgFromYaw(state.at<float>(2,0));
+	geometry_msgs::PoseStamped p;
+	p.pose.position.x = state.at<float>(0,0);
+	p.pose.position.y = state.at<float>(1,0);
+	p.pose.orientation = tf::createQuaternionMsgFromYaw(state.at<float>(2,0));
 	return(p);
 }
 
@@ -213,10 +222,10 @@ int main(int argc, char **argv)
 	
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
-	pose_pub = n.advertise<nav_msgs::Odometry>("odom", 1);
+	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
 
 	int debug_ctr = 0;
-	geometry_msgs::Pose temp_pose;
+	geometry_msgs::PoseStamped temp_pose;
 
 	ros::Rate loopTimer(LOOP_RATE);
 	while(ros::ok())
@@ -230,7 +239,7 @@ int main(int argc, char **argv)
 		// Every so often, spit out info for debugging
 		if( debug_ctr++ % 20 == 0 )
 		{
-			ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.position.x,temp_pose.position.y,tf::getYaw(temp_pose.orientation));
+			ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.pose.position.x,temp_pose.pose.position.y,tf::getYaw(temp_pose.pose.orientation));
 		}
 		
 		loopTimer.sleep();
