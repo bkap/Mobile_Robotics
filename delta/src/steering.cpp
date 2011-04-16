@@ -228,7 +228,7 @@ int main(int argc,char **argv)
 		//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
 		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
-		//cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
+		cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
 		vw = getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		
@@ -243,6 +243,7 @@ int main(int argc,char **argv)
 	  	staleDes = true;
 
 		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		
 		pub.publish(vel_object);
 	}
 }

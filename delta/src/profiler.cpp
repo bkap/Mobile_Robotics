@@ -229,6 +229,7 @@ int main(int argc,char **argv)
 
 		// ramp to zero if you're on the last path segment
 		bool end_of_path = false;
+		bool is_neg = false;
 		//cout << "\nPROFILER\n";
 		if(crawlerDesStateCalled && pathListCalled && lidarMapCalled) {
 			bool no_distance_left = (pathlist.path_list[curState.seg_number].seg_length <= curState.des_lseg);
@@ -238,7 +239,7 @@ int main(int argc,char **argv)
 				curState.seg_type = 4; // hax to tell steering to not go anywhere
 			}
 			vGoal = 0.0;
- 
+			curState.des_speed = fabs(curState.des_speed); 
 			if (curState.seg_type == 3) { // point
 				vMax = pathlist.path_list[curState.seg_number].max_speeds.angular.z;
 				aMax = pathlist.path_list[curState.seg_number].accel_limit;
@@ -251,6 +252,7 @@ int main(int argc,char **argv)
 					vGoal = pathlist.path_list[curState.seg_number + 1].max_speeds.linear.x;
 			}
 		
+			is_neg = pathlist.path_list[curState.seg_number].curvature < 0;
 			double brakingDistance = distanceToGoalSpeed(0.0);
 			double slowingDistance = distanceToGoalSpeed(vMax);
 			double distToGo = distanceRemaining();
@@ -274,10 +276,10 @@ int main(int argc,char **argv)
 			} else if (clearPath(brakingDistance)) { // not last segment and we have a clear path
 				cout << "\npro: clearpath woo";
 				if (slowingDistance < distToGo) {   // go to maximum velocity
-					//cout << " TO THE MAX which is min " << vGoal << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
-					curState.des_speed = min(curState.des_speed + aMax / REFRESH_RATE, vGoal);
+					cout << " TO THE MAX which is min " << vMax << " vs. " << curState.des_speed << " + " << aMax << " / " << REFRESH_RATE;
+					curState.des_speed = min(curState.des_speed + aMax / REFRESH_RATE, vMax);
 				} else {    // ramp speed down to goal speed
-					//cout << " goal speed is slowsauce " << vGoal;
+					cout << " goal speed is slowsauce " << vGoal;
 					curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, vGoal);
 				}
 			} else {
@@ -285,7 +287,8 @@ int main(int argc,char **argv)
 				//cout << " BRAKINGGGGG";
 				curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
 			}
-
+			if(is_neg)
+					curState.des_speed = -curState.des_speed;
 			//cout << "\npro: des_speed = " << curState.des_speed << " on segment " << curState.seg_number << " of " << pathlist.path_list.size()-1 << "\n";
 			pub.publish(curState); // publish the CrawlerDesiredState
 		}

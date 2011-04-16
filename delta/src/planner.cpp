@@ -102,7 +102,7 @@ PathSegment MakeLine(Point3f A, Point3f B, int SegNum)
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(atan2(vec.y, vec.x));
 	P.curvature = 1337;
 	
-	P.max_speeds.linear.x = MAX_LINEAR*0.5;
+	P.max_speeds.linear.x = MAX_LINEAR;
 	P.max_speeds.linear.y = 0;
 	P.max_speeds.linear.z = 0;
 	P.min_speeds.linear.x = 0;
