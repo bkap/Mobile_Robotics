@@ -19,9 +19,9 @@
 using namespace cv;
 using namespace std;
 
-void getOrangeLines(Mat& img, vector<Vec4i>& lines);
-void popNearest(list<Point2d>& Points, list<Point2d>& OrderedPoints, Point2d Target, double minSeparation);
+Mat getOrangeLines(Mat& img, vector<Vec4i>& lines);
+void popNearest(list<Point2f>& Points, list<Point2f>& OrderedPoints, Point2f Target, double minSeparation);
 list<Point2i> getUnsortedPoints(vector<Vec4i> lines);
-list<Point2d> linesToNastyPolyLine(list<Point2d> Lines,  double IMAGE_ORIGIN_X, double IMAGE_ORIGIN_Y, double minSeparation);
-list<Point2d> cleanNastyPolyLine(list<Point2d> NastyPolyLine, int NumRemaining =20);
-list<Point2d> noTransform(list<Point2i> Pts);
+list<Point2f> linesToNastyPolyLine(list<Point2f> Lines,  double IMAGE_ORIGIN_X, double IMAGE_ORIGIN_Y, double minSeparation);
+list<Point2f> cleanNastyPolyLine(list<Point2f> NastyPolyLine, int NumRemaining =20);
+list<Point2f> noTransform(list<Point2i> Pts);

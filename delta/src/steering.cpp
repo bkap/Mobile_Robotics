@@ -51,7 +51,8 @@ void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed)
 	desired.seg_type = newSpeed->seg_type;
 	desired.seg_number = newSpeed->seg_number;
 	staleDes = false;
-	//cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose="<< desired.des_pose;
+
+	cout << "\nSPEED CALLBACK: seg_type=" << (int)desired.seg_type << ", seg_num=" << desired.seg_number << ", pose="<< desired.des_pose;
 }
 //Forces angles to be in range
 inline double coerceAngle(double angle){
@@ -76,7 +77,9 @@ cv::Vec3d calculateSteeringParameters(geometry_msgs::Pose *poseA, geometry_msgs:
 {
 	cv::Vec2d posA(poseA->position.x,poseA->position.y);
 	cv::Vec2d posD(poseD->position.x,poseD->position.y);
+	ROS_INFO("getting yaw 1");
 	double dirA= tf::getYaw(poseA->orientation);
+	ROS_INFO("getting yaw 2");
 	double dirD=tf::getYaw(poseD->orientation);
 	cv::Vec2d psiA(cos(dirA),sin(dirA));
 	cv::Vec2d psiD(cos(dirD),sin(dirD));
@@ -221,11 +224,11 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		//ROS_INFO("birthday is %f", birthday.toSec());
 		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
-		if(stalePos)	{continue;}
+		if(stalePos || staleDes)	{cout << "stale\n";continue;}
 		//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
 		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
-		//cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
+		cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
 		vw = getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		
@@ -239,7 +242,8 @@ int main(int argc,char **argv)
 		stalePos = true,
 	  	staleDes = true;
 
-		//cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		
 		pub.publish(vel_object);
 	}
 }

@@ -28,10 +28,10 @@ tf::TransformListener *tfl;
 class DemoNode {
 	public:
 		DemoNode();
-		void publishNavLoc(list<Point2d> NavPoints);
+		void publishNavLoc(list<Point2f> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
-		list<Point2d> transformPts(list<Point2i> NavPoints);
+		list<Point2f> transformPts(list<Point2i> NavPoints);
 		ros::NodeHandle nh_; // Made this public to access it
 	private:
 		image_transport::ImageTransport it_;
@@ -40,28 +40,27 @@ class DemoNode {
 		ros::Publisher pub_nav_pts;
 		sensor_msgs::PointCloud NavPts;
 		Mat_<float> rvec, tvec;
-		Mat_<double> rvec_, tvec_;
 		Mat R2;
-		Mat_<double> projector;
+		Mat projector;
 };
 
-list<Point2d> DemoNode::transformPts(list<Point2i> NavPoints)
+list<Point2f> DemoNode::transformPts(list<Point2i> NavPoints)
 {
-	list<Point2d> result; 
-	Point2d temp;
-	Point3d V;
+	list<Point2f> result; 
+	Point2f temp;
+	Point3f V;
 	
 	for(list<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
 	{
 		V.x = it->x;
 		V.y = it->y;
-		V.z = 0;
+		V.z = 1;
 		
-		Mat_<double> W = projector*Mat(V);
-		temp.x = W(0);
-		temp.y = W(1);
+		Mat_<float> W = projector*Mat(V);
+		temp.x = W(0) / W(2);
+		temp.y = W(1) / W(2);
 
-		cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
+		//cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
 		result.push_back(temp);
 	}
 	
@@ -69,15 +68,16 @@ list<Point2d> DemoNode::transformPts(list<Point2i> NavPoints)
 }
 
 //call this with a point32 to publish the blob's location
-void DemoNode::publishNavLoc(list<Point2d> NavPoints)
+void DemoNode::publishNavLoc(list<Point2f> NavPoints)
 {
 	NavPts.points.erase(NavPts.points.begin(), NavPts.points.end());
   // Convert into geometry points, and transform from pixel to robot coordinates
+	ROS_INFO("starting publish");
 	while(NavPoints.size()>0)
 	{
 		geometry_msgs::Point32 geoPoint;
-		geoPoint.x = NavPoints.begin()->x;
-		geoPoint.y = NavPoints.begin()->y;
+		geoPoint.x =  -1.5 * NavPoints.begin()->x;
+		geoPoint.y =   -2 * NavPoints.begin()->y;
 		geoPoint.z = 0;
 		NavPts.points.push_back(geoPoint);
 		NavPoints.pop_front();
@@ -87,6 +87,10 @@ void DemoNode::publishNavLoc(list<Point2d> NavPoints)
   // Transform the point cloud from robot coordinates to map coordinates
 	sensor_msgs::PointCloud tNavPts;
 	tfl->transformPointCloud("map", NavPts, tNavPts);
+	for(int i = 0; i < NavPts.points.size(); i++) {
+		cout << NavPts.points[i].x << "," << NavPts.points[i].y << "::";
+		cout << tNavPts.points[i].x << "," << tNavPts.points[i].y << endl;
+	}
 	pub_nav_pts.publish(tNavPts);
 }
 
@@ -123,7 +127,10 @@ void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
 	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
 	cameraCalled = true;
-	projector = Mat_<double>((Mat_<double>(cameraMat) *Mat_<double>( R2)).inv());
+	Rodrigues(rvec, R2);
+	R2.col(1) = R2.col(2);
+	R2.col(2) = tvec;
+	projector = (cameraMat * R2).inv();	
 }
 
 // Called whenever you get a new image
@@ -146,18 +153,23 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     vector<Vec4i> vickyTheVector;
     getOrangeLines(image, vickyTheVector);
     list<Point2i> imPts = getUnsortedPoints(vickyTheVector);
-    list<Point2d> crtPts = transformPts(imPts); 
-    crtPts = linesToNastyPolyLine(crtPts, 0, 0, .3);
-    crtPts = cleanNastyPolyLine(crtPts, 5);
+    cout << "preparing to transform" << endl;
+    list<Point2f> crtPts = transformPts(imPts);
+ 
+    ROS_INFO("1:Created a path %d points long",crtPts.size());
+    crtPts = linesToNastyPolyLine(crtPts, 0, 0, .05);
+     ROS_INFO("%lu points remaining", crtPts.size());
+    //crtPts = cleanNastyPolyLine(crtPts, 10);
+
 
     // Spit out the coordinates of the points
     ROS_INFO("Created a path %d points long",crtPts.size());
-    for( int i=0; i<crtPts.size(); i++ )
+    /*for( int i=0; i<crtPts.size(); i++ )
     {
       ROS_INFO("(%d,%d)",crtPts[i].x,crtPts[i].y);
     }
-
-    if(vickyTheVector.size()==0)
+*/
+    if(crtPts.size() > 1)
     {
 	    this->publishNavLoc(crtPts);
     }
@@ -170,6 +182,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
   }
+
 }
 
 //reads a mat from the file in ~/.ros
@@ -213,8 +226,8 @@ int main(int argc, char **argv)
 
   // Wait until you get transform data
 	tfl = new tf::TransformListener();
-	while (!ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
-
+	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
+	cout << "READY"  << endl;
 	DemoNode motion_tracker;
 
 	ROS_INFO("Camera Node Started");
