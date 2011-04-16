@@ -49,7 +49,7 @@ void pathListCallback(const PathList::ConstPtr& paths)
 
 //http://www.ros.org/doc/api/nav_msgs/html/msg/OccupancyGrid.html
 
-bool lidarMapCalled = false;
+bool lidarMapCalled = true;
 void lidarMapCallback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& newLidarMap)
 {
 	// get the map, as a matrix (1 = occupied, 0 = empty; 5 cm grid)

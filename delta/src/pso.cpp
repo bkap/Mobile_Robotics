@@ -82,6 +82,11 @@ void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
 	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
 	state_estimate[2] += HEADING_WEIGHT * (theta_gps - theta_squiggle);
+	if(state_estimate[2] > 3.14159) {
+		state_estimate[2] -= 2 * 3.14159;
+	} else if(state_estimate[2] < -3.14159) {
+		state_estimate[2] += 2 * 3.14159;		
+	}
 	cout<<"state_estimate 2 = "<<state_estimate[2]<<", "<<HEADING_WEIGHT*(theta_gps-theta_squiggle)<<"\n";
 	state_last_fix = state_estimate;
 	state_odom_only = state_estimate;
@@ -104,8 +109,8 @@ void gpsUpdateState(Vec3f gpsFix, float a){
 Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 	double x = (gps_world_coords.latitude - 41.5);
 	double y = (gps_world_coords.longitude + 81.605); 
-	Vec3f coords(x * 111090.0,
-		     y * 81968.0,
+	Vec3f coords(x * 111090.0 - 217.168,
+		     y * 81968.0 + 149.419,
 		     0);
 	return coords;
 } 
@@ -121,7 +126,7 @@ void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 	//newman said this might be good in class.  
 	//If it isn't, use gps_world_coords.position_covariance, which should be a 9 element 1D array.
 	float alpha = goodCoords? 0.9:1;
-	
+	cerr << gpsAllegedState[0] << "," << gpsAllegedState[1] <<endl;	
 	// Apply the filter to state_inc_GPS
 	gpsUpdateState(gpsAllegedState, alpha);
 	
@@ -186,9 +191,14 @@ geometry_msgs::PoseStamped getPositionEstimate()
 	
 	// Load the state from the matrix, and return it as a pose
 	geometry_msgs::PoseStamped p;
-	p.pose.position.x = state.at<float>(0,0);
-	p.pose.position.y = state.at<float>(1,0);
-	p.pose.orientation = tf::createQuaternionMsgFromYaw(state.at<float>(2,0));
+	p.pose.position.x = state_inc_GPS[0];
+	p.pose.position.y = state_inc_GPS[1];
+	if(state_inc_GPS[2] > CV_PI) {
+		state_inc_GPS[2] -= 2 * CV_PI;
+	} else if(state_inc_GPS[2] < -1 * CV_PI) {
+		state_inc_GPS[2] += 2 * CV_PI;
+	}
+	p.pose.orientation = tf::createQuaternionMsgFromYaw(state_inc_GPS[2]);
 	return(p);
 }
 

@@ -402,11 +402,11 @@ geometry_msgs::PoseStamped poseActual;
 sensor_msgs::PointCloud pointList;
 
 
-bool LIDARcalled = false;
+bool LIDARcalled = true;
 bool poseDescalled = false;
 bool goalPosecalled = false;
 bool poseActualcalled = false;
-bool pointListcalled = false;
+bool pointListcalled = true;
 
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSpace_Map)
 {
@@ -450,7 +450,7 @@ void goalPose_Callback(const geometry_msgs::Pose::ConstPtr& newGoalPose)
 
 void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 {
-    pointList = *newPointList;
+    //pointList = *newPointList;
     pointListcalled = true;
 }
 
@@ -481,18 +481,18 @@ int main(int argc,char **argv)
 		origin.y = poseActual.pose.position.y;
    		pointList.points.push_back(origin);
 	    geometry_msgs::Point32 p;
-		p.x = 163.45;
-		p.y = -135.08;
+		p.x = 4.326;
+		p.y = 4.265;
 		pointList.points.push_back(p);
 	    
         geometry_msgs::Point32 p2;
-		p2.x = 153.6;
-		p2.y = -132.32;
+		p2.x = 7.848;
+		p2.y = 9.336;
 		pointList.points.push_back(p2);
 		
         geometry_msgs::Point32 p3;
-		p3.x = 140.5;
-		p3.y = -123.3;
+		p3.x = 16.227;
+		p3.y = 18.893;
 		pointList.points.push_back(p3);
 		double initial_heading= tf::getYaw(poseActual.pose.orientation);
 	    PathList turns = joinPoints(initial_heading,pointList);
@@ -507,7 +507,7 @@ int main(int argc,char **argv)
           	cout<<"3\n";
 	    ros::Time birthday = ros::Time::now();
 	    //desired_pose.header.stamp = birthday;
-	    while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+	   // while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
 	    cout<<"3\n";
 	    ROS_INFO("birthday started as %f", birthday.toSec());
       
@@ -527,7 +527,7 @@ int main(int argc,char **argv)
 		
 			    list<geometry_msgs::Point> points;
 			    geometry_msgs::Point p;
-			    for(int i=0;i<lastCSpace_Map->size().height; i++)
+			    /*for(int i=0;i<lastCSpace_Map->size().height; i++)
 			    {
 				    for(int j =0; j<lastCSpace_Map->size().width; j++)
 				    {
@@ -538,7 +538,7 @@ int main(int argc,char **argv)
 					    }
 				    }
 			    }
-			
+			*/
 			    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 			    PathList turns = joinPoints(initial_heading,pointList);
 			
