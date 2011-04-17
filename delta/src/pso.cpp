@@ -15,6 +15,54 @@ using namespace std;
 using namespace cv;
 using namespace geometry_msgs;
 
+class LinFit
+{
+	public:
+	//the various sums we need to keep
+	double x;
+	double xy;
+	double y;
+	double x2;
+	int n;
+
+	LinFit();
+	void next(double x, double y);
+	double getSlope();
+	double getHeading();
+};
+
+LinFit::LinFit()
+{
+	n = x = xy = y = x2 = 0;
+}
+
+void LinFit::next(double x, double y)
+{
+	this->x += x;
+	this->y += y;
+	this->xy += x*y;
+	this->x2 += x*x;
+	this->n++;
+}
+
+double LinFit::getSlope()
+{
+	if(n>0)
+	{
+		return (xy-x*y/n)/(x2-x*x/n);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+double LinFit::getHeading()
+{
+	return atan2(getSlope(), 1.0);
+}
+
+
 // Two state vectors: one only from open loop odometry, and the other from both odometry and GPS.
 Vec3f state_odom_only;
 Vec3f state_inc_GPS;
