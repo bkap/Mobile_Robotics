@@ -15,9 +15,9 @@
 using namespace std;
 
 double LOOP_RATE = 20;	//loop rate in Hz
-double kS = -1.0;		//proportional gain on following error correction
-double kD = -.75;		//proportional gain on lateral error correction
-double kP = -.75;		//proportional gain on heading error correction
+double kS = -.5;		//proportional gain on following error correction
+double kD = -.25;		//proportional gain on lateral error correction
+double kP = -.25;		//proportional gain on heading error correction
 
 double maxSteerV = .3;	//saturation limit for control response on linear velocity
 double maxSteerW = .5;	//saturation limit for control response on angular velocity
@@ -228,7 +228,9 @@ int main(int argc,char **argv)
 		//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
 		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
-		cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
+		ROS_INFO("\tactual:      %f,%f,%f", poseActual.pose.position.x, poseActual.pose.position.y, tf::getYaw(poseActual.pose.orientation));
+		ROS_INFO("\tdesired:     %f,%f,%f", desired.des_pose.position.x, desired.des_pose.position.y, tf::getYaw(desired.des_pose.orientation));
+		ROS_INFO("\tserrors:                   %f,%f,%f ",sdp[0],sdp[1],sdp[2]);		
 		vw = getNominalVelocities(&desired);
 		vw += calculateSteeringCorrections(sdp,&desired);
 		

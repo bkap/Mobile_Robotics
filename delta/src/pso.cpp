@@ -30,11 +30,16 @@ double DIST_BETWEEN_HEADING_UPDATES = 1.0;
 double LOOP_RATE = 10;
 
 // Trust the virtual heading sensor this much
-double HEADING_WEIGHT = 0.5;
+double HEADING_WEIGHT = 0.2;
 
 ros::Publisher pose_pub;
 ros::Subscriber gps_sub;
 ros::Subscriber odom_sub;
+ros::Publisher cmdvel_pub;
+
+bool orient = true;
+//true = working on orientation.
+//false = doing normal data publishing
 
 void PrintMat(CvMat *A, FILE* f=stdout)
 {
@@ -172,7 +177,9 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	//be aware that these are all ints and need to be converted to sensible units before use.
 	state_odom_only = odomUpdateState(state_odom_only, ds_right, ds_left);
 	state_inc_GPS = odomUpdateState(state_inc_GPS, ds_right, ds_left);
-
+	if(orient) {
+		return; //don't publish while we're orienting
+	}
 	if(rolex<ALARM_CLOCK)rolex++;
 	else
 	{
@@ -233,7 +240,7 @@ int main(int argc, char **argv)
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
-
+	cmdvel_pub = n.advertise<gemoetry_msgs::Twist>("cmd_vel",1);
 	int debug_ctr = 0;
 	geometry_msgs::PoseStamped temp_pose;
 
@@ -241,11 +248,55 @@ int main(int argc, char **argv)
 	while(ros::ok())
 	{
 		ros::spinOnce();
-		
+	/*	
 		// Publish the latest pose estimate
 		temp_pose = getPositionEstimate();
 		pose_pub.publish(temp_pose);
+	*/
+	//get our initial haeading
 		
+		if(orient) {
+			static double currentspeed = 0.0;
+			static bool slowing = false;
+			static bool firsttime = true;
+			static bool waiting = true;
+			if(waiting) {
+				static int wait_count = 0;
+				wait_count++;
+				if(wait_count > 10 * LOOP_RATE) {
+					waiting = false;
+					wait_count = 0;
+					if(!firsttime) {
+						orient = false;
+						cmdvel_pub.shutdown();
+						continue;
+					}
+				}
+			}
+			else if(!slowing) {
+				currentspeed += 0.1/LOOP_RATE;
+				if(currentspeed > 0.5) {
+					slowing = true;
+				}
+			} else if(firsttime){
+				currentspeed -= -.1/LOOP_RATE;
+				if(currentspeed < -0.5) {
+					firsttime = false;
+				}
+			} else {
+			currentspeed += 0.1/LOOP_RATE;
+				if(currentspeed >= 0) {
+					waiting = true;
+				}
+			}
+			double publishspeed = min(max(currentspeed,0.0), 0.5);		
+			Twist vel_object;
+			vel_object.linear.x = -1 * publishspeed;
+			vel_object.angular.z = 0.0;
+			cmdvel_pub.publish(vel_object);			
+		
+			continue;
+		}
 		// Every so often, spit out info for debugging
 		if( debug_ctr++ % 20 == 0 )
 		{
