@@ -8,9 +8,7 @@
 #include<tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
 #include "opencv2/core/core.hpp"
-
-#define pi 3.14159265358979323846264338327950288
-
+#include "vision/cvFuncs.h"
 
 using namespace std;
 
@@ -56,16 +54,20 @@ void speedCallback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& newSpeed)
 }
 //Forces angles to be in range
 inline double coerceAngle(double angle){
-	if (angle<-pi) {return angle + 2*pi;}
-	if (angle> pi) {return angle - 2*pi;}
+	if (angle<-CV_PI) {return angle + 2*CV_PI;}
+	if (angle> CV_PI) {return angle - 2*CV_PI;}
 	return angle;
 }
-
 inline double min(double a, double b){
 	return (a < b)? a:b;
 }
 inline double max(double a, double b){
 	return (a > b)? a:b;
+}
+inline double sign(double a){
+	if (a==0)
+		return 0;
+	return (a>0? 1:-1);
 }
 /*
 calculates steering errors based on the error vector (vector from desired pose to actual pose)
@@ -73,19 +75,14 @@ Following error is calculated by projecting the error vector onto a unit vector 
 Lateral error is calculated by projecting the error vector onto the leftward normal unit vector to the direction of the desired heading
 Heading error is calculated by subtracting the desired heading from the actual heading 
 */
-cv::Vec3d calculateSteeringParameters(geometry_msgs::Pose *poseA, geometry_msgs::Pose *poseD)
+cv::Vec3f calculateSteeringParameters(geometry_msgs::Pose& poseA, geometry_msgs::Pose& poseD)
 {
-	cv::Vec2d posA(poseA->position.x,poseA->position.y);
-	cv::Vec2d posD(poseD->position.x,poseD->position.y);
-	ROS_INFO("getting yaw 1");
-	double dirA= tf::getYaw(poseA->orientation);
-	ROS_INFO("getting yaw 2");
-	double dirD=tf::getYaw(poseD->orientation);
-	cv::Vec2d psiA(cos(dirA),sin(dirA));
-	cv::Vec2d psiD(cos(dirD),sin(dirD));
-	cv::Vec2d psiN(cos(dirD+pi/2),sin(dirD+pi/2));
- 
-	return cv::Vec3d((posA - posD).dot(psiD),(posA - posD).dot(psiN),coerceAngle(dirA - dirD));
+	cv::Vec2f posA,posD,dirA,dirD,dirN;
+	ROS2CVPose(poseA,posA,dirA);
+	ROS2CVPose(poseD,posD,dirD);
+	getUnitVec(dirN,angle(dirD)+CV_PI/2);
+	
+	return cv::Vec3f((posA - posD).dot(dirD),(posA-posD).dot(dirN),coerceAngle(angle(dirA) - angle(dirD)));
 }
 /*
 calculates steering adjustments to apply to nominal speed based on steering parameters.
@@ -96,37 +93,37 @@ For a corner, the angular velocity is adjusted proportionally to the following e
 In the case of an invalid segment type, no adjustment is applied.
 For all cases, the absolute value of the linear velocity correction is constrained by maxSteerV and the absolute value of the angular velocity correction is constrained by maxSteerW.
 */
-cv::Vec2d calculateSteeringCorrections(cv::Vec3d sdp,eecs376_msgs::CrawlerDesiredState *goal){
-	cv::Vec2d vw(0,0);
-	switch(goal->seg_type){
+cv::Vec2f calculateSteeringCorrections(cv::Vec3f sdp,eecs376_msgs::CrawlerDesiredState& goal){
+	cv::Vec2f vw(0,0);
+	switch(goal.seg_type){
 			case 1:	//line
 			{
 				//cout<<"STEERING IN A LINE\n";
+				cv::Vec3f v(kS, 0 , 0);
+				cv::Vec3f w(0 , kD, kP);
 
-				vw[0] = kS * sdp[0];
-				vw[1] = kD*sdp[1]+kP*sdp[2];
+				setVec(vw,sdp.dot(v),sdp.dot(w));
 				break;
 			}
 
 			case 2:	//arc
-			{
+			{ 
 				//cout<<"STEERING IN A ARC"<<endl;
-                
-				//vw[0] =  kS * sdp[0];
-				//vw[1] = vw[0] * goal->des_rho + kD*sdp[1] + kP*sdp[2];
+				cv::Vec3f v(kS, 0 , 0);
+				cv::Vec3f w(kS * goal.des_rho , kD, kP);
+					//temporarily disabled
+				//setVec(vw,sdp.dot(v),sdp.dot(w));
 
-                // disable steering corrections in an arc?
-				vw[0] = 0;
-				vw[1] = 0;
 				break;
 			}
 
 			case 3:	//turn in place
 			{
 				//cout<<"STEERING IN A CIRCLE"<<endl;	
-
-				vw[0] = 0;
-				vw[1] = kS * sdp[0];
+				cv::Vec3f v(0,0,0);
+				cv::Vec3f w(0,0,kS);
+				
+				setVec(vw,sdp.dot(v),sdp.dot(w));
 				break;
 			}
 
@@ -135,31 +132,31 @@ cv::Vec2d calculateSteeringCorrections(cv::Vec3d sdp,eecs376_msgs::CrawlerDesire
 				vw[0] = 0;
 				vw[1] = 0;
 		}
-	vw[0] = (vw[0] > 0)? min(maxSteerV, vw[0]) : max(-maxSteerV, vw[0]);
-	vw[1] = (vw[1] > 0)? min(maxSteerW, vw[1]) : max(-maxSteerW, vw[1]);
+	vw[0] = min(maxSteerV,fabs(vw[0])) * sign(vw[0]);
+	vw[1] = min(maxSteerW,fabs(vw[1])) * sign(vw[1]);
 	return vw;
 }
 /*
 calculates the nominal velocities from the NominalVelocity.
 For a line, the nominal linear velocity is des_speed and the nominal angular velocity is 0.
 For an arc, the nominal linear velocity is des_speed and the nominal angular velocity is des_speed * des_rho (v=wr)
-For a corner, the nominal linear velocity is 0 and the nominal angular velocity is des_speed.
+For a corner, the nominal linear velocity is 0 and the nominal angular velocity is des_speed, with the sign of des_rho.
 For invalid segments, the nominal velocities are both 0.
 */
-cv::Vec2d getNominalVelocities(eecs376_msgs::CrawlerDesiredState* goal)
+cv::Vec2f getNominalVelocities(eecs376_msgs::CrawlerDesiredState& goal)
 {
-	switch(goal->seg_type){
+	switch(goal.seg_type){
 		case 1:	//line
-			return cv::Vec2d(goal->des_speed,0);
+			return cv::Vec2f(goal.des_speed,0);
 		case 2:	//arc
-			return cv::Vec2d(goal->des_speed,goal->des_speed * goal->des_rho);
+			return cv::Vec2f(goal.des_speed,goal.des_speed * goal.des_rho);
 		case 3:	//turn
-			return cv::Vec2d(0,goal->des_speed);
+			return cv::Vec2f(0,goal.des_speed * sign(goal.des_rho));
 		default:
 			return cv::Vec2d(0,0);
 	}
 }
-//publishes cmd_vel every time a steering correction is available at the specified lop rate
+//publishes cmd_vel every time a steering correction is available at the specified loop rate
 //constrains linear velocity to be non-negative to prevent backing into unviewable space
 int main(int argc,char **argv)
 {
@@ -212,7 +209,7 @@ int main(int argc,char **argv)
 	while (!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now()
 	ros::Time birthday = ros::Time::now();
 
-	cv::Vec3d sdp;
+	cv::Vec3f sdp;
 	cv::Vec2d vw;
 
 	while(ros::ok()){
@@ -227,15 +224,15 @@ int main(int argc,char **argv)
 		if(stalePos || staleDes)	{cout << "stale\n";continue;}
 		//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
-		sdp = calculateSteeringParameters(&poseActual.pose, &desired.des_pose);
+		sdp = calculateSteeringParameters(poseActual.pose, desired.des_pose);
 		cout<<"\tserrors:                    "<<sdp[0]<<","<<sdp[1]<<","<<sdp[2]<<endl;		
-		vw = getNominalVelocities(&desired);
-		vw += calculateSteeringCorrections(sdp,&desired);
-		
-		vw[0]  = max(vw[0], 0);
+		vw = getNominalVelocities(desired);
+		bool requestReverse = vw[0] < 0;
+		vw += calculateSteeringCorrections(sdp,desired);
 
-		//	cout<<"Steering calculated"<<endl;
-		//limit velocities
+		if(!requestReverse){	//only allow reverse if desired speed < 0		
+			vw[0]  = max(vw[0], 0);
+		}
 			
 		vel_object.linear.x = vw[0];
 		vel_object.angular.z= vw[1];
