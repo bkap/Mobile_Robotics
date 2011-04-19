@@ -122,16 +122,17 @@ PathSegment MakeLine(Point3f A, Point3f B, int SegNum)
 // Generate a turn in place given an initial heading, a final heading, and a point to turn on.
 PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_point, int SegNum)
 {
-	double theta1 = InitAngle;
-	double theta2 = FinalAngle;
-	
+	double amountToTurn = FinalAngle - InitAngle;
+	if(amountToTurn > CV_PI) { amountToTurn -= 2 * CV_PI; }
+	else if(amountToTurn < -CV_PI) { amountToTurn += 2 * CV_PI;}
 	PathSegment P;
 	P.seg_type = POINT_TURN;
 	P.seg_number = SegNum;
-	P.seg_length = fabs(theta2-theta1); //how much to turn
+	P.seg_length = fabs(amountToTurn); //how much to turn
 	P.ref_point = convertPoint3fToGeoPoint(ref_point); //where to turn
 	P.init_tan_angle = tf::createQuaternionMsgFromYaw(InitAngle); //initial heading as a quaternion
-	P.curvature = (FinalAngle>InitAngle)?1:-1; //direction to turn
+	
+	P.curvature = (amountToTurn > 0)?1:-1; //direction to turn
 	
 	P.max_speeds.linear.x = 0;
 	P.max_speeds.linear.y = 0;
@@ -481,18 +482,33 @@ int main(int argc,char **argv)
 		origin.y = poseActual.pose.position.y;
    		pointList.points.push_back(origin);
 	    geometry_msgs::Point32 p;
-		p.x = 4.326;
-		p.y = 4.265;
+		//along front
+		//p.x = 4.326;
+		//p.y = 4.26;
+		/*//inside
+		p.x = 5.2;
+		p.y = 12.15; */
+		//along back
+		p.x = -67.4;
+		p.y = 20.2;
 		pointList.points.push_back(p);
 	    
         geometry_msgs::Point32 p2;
-		p2.x = 7.848;
-		p2.y = 9.336;
+		//p2.x = 7.848;
+		//p2.y = 9.336;
+		//p2.x = -3.15;
+		//p2.y = 20.4;
+		p2.x = -63.8;
+		p2.y = 19.4;
 		pointList.points.push_back(p2);
 		
         geometry_msgs::Point32 p3;
-		p3.x = 16.227;
-		p3.y = 18.893;
+		//p3.x = 16.227;
+		//p3.y = 18.893;
+		//p3.x = -0.75;
+		//p3.y = 23.05;
+		p3.x = -59.8;
+		p3.y = 16.6;
 		pointList.points.push_back(p3);
 		double initial_heading= tf::getYaw(poseActual.pose.orientation);
 	    PathList turns = joinPoints(initial_heading,pointList);

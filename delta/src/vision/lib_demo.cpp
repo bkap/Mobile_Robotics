@@ -81,7 +81,7 @@ CvPoint2D64f blobfind(const cv::Mat& src, cv::Mat& out)
 
   erode(out, out, Mat());
 
-  dilate(out, out, Mat(), Point(-1,-1), 30);
+  dilate(out, out, Mat(), Point(-1,-1), 5);
 
   IplImage temp1 = out;
   IplImage temp2 = temp;

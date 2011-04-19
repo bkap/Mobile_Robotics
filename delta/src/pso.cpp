@@ -166,7 +166,12 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 		     y * 81968.0 + 149.419,
 		     0);
 	return coords;
-} 
+}
+
+LinFit fitter;
+bool getposition = false;
+Vec3f pos;
+float poscount = 0.0;
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
 
@@ -174,7 +179,14 @@ void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 	bool goodCoords = (gps_world_coords->status.status>0);
 
 	Vec3f gpsAllegedState = gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
-
+	if(orient){
+		fitter.next(gpsAllegedState[0],gpsAllegedState[1]);
+		if(getposition){
+				pos+= gpsAllegedState;
+				poscount+=1.0;
+		}
+		return;
+	}
 	// Calculate the weighting factor for the filter
 	//newman said this might be good in class.  
 	//If it isn't, use gps_world_coords.position_covariance, which should be a 9 element 1D array.
@@ -191,7 +203,7 @@ Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 	// For convenience, grab the current angle
 	double psi = state[2];
 	CvMat stateOld = Mat(state);
-	PrintMat(&stateOld);	
+	//PrintMat(&stateOld);	
 	// Generate the control matrix B
 	Mat B = (Mat_<float>(3,2) << 0.5*cos(psi),0.5*cos(psi),0.5*sin(psi),0.5*sin(psi),1.0/TRACK_WIDTH,-1.0/TRACK_WIDTH);
 	
@@ -204,6 +216,7 @@ Vec3f odomUpdateState(Vec3f state, float s_right, float s_left)
 	return(newstate);
 }
 
+geometry_msgs::PoseStamped getPositionEstimate();
 int rolex = 0;//because clock is already taken
 #define ALARM_CLOCK 50*60
 void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
@@ -232,9 +245,9 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	else
 	{
 		// the final output should have this type and call the publish function on pose_pub
-		nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
+		//nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
 		//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
-		pose_pub.publish(odom);
+		pose_pub.publish(getPositionEstimate());
 	}
 	
 }
@@ -288,7 +301,7 @@ int main(int argc, char **argv)
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
-	cmdvel_pub = n.advertise<gemoetry_msgs::Twist>("cmd_vel",1);
+	cmdvel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel",1);
 	int debug_ctr = 0;
 	geometry_msgs::PoseStamped temp_pose;
 
@@ -302,48 +315,46 @@ int main(int argc, char **argv)
 		pose_pub.publish(temp_pose);
 	*/
 	//get our initial haeading
-		
+	
 		if(orient) {
+			static int wait_count = 0;
 			static double currentspeed = 0.0;
-			static bool slowing = false;
 			static bool firsttime = true;
 			static bool waiting = true;
 			if(waiting) {
-				static int wait_count = 0;
 				wait_count++;
+				currentspeed = 0.0;
 				if(wait_count > 10 * LOOP_RATE) {
+					ROS_INFO("moving: %f", LOOP_RATE);
+					
 					waiting = false;
 					wait_count = 0;
 					if(!firsttime) {
 						orient = false;
 						cmdvel_pub.shutdown();
+						pos = pos * (1/poscount);
+						float heading = (float)fitter.getHeading();
+						pos[2] = heading;
+						state_odom_only = pos;
+						state_inc_GPS = pos;
+						state_last_fix = pos;
 						continue;
 					}
 				}
-			}
-			else if(!slowing) {
-				currentspeed += 0.1/LOOP_RATE;
-				if(currentspeed > 0.5) {
-					slowing = true;
-				}
-			} else if(firsttime){
-				currentspeed -= -.1/LOOP_RATE;
-				if(currentspeed < -0.5) {
-					firsttime = false;
-				}
 			} else {
-			currentspeed += 0.1/LOOP_RATE;
-				if(currentspeed >= 0) {
+				currentspeed = 0.1;
+				wait_count++;
+				if(wait_count > 15 * LOOP_RATE) {
+					wait_count = 0;
+					firsttime = false;
 					waiting = true;
 				}
+			
 			}
-			double publishspeed = min(max(currentspeed,0.0), 0.5);		
 			Twist vel_object;
-			vel_object.linear.x = -1 * publishspeed;
+			vel_object.linear.x = currentspeed; 
 			vel_object.angular.z = 0.0;
 			cmdvel_pub.publish(vel_object);			
-		
-			continue;
 		}
 		// Every so often, spit out info for debugging
 		if( debug_ctr++ % 20 == 0 )

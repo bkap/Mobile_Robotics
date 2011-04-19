@@ -287,8 +287,8 @@ int main(int argc,char **argv)
 				//cout << " BRAKINGGGGG";
 				curState.des_speed = max(curState.des_speed - aMax / REFRESH_RATE, 0.0);
 			}
-			if(is_neg)
-					curState.des_speed = -curState.des_speed;
+			//if(is_neg)
+			//		curState.des_speed = -curState.des_speed;
 			//cout << "\npro: des_speed = " << curState.des_speed << " on segment " << curState.seg_number << " of " << pathlist.path_list.size()-1 << "\n";
 			pub.publish(curState); // publish the CrawlerDesiredState
 		}
