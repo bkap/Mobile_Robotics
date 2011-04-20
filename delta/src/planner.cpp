@@ -490,7 +490,7 @@ int main(int argc,char **argv)
 		p.y = 12.15; */
 		//along back
 		p.x = -67.4;
-		p.y = 20.2;
+		p.y = -20.2;
 		pointList.points.push_back(p);
 	    
         geometry_msgs::Point32 p2;
@@ -499,7 +499,7 @@ int main(int argc,char **argv)
 		//p2.x = -3.15;
 		//p2.y = 20.4;
 		p2.x = -63.8;
-		p2.y = 19.4;
+		p2.y = -19.4;
 		pointList.points.push_back(p2);
 		
         geometry_msgs::Point32 p3;
@@ -508,7 +508,7 @@ int main(int argc,char **argv)
 		//p3.x = -0.75;
 		//p3.y = 23.05;
 		p3.x = -59.8;
-		p3.y = 16.6;
+		p3.y = -16.6;
 		pointList.points.push_back(p3);
 		double initial_heading= tf::getYaw(poseActual.pose.orientation);
 	    PathList turns = joinPoints(initial_heading,pointList);

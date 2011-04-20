@@ -166,7 +166,7 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 	double x = (gps_world_coords.latitude - 41.5);
 	double y = (gps_world_coords.longitude + 81.605); 
 	Vec3f coords(x * 111090.0 - 217.168,
-		     y * 81968.0 + 149.419,
+		     -1 * (y * 81968.0 + 149.419),
 		     0);
 	return coords;
 }
@@ -276,7 +276,7 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "pso");
  
-        while(!ros::Time::isValid()) { ros::spinOnce(); }
+        //while(!ros::Time::isValid()) { ros::spinOnce(); }
      
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 			} else {
 				currentspeed = 0.1;
 				wait_count++;
-				if(wait_count > 15 * LOOP_RATE) {
+				if(wait_count > 25 * LOOP_RATE) {
 					wait_count = 0;
 					firsttime = false;
 					waiting = true;
