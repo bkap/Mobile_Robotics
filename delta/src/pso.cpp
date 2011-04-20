@@ -171,38 +171,16 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 	return coords;
 }
 
-ros::Subscriber gps_sub2;
-tf::TransformListener *tfl;
-PoseStamped temp;
- PoseStamped output;
-bool hasOdom = false;
-void realOdomCallback(const Odometry::ConstPtr& odom) {
-
-        Odometry o = *odom;
-        temp.pose = o.pose.pose;
-        temp.header = o.header;
-        try {
-                        tfl->transformPose("map",temp,output);
-                hasOdom = true; 
-		//  pose_pub.publish(output);
-        } catch(tf::TransformException ex) {
-                ROS_ERROR("%s",ex.what());
-        }
-
-}
-
-
 LinFit fitter;
 bool getposition = false;
 Vec3f pos;
 float poscount = 0.0;
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
-	if(!hasOdom)	return;
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
-	bool goodCoords = true;//(gps_world_coords->status.status>0);
+	bool goodCoords = (gps_world_coords->status.status>0);
 
-	Vec3f gpsAllegedState(output.pose.position.x, output.pose.position.y, 0); //= gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
+	Vec3f gpsAllegedState = gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
 	if(orient){
 		fitter.next(gpsAllegedState[0],gpsAllegedState[1]);
 		if(getposition){
@@ -297,15 +275,9 @@ geometry_msgs::PoseStamped getPositionEstimate()
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "pso");
-
-	tfl = new tf::TransformListener();
-        
+ 
         while(!ros::Time::isValid()) { ros::spinOnce(); }
-        while(!tfl->canTransform("map","odom", ros::Time::now())) {
-                ros::spinOnce();
-        }
-
-
+     
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
 	
@@ -331,7 +303,6 @@ int main(int argc, char **argv)
 	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
 	
-        gps_sub2 = n.subscribe<Odometry>("odom",1,realOdomCallback);
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
