@@ -14,7 +14,7 @@
 using namespace std;
 using namespace cv;
 using namespace geometry_msgs;
-
+using namespace nav_msgs;
 class LinFit
 {
 	public:
@@ -134,11 +134,12 @@ nav_msgs::Odometry stateToOdom(Vec3f gpsState){
 void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	double theta_squiggle = atan2(state_estimate[1] - state_last_fix[1],state_estimate[0] - state_last_fix[0]);
 	double theta_gps = atan2(gps_fix[1] - state_last_fix[1],gps_fix[0]-state_last_fix[0]);
+	cerr<<"heading adjustment: "<<(theta_gps - theta_squiggle)<<endl;
 	state_estimate[2] += HEADING_WEIGHT * (theta_gps - theta_squiggle);
-	if(state_estimate[2] > 3.14159) {
-		state_estimate[2] -= 2 * 3.14159;
-	} else if(state_estimate[2] < -3.14159) {
-		state_estimate[2] += 2 * 3.14159;		
+	if(state_estimate[2] > CV_PI) {
+		state_estimate[2] -= 2 * CV_PI;
+	} else if(state_estimate[2] < -CV_PI) {
+		state_estimate[2] += 2 * CV_PI;		
 	}
 	//cout<<"state_estimate 2 = "<<state_estimate[2]<<", "<<HEADING_WEIGHT*(theta_gps-theta_squiggle)<<"\n";
 	state_last_fix = state_estimate;
@@ -154,6 +155,7 @@ void gpsUpdateState(Vec3f gpsFix, float a){
 	double y = (bestGuess[1]-state_last_fix[1]);
 
 	if(sqrt(x*x+y*y)>=DIST_BETWEEN_HEADING_UPDATES && a<1){
+		cerr<<"mangling heading\n";
 		applyCorrection(bestGuess,gpsFix);
 	}
 	state_inc_GPS = bestGuess;
@@ -169,17 +171,38 @@ Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
 	return coords;
 }
 
+ros::Subscriber gps_sub2;
+tf::TransformListener *tfl;
+PoseStamped temp;
+ PoseStamped output;
+bool hasOdom = false;
+void realOdomCallback(const Odometry::ConstPtr& odom) {
+
+        Odometry o = *odom;
+        temp.pose = o.pose.pose;
+        temp.header = o.header;
+        try {
+                        tfl->transformPose("map",temp,output);
+                hasOdom = true; 
+		//  pose_pub.publish(output);
+        } catch(tf::TransformException ex) {
+                ROS_ERROR("%s",ex.what());
+        }
+
+}
+
+
 LinFit fitter;
 bool getposition = false;
 Vec3f pos;
 float poscount = 0.0;
 void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 {
-
+	if(!hasOdom)	return;
 	//based on the comments in the cwru_base stuff, a status of -1 is a bad fix, and statuses >=0 represent valid coordinates
-	bool goodCoords = (gps_world_coords->status.status>0);
+	bool goodCoords = true;//(gps_world_coords->status.status>0);
 
-	Vec3f gpsAllegedState = gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
+	Vec3f gpsAllegedState(output.pose.position.x, output.pose.position.y, 0); //= gpsToReasonableCoords(*gps_world_coords); //should convert to a reasonable mat in meters
 	if(orient){
 		fitter.next(gpsAllegedState[0],gpsAllegedState[1]);
 		if(getposition){
@@ -274,6 +297,15 @@ geometry_msgs::PoseStamped getPositionEstimate()
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "pso");
+
+	tfl = new tf::TransformListener();
+        
+        while(!ros::Time::isValid()) { ros::spinOnce(); }
+        while(!tfl->canTransform("map","odom", ros::Time::now())) {
+                ros::spinOnce();
+        }
+
+
 	ros::NodeHandle n;
 	ROS_INFO("pso initialized");
 	
@@ -299,6 +331,7 @@ int main(int argc, char **argv)
 	// Wait for ROS to start	
 	while (!ros::ok()){ ros::spinOnce(); }
 	
+        gps_sub2 = n.subscribe<Odometry>("odom",1,realOdomCallback);
 	gps_sub = n.subscribe<cwru_base::NavSatFix>("gps_fix", 1, GPSCallback);
 	odom_sub = n.subscribe<cwru_base::cRIOSensors>("crio_sensors", 1, odomCallback);
 	pose_pub = n.advertise<geometry_msgs::PoseStamped>("poseActual", 1);
