@@ -59,7 +59,7 @@ double LinFit::getSlope()
 
 double LinFit::getHeading()
 {
-	return atan2(getSlope(), 1.0);
+	return atan2(1.0,getSlope());
 }
 
 
@@ -140,7 +140,7 @@ void applyCorrection(Vec3f& state_estimate, Vec3f gps_fix){
 	} else if(state_estimate[2] < -3.14159) {
 		state_estimate[2] += 2 * 3.14159;		
 	}
-	cout<<"state_estimate 2 = "<<state_estimate[2]<<", "<<HEADING_WEIGHT*(theta_gps-theta_squiggle)<<"\n";
+	//cout<<"state_estimate 2 = "<<state_estimate[2]<<", "<<HEADING_WEIGHT*(theta_gps-theta_squiggle)<<"\n";
 	state_last_fix = state_estimate;
 	state_odom_only = state_estimate;
 }
@@ -157,6 +157,7 @@ void gpsUpdateState(Vec3f gpsFix, float a){
 		applyCorrection(bestGuess,gpsFix);
 	}
 	state_inc_GPS = bestGuess;
+	cout<<"(x,y,h) "<<bestGuess[0]<<","<<bestGuess[1]<<","<<bestGuess[2]<<endl;
 }
 
 Vec3f gpsToReasonableCoords(cwru_base::NavSatFix gps_world_coords) {
@@ -191,7 +192,7 @@ void GPSCallback(const cwru_base::NavSatFix::ConstPtr& gps_world_coords)
 	//newman said this might be good in class.  
 	//If it isn't, use gps_world_coords.position_covariance, which should be a 9 element 1D array.
 	float alpha = goodCoords? 0.9:1;
-	cerr << gpsAllegedState[0] << "," << gpsAllegedState[1] <<endl;	
+	//cerr << gpsAllegedState[0] << "," << gpsAllegedState[1] << "," << gpsAllegedState[2] << endl;	
 	// Apply the filter to state_inc_GPS
 	gpsUpdateState(gpsAllegedState, alpha);
 	
@@ -241,11 +242,11 @@ void odomCallback(const cwru_base::cRIOSensors::ConstPtr& cRIO)
 	if(orient) {
 		return; //don't publish while we're orienting
 	}
-	if(rolex<ALARM_CLOCK)rolex++;
-	else
+	//if(rolex<ALARM_CLOCK)rolex++;
+	//else
 	{
 		// the final output should have this type and call the publish function on pose_pub
-		//nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
+		nav_msgs::Odometry odom = stateToOdom(state_inc_GPS); 
 		//see http://www.ros.org/doc/api/nav_msgs/html/msg/Odometry.html for the stuff that it has.
 		pose_pub.publish(getPositionEstimate());
 	}
@@ -338,6 +339,7 @@ int main(int argc, char **argv)
 						state_odom_only = pos;
 						state_inc_GPS = pos;
 						state_last_fix = pos;
+						getposition = false;
 						continue;
 					}
 				}
@@ -348,9 +350,11 @@ int main(int argc, char **argv)
 					wait_count = 0;
 					firsttime = false;
 					waiting = true;
+					getposition = true;
 				}
 			
 			}
+			ROS_INFO("publishing %f",currentspeed);
 			Twist vel_object;
 			vel_object.linear.x = currentspeed; 
 			vel_object.angular.z = 0.0;
@@ -359,7 +363,7 @@ int main(int argc, char **argv)
 		// Every so often, spit out info for debugging
 		if( debug_ctr++ % 20 == 0 )
 		{
-			ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.pose.position.x,temp_pose.pose.position.y,tf::getYaw(temp_pose.pose.orientation));
+			//ROS_INFO("PSO: at (%f,%f), psi=%f",temp_pose.pose.position.x,temp_pose.pose.position.y,tf::getYaw(temp_pose.pose.orientation));
 		}
 		
 		loopTimer.sleep();
