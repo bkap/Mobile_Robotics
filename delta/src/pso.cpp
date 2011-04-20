@@ -59,7 +59,7 @@ double LinFit::getSlope()
 
 double LinFit::getHeading()
 {
-	return atan2(1.0,getSlope());
+	return atan2(getSlope(), 1.0);
 }
 
 
