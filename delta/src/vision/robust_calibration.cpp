@@ -6,7 +6,9 @@
 #include <sensor_msgs/LaserScan.h>
 #include <eecs376_vision/lib_demo.h>
 #include <stdio.h>
-#include "vision/cvFuncs.h"
+#include <fstream>
+#include <iostream>
+#include "cvFuncs.h"
 
 using namespace cv;
 using namespace std;
@@ -16,7 +18,7 @@ using namespace std;
 
 /*
 	This should now work.  There is some code in the image callback which flips the image and is only necessary when testing from the harlie bagfile and should otherwise be disabled
-	
+
 	The code if(PRECAL){...} in the image callback converts the camera image to the birdseye view
 
 	perspectiveTransform(Mat(CoordsInCameraIJ),CoordsInBaseXY,viewToBase) transforms points from the camera frame into base_link
@@ -42,6 +44,40 @@ Size orthoImageSize(2 * orthoBounds.y * ppm + 1 , orthoBounds.x * ppm + 1);
 
 Mat lastImage;			//last image pulled from the callback
 Mat firstImage;
+
+
+template <typename T>
+void readMat(cv::Mat_<T>& mat, char* file){
+	ifstream* infile = new ifstream(file,ifstream::in&ifstream::binary);
+	int rows = 0,cols = 0;
+	(*infile)>>rows;
+	(*infile)>>cols;
+	mat = Mat_<T>(rows,cols);
+	T val;
+	for(int i=0;i<mat.rows;i++){
+		for(int j=0;j<mat.cols;j++){
+			(*infile)>>val;
+			mat(i,j)=val;
+		}
+	}
+	infile->close();
+}
+template <typename T>
+void writeMat(cv::Mat_<T>& mat, char* file){
+	ofstream* ofile = new ofstream(file,ofstream::out&ofstream::binary);
+	(*ofile)<<mat.rows<<" ";
+	(*ofile)<<mat.cols<<" ";
+	
+	for(int i = 0;i<mat.rows;i++){
+		for(int j = 0;j<mat.cols;j++){
+			(*ofile)<<(T) mat(i,j)<<" ";
+		}
+	}
+	ofile->close();
+}
+
+
+
 
 class DemoNode {
   public:
@@ -137,9 +173,9 @@ return last_scan_valid;
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
-  
+
 //  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
- 
+
   // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
   int num_filtered = filterLIDAR(scan);
   bool foundRod = findRod(scan);
@@ -219,7 +255,7 @@ int main(int argc, char **argv)
 	cout<<"beginning calibration"<<endl;
 
 
-	
+
 	/*	Initialization	*/
 	Mat viewIJ_ = Mat(viewIJ);
 	Mat baseXY_= Mat(baseXY);
@@ -263,24 +299,24 @@ int main(int argc, char **argv)
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
 
 	perspectiveTransform(Mat(orthoCornersBaseXY),orthoCornersIJ_,orthoToBaseInv);
-	//cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
-	
+	cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+
 	perspectiveTransform(Mat(viewCornersIJ),viewCornersBaseXY_,viewToBase);
-	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
+	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
 
 	writeMat<Point2f>(viewCornersBaseXY_,"/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link");
-	
+
 
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);
-	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
 
 	Mat out_;
-	warpPerspective(firstImage.t(),out_,viewToOrtho,Size(orthoImageSize.height,orthoImageSize.width));		
-	out_=out_.t();	
-	
+	warpPerspective(firstImage.t(),out_,viewToOrtho,Size(orthoImageSize.height,orthoImageSize.width));
+	out_=out_.t();
+
 	imshow("birdseye",out_);
-	waitKey(-1);	
+	waitKey(-1);
 
 	cout<<"got there"<<endl;
     cvDestroyWindow("birdseye");

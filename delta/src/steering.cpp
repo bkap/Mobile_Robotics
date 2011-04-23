@@ -8,12 +8,12 @@
 #include<tf/transform_datatypes.h>
 #include<tf/transform_listener.h>
 #include "opencv2/core/core.hpp"
-#include "vision/cvFuncs.h"
+#include "cvFuncs.h"
 
 using namespace std;
 
 double LOOP_RATE = 20;	//loop rate in Hz
-double kS = -.5;		//proportional gain on following error correction
+double kS = -0.5;		//proportional gain on following error correction
 double kD = -.25;		//proportional gain on lateral error correction
 double kP = -.25;		//proportional gain on heading error correction
 

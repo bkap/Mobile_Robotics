@@ -10,137 +10,346 @@
 #include <nav_msgs/Odometry.h>
 #include <vector>
 #include <math.h>
-#include <iostream>		
-#include "CSpaceFuncs.h"
+#include <iostream>
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/core/core.hpp"
-#define pi 3.14159265358979323846264338327950288
+#include <fstream>
+#include <iostream>
+#include <cvFuncs.h>
+
+#define FILL_RATE 25
+#define CLEAR_RATE 5
+#define CAMERA_ROIx_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIx_base_link"
+#define CAMERA_ROIy_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIy_base_link"
+
+
+using namespace std;
+using namespace cv;
+
+/*
+	Separated lidar and camera occupancy grids
+	implemented lidar clearing via raytracing
+	implemented camera clearing via viewable area masking
+
+	mask camera by lidar pings to prevent addition of poorly-mapped camera points
+
+*/
 
 /*TODO
-	tie grid position to pose
-	use more openCV:
-		dilate a sparse matrix by a disk to fatten pings
+
+finish and verify the rewrite
+	Clearing is presently mediocre
+		cameara clears via subtraction, lidar clears via setting
+
+	convert from fixed origin to rolling window
+
+various fixes needed:
+	use real transforms
+	eliminate extraneous computation
+
+
+camera mask depends on lidar mask:
+	valid camera points exist only behind valid pings
 */
 
 double loopRate = 10;
 
-const double gridOx = -10;	//origin y co-ordinate
-const double gridOy = -10;	//origin x co-ordinate
-const double gridRes = 0.05;	//5cm per pixel
-const double patchRadius = 15/39.37;//radius of fattening patch (robot radius)
-const double gridLength = 45;	//25 meter square
-const int gridSize = ceil(gridLength / gridRes);	//pixel width of grid
-const int patchSize = 2*ceil(patchRadius/gridRes) + 1;	//pixel width of patch
-
 sensor_msgs::PointCloud scanCloud;
-nav_msgs::OccupancyGrid cSpace;
-int** patch;			//fattening template
+geometry_msgs::PoseStamped last_map_pose;
+nav_msgs::Odometry last_odom;
 
-/*presently unused, will implement later*/
-	double PoseX;			
-	double PoseY;
-	double InitX;
-	double InitY;
-	geometry_msgs::PoseStamped last_map_pose;
-	nav_msgs::Odometry last_odom;
+Mat_<Vec2f> cameraROICorners(2,2,Vec2f(0,0));
 
-using namespace std;
+const float gridWidth= 45;	//meters
+const float gridRes = 0.05;	//meters per pixel
+const float fattening=0.35;	//meters dilation of obstacles
+const int fixedPoints = 1;	//fractional bits for locations on grid
+const Point_<float> gridOrigin(-10,-10); //grid x0,y0 in meters
 
-//checks whether a given map-frame co-ordinate is within the bounds of the CSpace grid
-inline bool inGrid(double x, double y){
-	return x>=gridOx && x<= gridOx+gridLength
-		&&y>=gridOy && y<=gridOy+gridLength;
-}
-//checks whether the entirety of the fattened representation of the given point in map-frame co-ordinates is witin the bounds of the CSpace grid
-inline bool fatInGrid(double x, double y){
-	return inGrid(x+patchRadius+gridRes,y)&&inGrid(x-patchRadius-gridRes,y)
-		&&inGrid(x,y+patchRadius+gridRes)&&inGrid(x,y-patchRadius-gridRes);
-}
-//converts from a row, col index format to the coresponding index in the 1D representation
-inline int address(int x, int y)
-{
-	//cout<< "\tplacing ("<<x<<","<<y<<") in ["<<y * gridSize + x<<"]"<<endl;
-	return y * gridSize + x;
-}
+const Size_<float> gridSize(gridWidth,gridWidth);	//meter width of grid
+const Size_<int> gridMatSize(ceil(gridWidth/gridRes),ceil(gridWidth/gridRes));
+const Rect_<float> gridBounds(gridOrigin,gridSize);
+const Scalar_<char> fillColor(FILL_RATE);
+const Scalar_<char> clearColor(CLEAR_RATE);
+Mat_<char> gridMat;
+Mat_<char> lidarROI(gridMatSize,CV_8S);		//mask containing current area within LIDAR pings;; just a fattened raytrace
+Mat_<char> cameraROI(gridMatSize,CV_8S);	//mask containing current viewable area
+Mat_<char> cameraGrid(gridMatSize,CV_8S);	//occupancy grid based solely on camera
+Mat_<char> LIDARGrid(gridMatSize,CV_8S);	//occupancy grid based solely on lidar
+
+
+nav_msgs::OccupancyGrid grid;
+bool init = false;
+/*
+	In accordance with OccupancyGrid, columns correspond to x and rows correspond to y
+*/
+
 //initializes the CSpace grid.
+
+
+
+template <typename T>
+void readMat(cv::Mat_<T>& mat, char* file){
+	ifstream* infile = new ifstream(file,ifstream::in&ifstream::binary);
+	int rows = 0,cols = 0;
+	(*infile)>>rows;
+	(*infile)>>cols;
+	mat = Mat_<T>(rows,cols);
+	T val;
+	for(int i=0;i<mat.rows;i++){
+		for(int j=0;j<mat.cols;j++){
+			(*infile)>>val;
+			mat(i,j)=val;
+		}
+	}
+	infile->close();
+}
+template <typename T>
+void writeMat(cv::Mat_<T>& mat, char* file){
+	ofstream* ofile = new ofstream(file,ofstream::out&ofstream::binary);
+	(*ofile)<<mat.rows<<" ";
+	(*ofile)<<mat.cols<<" ";
+	
+	for(int i = 0;i<mat.rows;i++){
+		for(int j = 0;j<mat.cols;j++){
+			(*ofile)<<(T) mat(i,j)<<" ";
+		}
+	}
+	ofile->close();
+}
+
+
+
 void cSpaceInit()
 {
 	cout<<"creating cSpace grid:"<<endl;
-	cSpace.header.seq = 0;
-	cSpace.header.frame_id = "map";
+	grid.header.seq = 0;
+	grid.header.frame_id = "map";
 	//Output.header.stamp = time(NULL);
-	cSpace.info.resolution = gridRes;
+	grid.info.resolution = gridRes;
 	//Output.info.map_load_time = time(NULL);
-	cSpace.info.width = gridSize;//NUM_WIDTH;
-	cSpace.info.height = gridSize;//NUM_HEIGHT;
-	cSpace.info.origin.position.x = gridOx;//InitX-GRID_WIDTH/2.0;
-	cSpace.info.origin.position.y = gridOy;//InitY-GRID_HEIGHT/2.0;
-	cSpace.info.origin.position.z = 0;
-	cSpace.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
-	vector<char>* data = new vector<char>((cSpace.info.width) * (cSpace.info.height));
-	cSpace.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
-	cout<<"\tcreated cSpace grid with "<<cSpace.info.width*cSpace.info.width<<" elements"<<endl;
+	grid.info.width = gridSize.width;//NUM_WIDTH;
+	grid.info.height = gridSize.height;//NUM_HEIGHT;
+	grid.info.origin.position.x = gridOrigin.x;//InitX-GRID_WIDTH/2.0;
+	grid.info.origin.position.y = gridOrigin.y;//InitY-GRID_HEIGHT/2.0;
+	grid.info.origin.position.z = 0;
+	grid.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
+	vector<char>* data = new vector<char>((grid.info.width) * (grid.info.height));
+	grid.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.	
+	gridMat = cv::Mat(grid.data,false);
+	gridMat = gridMat.reshape(gridMatSize.width);
+
+	Mat_<float> x(2,2,0.f);
+	Mat_<float> y(2,2,0.f);
+
+	
+	readMat<float>(x,CAMERA_ROIx_FILE);
+	readMat<float>(y,CAMERA_ROIy_FILE);
+
+	for (int i=0;i<4;i++){
+		cameraROICorners(i) = Vec2f(x(i), y(i));
+	}
+
+	cout<<"\tcreated cSpace grid with "<<gridMat.total()<<" elements"<<endl;
 }
-//one-time generation of patch for fattening
-void patchInit()
+
+//return index in grid corresponding to x,y coordinate in frame
+int pointToGridIndex(Point2f point){
+	int gx = round((point.x - gridOrigin.x)/gridRes);
+	int gy = round((point.y - gridOrigin.y)/gridRes);
+	return gx + gridMatSize.width * gy;
+}
+
+Point pointToGridPoint(Point2f point, size_t shift = 0){
+	float gx = (point.x - gridOrigin.x)/gridRes;
+	float gy = (point.y - gridOrigin.y)/gridRes;
+
+	if(shift==0)	return Point(round(gx),round(gy));
+
+	float s = (1 << shift);
+	int gxs = static_cast<int>(gx*s);
+	int gys = static_cast<int>(gy*s);
+	return Point(gxs,gys);	
+}
+void drawHit(Mat_<char>& grid, Point2f hit){
+	static int radius = static_cast<int>(fattening / gridRes * (1 << fixedPoints));
+	Point center = pointToGridPoint(hit,fixedPoints);
+
+	circle(gridMat, center, radius, fillColor, -1, 8,fixedPoints);
+}
+
+/*
+	Given a grid, a pointcloud in map frame, and a mask for which points to accept,
+	renders the points onto the grid, subject to the mask
+*/
+void addHits(Mat_<char>& grid, const sensor_msgs::PointCloud& cloud, vector<bool> mask= vector<bool>()){
+	bool maskall = mask.size() == 0;
+	vector<Point3f> points;
+	ROS2CVPointCloud(cloud,points);
+	Point2f hit;
+	for(unsigned int i=0;i<points.size();i++){
+		hit.x = points[i].x;
+		hit.y = points[i].y;
+		if(maskall || mask[i]){
+			drawHit(grid,hit);
+		}
+	}
+}
+void updateGrid(){
+	cv::MatIterator_<char> it=gridMat.begin(), it_end = gridMat.end();
+	cv::MatIterator_<char> camerait=cameraGrid.begin(), camerait_end = cameraGrid.end();
+	cv::MatIterator_<char> lidarit=LIDARGrid.begin(), lidarit_end = LIDARGrid.end();
+	
+        for(;it!=it_end;++it,++camerait,++lidarit){
+                *it = (*lidarit) > (*camerait)? *lidarit : *camerait;
+        }
+}
+
+/*
+	Given a point cloud in the map frame,
+	returns a mask for which are located within a valid region of the grid:
+		in presently viewable camera area and not behind a lidar ping
+*/
+void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
+	mask.clear();
+	vector<Point3f> points;
+	ROS2CVPointCloud(cloud,points);
+	Point2f hit;
+	for(unsigned int i=0;i<points.size();i++){
+		hit.x = points[i].x;
+		hit.y = points[i].y;
+		Point cell = pointToGridPoint(hit);
+		mask.push_back(gridBounds.contains(hit) && (cameraROI(cell) & lidarROI(cell)));
+	}
+}
+/*
+	
+*/
+void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	patch = (int **)calloc(patchSize, sizeof(int));
-	//cout<<"creating patch of size "<<patchSize<<endl;
-	int center = (patchSize-1)/2;	//center pixel coordinate
-	int rsquared = center*center;
-	for (int i = 0; i< patchSize; i++)
-	{
-		patch[i] = (int*) calloc(patchSize, sizeof(int));
-		for(int j=0;j<patchSize;j++)
-		{
-			if((i-center)*(i-center) + (j-center)*(j-center) < rsquared)
-			{
-				patch[i][j] = 100;
+	if (!init)	return;
+	//clearCamera();
+	subtract(cameraGrid,clearColor,cameraGrid,cameraROI);
+	vector<bool> mask;
+	maskCamera(*scan_cloud,mask);
+	addHits(cameraGrid,*scan_cloud,mask);
+	updateGrid();
+}
+
+/*
+	returns a point representing the vector wrt the given pose
+*/
+Point2f relativeTo(Vec2f point, geometry_msgs::Pose& pose){
+	Vec2f refDir,refPos,rDir,newDir;
+	ROS2CVPose(pose,refPos,refDir);
+
+	Vec2f r = point - refPos;//(point.x - refPos[0],point.y - refPos[1]);
+	getUnitVec(rDir,angle(r));
+	getUnitVec(newDir,angle(r)+angle(refDir));
+	Vec2f dest = newDir * (float) norm(r);
+	dest = dest + refPos;
+	return Point2f(dest[0],dest[1]);
+}
+
+/*
+	updates cameraROI to reflect presently viewable camera area
+*/
+void updateCameraROI(){
+	static vector<Point> corners;
+	if(corners.size()!=0){
+		//may be bad pointer
+		cameraROI = (char) 0;
+		corners.clear();	
+	}
+	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,0),last_map_pose.pose),fixedPoints));
+	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,1),last_map_pose.pose),fixedPoints));
+	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(1,1),last_map_pose.pose),fixedPoints));
+	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(1,0),last_map_pose.pose),fixedPoints));
+	//may be bad pointer	
+	fillConvexPoly(cameraROI,&(corners.front()),4,Scalar_<char>(1),8,fixedPoints);
+}
+
+/*
+	Given a PointCloud of lidar pings in map frame,
+	raytraces pings to generate a mask for clear space
+*/
+void updateLIDARROI(sensor_msgs::PointCloud cloud){
+	lidarROI = (char)0;
+	vector<Point3f> points;
+	ROS2CVPointCloud(cloud,points);
+	Point2f hit;
+	Point2f robot(last_map_pose.pose.position.x,last_map_pose.pose.position.y);
+	for(unsigned int i=0;i<points.size();i++){
+		hit.x = points[i].x;
+		hit.y = points[i].y;
+		line(lidarROI, pointToGridPoint(robot,fixedPoints), pointToGridPoint(hit,fixedPoints), Scalar(127), 2, 8, fixedPoints);
+	}
+}
+
+/*
+	Given a PointCloud of lidar pings in map frame,
+	clears grid by raytracing out to pings
+*/
+void clearLIDAR(const sensor_msgs::PointCloud& cloud, vector<bool> mask = vector<bool>()){
+	bool maskall = mask.size()==0;	
+	vector<Point3f> points;
+	ROS2CVPointCloud(cloud,points);
+	Point2f hit;
+	Point2f robot(last_map_pose.pose.position.x,last_map_pose.pose.position.y);
+	for(unsigned int i=0;i<points.size();i++){
+		hit.x = points[i].x;
+		hit.y = points[i].y;
+		if(maskall || mask[i]){
+			//line(LIDARGrid, pointToGridPoint(robot,fixedPoints), pointToGridPoint(hit,fixedPoints), Scalar(-CLEAR_RATE), 1, 8, fixedPoints);
+			LineIterator it(LIDARGrid,pointToGridPoint(robot),pointToGridPoint(hit));
+			for(int j=0;j<it.count;j++, ++it){
+				**it = saturate_cast<char>((char) **it - (char)CLEAR_RATE);
 			}
 		}
 	}
 }
-
-void copyPoints(sensor_msgs::PointCloud scanCloud)	
-{
-	static cv::Mat image = cv::Mat(gridSize,gridSize,CV_8U);
-	//cout<<"copying points:"<<endl;
-	int numPts = scanCloud.points.size();
-	cv::Vec2d r;
-	double theta;
-	for(int i = 0;i<numPts;i++)
-	{
-		double x = scanCloud.points[i].x;
-		double y = scanCloud.points[i].y;
-
-		r = cv::Vec2d(x - last_map_pose.pose.position.x,y-last_map_pose.pose.position.y);
-		theta=  tf::getYaw(last_map_pose.pose.orientation) - atan2(r[1],r[0]);
-		if(theta < - pi/2 || theta > pi/2  || r.dot(r) > 100)	{continue;}	//only accept points from within 10m in the correct directions in case a transform broke
-		if(fatInGrid(x,y))
-		{
-			
-			//cout<<"\tpoint validated at (" << x<<","<<y<<")"<<endl;
-			int Gx = round((x - gridOx)/gridRes) - (patchSize-1)/2;
-			int Gy = round((y - gridOy)/gridRes) - (patchSize-1)/2;
-			for(int j = 0; j < patchSize;j++)	//rows - y
-			{
-				for(int k = 0; k < patchSize;k++)//cols - x
-				{
-					cSpace.data[address(Gx + k ,Gy + j)] = cSpace.data[address(Gx + k, Gy + j)] | patch[j][k];
-//					image.at<char>(Gy+j,Gx+k)=cSpace.data[address(Gx + k ,Gy + j)];
-				}
-			}
-		}
+/*
+	Given a point cloud in the map frame,
+	returns a mask for which are located within a valid region of the grid:
+		within 20m of robot
+		in bounds of occupancy grid
+*/
+void maskLIDAR(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
+	mask.clear();
+	vector<Point3f> points;
+	ROS2CVPointCloud(cloud,points);
+	Point2f hit;
+	Point2f robot(last_map_pose.pose.position.x,last_map_pose.pose.position.y);
+	for(unsigned int i=0;i<points.size();i++){
+		hit.x = points[i].x;
+		hit.y = points[i].y;
+		float r = (hit.x-robot.x)*(hit.x-robot.x)+(hit.y-robot.y)*(hit.y-robot.y);
+		mask.push_back(gridBounds.contains(hit) && r < 400);
 	}
-//	cv::imshow("cSpace",image);
-	waitKey(5);
-	//cout<<"copied points"<<endl;
 }
 
-bool init = false;
+/*
+	adds new scan to lidar grid
+*/
+void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
+{
+	if (!init)	return;
+	vector<bool> mask;
+	maskLIDAR(*scan_cloud, mask);
+	clearLIDAR(*scan_cloud,mask);
+	addHits(LIDARGrid,*scan_cloud,mask);
+}
+
+
+
 geometry_msgs::PoseStamped temp;
 tf::TransformListener *tfl;
+
+/*
+	tracks robot location and triggers updates of cameraROI when robot moves
+	initializes various things on first call
+*/
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
 //	cout<<"lidarmapper odom callback occured\n";
@@ -157,39 +366,17 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 	  cout << "We caught an error!" << endl;
           ROS_ERROR("%s", ex.what());
         }
-	
-	PoseX = last_map_pose.pose.position.x;
-	PoseY = last_map_pose.pose.position.y;
-	
-	if(init == false)
-	{
+	if(init == false){
 		cout<<"odom callback initialized"<<endl;
-		InitX = PoseX;
-		InitY = PoseY;
 		cSpaceInit();
 		init = true;
 	}
+	updateCameraROI();
 	
-}
-
-void cloudCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
-{
-	if (init == true)
-	{
-		//cout<<"2callback\n";
-		scanCloud = *scan_cloud; 
-		//ROS_INFO("I got a scan cloud of size %lu", scanCloud.points.size());
-		copyPoints(scanCloud);
-		//cout<<"yo\n";
-	}
 }
 
 int main(int argc,char **argv)
 {
-	cout<<"2\n";
-	patchInit();
-//	cSpaceInit();
-//	init=true;
 	cout<<"2\n";
 	ros::init(argc,argv,"mapper");//name of this node
 
@@ -208,24 +395,20 @@ int main(int argc,char **argv)
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout<<"2\n";
 
-
-	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, cloudCallback);
+	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, lidarCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
+	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",1,cameraCallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
-		//cout<<"2\n";
-		ros::spinOnce(); //spin until ctrl-C or otherwise shutdown
-		//cout<<"grid dimensions "<<cSpace.info.width<<" by "<< cSpace.info.height<<endl;
-		P.publish(cSpace);
-		//cout<<"2\n";
-		loopTimer.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
-		//thus enforcing that we achieve the desired update rate (10Hz)
+		ros::spinOnce();
+		P.publish(grid);
+		loopTimer.sleep();
 	}
 	
-	return 0; // this code will only get here if this node was told to shut down, which is
-	// reflected in ros::ok() is false 
+	return 0;
 }
 
