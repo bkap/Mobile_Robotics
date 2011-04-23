@@ -20,8 +20,8 @@
 
 #define FILL_RATE 25
 #define CLEAR_RATE 5
-#define CAMERA_ROIx_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIx_base_link"
-#define CAMERA_ROIy_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIy_base_link"
+#define CAMERA_ROIx_FILE "delta/cameraROIx_base_link"
+#define CAMERA_ROIy_FILE "delta/cameraROIy_base_link"
 
 
 using namespace std;
