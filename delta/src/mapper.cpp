@@ -151,7 +151,7 @@ void cSpaceInit()
 		cameraROICorners(i) = Vec2f(x(i), y(i));
 	}
 
-	cout<<"\tcreated cSpace grid with "<<gridMat.total()<<" elements"<<endl;
+	//cout<<"\tcreated cSpace grid with "<<gridMat.total()<<" elements"<<endl;
 }
 
 //return index in grid corresponding to x,y coordinate in frame

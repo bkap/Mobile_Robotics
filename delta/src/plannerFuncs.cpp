@@ -29,6 +29,38 @@ using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
 
+inline double heuristic(int x, int y, Point2i goal) {
+	Point2i nodePoint(x, y);
+	return norm(nodePoint - goal);
+}
+
+inline double cost(Node expanding, double locCost) {
+	return expanding.pathCost + locCost;
+}
+
+vector<Node> getNeighbors(Node previous, Mat map, Node*** nodeList, Point2i goal) {
+	vector<Node> nodes;
+	Point2i directions[4] = {Point2i(1,0),Point2i(-1,0),Point2i(0,1), Point2i(0,-1)};
+	for(int i = 0; i < 4; i++) {
+		int newX = previous.x + directions[i].x;
+		int newY = previous.y + directions[i].y;
+		if(newX > 0 && newX < map.rows && newY > 0 && newY < map.cols) {
+			//okay, we're on the map. Now let's check to see if we're allowed
+			//to move here
+			if(nodeList[newX][newY] == NULL && map[newX][newY] != 256) {
+				Node n;
+				n.pathCost = cost(previous,map[newX][newY]);
+				n.heuristic = heuristic(newX, newY, goal);
+				n.x = newX;
+				n.y = newY;
+				n.Parent = &previous;
+				nodes.push_back(n);
+			}
+		}
+	}
+	return nodes;
+}
+
 vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 {
 	Node*** nodeList;
