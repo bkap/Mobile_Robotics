@@ -49,8 +49,8 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	//make list into vector and return it.
 	
 }
-inline double heuristic(Node n, Point2i goal) {
-	Point2i nodePoint(n.x, n.y);
+inline double heuristic(int x, int y, Point2i goal) {
+	Point2i nodePoint(x, y);
 	return norm(nodePoint - goal);
 }
 
