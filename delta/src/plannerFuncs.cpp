@@ -57,7 +57,7 @@ inline double heuristic(int x, int y, Point2i goal) {
 inline double cost(Node expanding, double locCost) {
 	return expanding.pathCost + locCost;
 }
-vector<Point2f> convertToMap(vector<Point2i> victor)
+vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution)
 {
 	//just iterate and convert in like 3 lines
 }

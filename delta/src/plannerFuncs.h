@@ -28,7 +28,7 @@ using namespace std;
 using namespace eecs376_msgs;
 
 vector<Point2i> aStar (Mat map, Point2i start, Point2i end);
-vector<Point2f> convertToMap(vector<Point2i> victor);
+vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution);
 vector<point2f> reducePoints(vector<Point2f> victor);
 
 class Node
@@ -37,4 +37,8 @@ class Node
 	Node* Parent;
 	int heuristic;
 	int pathCost;
+	
+	bool operator<(Node other) {
+		return heuristic+pathCost < other.heuristic + other.pathCost;
+		}
 }
