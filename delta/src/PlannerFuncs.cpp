@@ -27,7 +27,7 @@ using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
 
-vector<Point2i> aStar (Mat map, Point2i start)
+vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 {
 	//expand start
 	
