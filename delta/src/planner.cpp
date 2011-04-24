@@ -566,7 +566,7 @@ int main(int argc,char **argv)
 			    PathList turns = joinPoints(initial_heading,pointList);
 			
 					// Publish a visualization of the points
-					markers = visualizePoints(turns)
+					//markers = visualizePoints(turns)
 					vis_pub.publish(markers);
 					
 			    cout<<"publishing\n";

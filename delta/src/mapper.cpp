@@ -16,7 +16,7 @@
 #include "opencv2/core/core.hpp"
 #include <fstream>
 #include <iostream>
-#include <cvFuncs.h>
+#include "cvFuncs.h"
 
 #define FILL_RATE 25
 #define CLEAR_RATE 5
