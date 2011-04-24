@@ -19,6 +19,7 @@
 #include <eecs376_msgs/PathList.h>
 #include <eecs376_msgs/CrawlerDesiredState.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include "CSpaceFuncs.h"
 
 #define REFRESH_RATE 10
@@ -473,8 +474,10 @@ int main(int argc,char **argv)
 	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);
 
+	// Stuff for path visualization
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
-
+	visualization_msgs::MarkerArray markers;
+	
 	// hax to test
 	while(!poseActualcalled) {ros::spinOnce();}
 
@@ -559,9 +562,13 @@ int main(int argc,char **argv)
 			    }
 			*/
 			    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+			    
 			    PathList turns = joinPoints(initial_heading,pointList);
 			
-			
+					// Publish a visualization of the points
+					markers = visualizePoints(turns)
+					vis_pub.publish(markers);
+					
 			    cout<<"publishing\n";
 			    path_pub.publish(turns);
 			    cout<<"3published"<<"\n";	
