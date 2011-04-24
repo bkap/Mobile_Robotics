@@ -49,7 +49,14 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	//make list into vector and return it.
 	
 }
+inline double heuristic(Node n, Point2i goal) {
+	Point2i nodePoint(n.x, n.y);
+	return norm(nodePoint - goal);
+}
 
+inline double cost(Node expanding, double locCost) {
+	return expanding.pathCost + locCost;
+}
 vector<Point2f> convertToMap(vector<Point2i> victor)
 {
 	//just iterate and convert in like 3 lines
