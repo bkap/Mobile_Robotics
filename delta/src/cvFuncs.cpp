@@ -4,7 +4,7 @@
 #include<tf/transform_listener.h>
 #include <fstream>
 #include <iostream>
-#include <cvFuncs.h>
+#include "cvFuncs.h"
 
 using namespace cv;
 using namespace geometry_msgs;
