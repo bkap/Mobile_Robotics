@@ -92,8 +92,15 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	vector<Point2i> pathVec (pathList);
 	return pathVec;
 }
+inline double heuristic(int x, int y, Point2i goal) {
+	Point2i nodePoint(x, y);
+	return norm(nodePoint - goal);
+}
 
-vector<Point2f> convertToMap(vector<Point2i> victor)
+inline double cost(Node expanding, double locCost) {
+	return expanding.pathCost + locCost;
+}
+vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution)
 {
 	//just iterate and convert in like 3 lines
 }
