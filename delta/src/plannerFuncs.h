@@ -27,6 +27,9 @@ using namespace cv;
 using namespace std;
 using namespace eecs376_msgs;
 
+#ifndef PLANNER_FUNCS
+#define PLANNER_FUNCS
+
 vector<Point2i> aStar (Mat map, Point2i start, Point2i end);
 vector<Point2f> convertToMap(vector<Point2i> victor);
 vector<point2f> reducePoints(vector<Point2f> victor);
@@ -35,6 +38,25 @@ class Node
 {
 	int x, y;
 	Node* Parent;
-	int heuristic;
-	int pathCost;
+	double heuristic;
+	double pathCost;
+	
+	Node(int x, int, Node* Parent, double heuristic, double pathCost)
+	{
+		this->x = x;
+		this->y = y;
+		this->Parent = Parent;
+		this->heuristic = heuristic;
+		this->pathCost = pathCost;
+	}
+	
+	Node(Node N)
+	{
+		this->x = N.x;
+		this->y = N.y;
+		this->Parent = N.Parent;
+		this->heuristic = N.heuristic;
+		this->pathCost = N.pathCost;
+	}
 }
+#endif
