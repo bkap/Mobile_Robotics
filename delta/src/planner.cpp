@@ -459,29 +459,32 @@ int main(int argc,char **argv)
 {
 	cout<<argc<<"=argc, argv's=\n";
 	for (int i=0;i<argc;i++)
-	    cout <<i<<": "<< *argv[i] << "\n";
-    
-    ros::init(argc,argv,"pathPlanner");//name of this node
-    tfl = new tf::TransformListener();
-      	double amount_to_change = 0.0;    
-      	cout<<"3\n";
-    ros::NodeHandle n;
+	cout <<i<<": "<< *argv[i] << "\n";
+
+	ros::init(argc,argv,"pathPlanner");//name of this node
+	tfl = new tf::TransformListener();
+	double amount_to_change = 0.0;    
+	cout<<"3\n";
+	ros::NodeHandle n;
 	double intial_heading;
-    ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
-    ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseActual", 10, poseActual_Callback);
-    ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
-    ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
-	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);	
-    // hax to test
+	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
+	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseActual", 10, poseActual_Callback);
+	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
+	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
+	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);
+
+	ros::Publisher vis_pub = n.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
+
+	// hax to test
 	while(!poseActualcalled) {ros::spinOnce();}
-        
-        // let's make some fake points for a path WOO
-        sensor_msgs::PointCloud pointList;
-		geometry_msgs::Point32 origin;
-		origin.x = poseActual.pose.position.x;
-		origin.y = poseActual.pose.position.y;
-   		pointList.points.push_back(origin);
-	    geometry_msgs::Point32 p;
+
+	// let's make some fake points for a path WOO
+	sensor_msgs::PointCloud pointList;
+	geometry_msgs::Point32 origin;
+	origin.x = poseActual.pose.position.x;
+	origin.y = poseActual.pose.position.y;
+	pointList.points.push_back(origin);
+	geometry_msgs::Point32 p;
 		//along front
 		//p.x = 4.326;
 		//p.y = 4.26;
