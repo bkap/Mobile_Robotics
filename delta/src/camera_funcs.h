@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <list>
 
+#ifndef __ORANGELINES_H
+#define __ORANGELINES_H
 using namespace cv;
 using namespace std;
 
@@ -25,3 +27,4 @@ list<Point2i> getUnsortedPoints(vector<Vec4i> lines);
 list<Point2f> linesToNastyPolyLine(list<Point2f> Lines,  double IMAGE_ORIGIN_X, double IMAGE_ORIGIN_Y, double minSeparation);
 list<Point2f> cleanNastyPolyLine(list<Point2f> NastyPolyLine, int NumRemaining =20);
 list<Point2f> noTransform(list<Point2i> Pts);
+#endif
