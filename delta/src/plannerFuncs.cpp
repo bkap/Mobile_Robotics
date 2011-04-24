@@ -22,6 +22,7 @@
 #include <eecs376_msgs/CrawlerDesiredState.h>
 #include <visualization_msgs/Marker.h>
 #include <queue>
+#include <assert.h>
 #include "CSpaceFuncs.h"
 #include "plannerFuncs.h"
 using namespace cv;
@@ -46,7 +47,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, heuristic(x,y,end), 0);
 	
 	//add all nearby start to the priority queue
-	vector<Node> neighbors = getNeighbors(*nodeList[start.x][start.y], map, nodeList);
+	vector<Node> neighbors = getNeighbors(*nodeList[start.x][start.y], map, nodeList, end);
 	for(int i = 0; i<neighbors.size(); i++)
 	{
 		Q.push(neighbors[i]);
@@ -69,7 +70,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 		}
 		
 		//add it's neighbors to the priority queue
-		vector<Node> neighbors = getNeighbors(current, map, nodeList);
+		vector<Node> neighbors = getNeighbors(current, map, nodeList, end);
 		for(int i = 0; i<neighbors.size(); i++)
 		{
 			Q.push(neighbors[i]);
@@ -92,6 +93,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	vector<Point2i> pathVec (pathList);
 	return pathVec;
 }
+
 inline double heuristic(int x, int y, Point2i goal) {
 	Point2i nodePoint(x, y);
 	return norm(nodePoint - goal);
@@ -100,12 +102,63 @@ inline double heuristic(int x, int y, Point2i goal) {
 inline double cost(Node expanding, double locCost) {
 	return expanding.pathCost + locCost;
 }
+
 vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution)
 {
-	//just iterate and convert in like 3 lines
+	vector<Point2f> RetVal;
+	for(int i = 0; i<victor.size(); i++)
+	{
+		RetVal.push_back(Point2f(victor[i].x*resolution, victor[i].y*resolution)+origin);
+	}
+	return RetVal;
 }
 
-vector<point2f> reducePoints(vector<Point2f> victor)
+class PathNode
 {
-	//use an existing function here
+	public:
+	Point2f Pose;
+	double Significance
+	PathNode(Point2f Pose, double Significance);
 }
+
+bool operator<(PathNode A, PathNode B)
+{
+	return A.Significance<B.Significance;
+}
+
+vector<Point2f> cleanPath(vector<Point2f> NastyPolyLine, int NumRemaining)
+{
+	assert(1==0);//DON'T USE THIS I DIDN'T DO IT !!!!!!!!!!!!!!!! IT DOESN'T WORK AT  ALL!!!!!!!!!!!!!!
+	priority_queue Q;
+	list<Point2f>::iterator leastSignificant;
+	double minSignif; //short for minimum significance
+	int i =0;
+	while(NastyPolyLine.size()>NumRemaining)
+	{
+		//cout<<"loopin "<<i++<<"\n";
+		minSignif = 10000000; 
+		for (list<Point2f>::iterator it=++(++(NastyPolyLine.begin())); it!=--(NastyPolyLine.end()); it++)
+		{
+			Point2f A = (*(--it))-(*(++it));
+			Point2f B = (*(++it))-(*(--it));
+			cout << A.x << "," << A.y << endl;
+			double cosTheta = A.ddot(B)/(norm(A)*norm(B));
+			cout << cosTheta << endl;
+			double angle = acos(cosTheta);
+			double curSignif = fabs(3.14159-angle)*A.ddot(B)/(norm(A)+norm(B));
+			//if(cosTheta>0) curSignif = -100;
+			cout << curSignif << endl;
+			if(curSignif<minSignif)
+			{
+				cout << "new candidate" << endl;
+				minSignif = curSignif;
+				leastSignificant = it;
+			}
+		}
+		cout << "deleting" << endl;
+		NastyPolyLine.erase(leastSignificant);
+		cout << "deleted" << endl;
+	}	
+	return NastyPolyLine;
+}
+
