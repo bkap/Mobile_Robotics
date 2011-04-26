@@ -38,27 +38,31 @@ inline double cost(Node expanding, double locCost) {
 
 bool operator<(Node a, Node b) 
 {
-	return a.heuristic+a.pathCost < b.heuristic + b.pathCost;
+	return a.heuristic+a.pathCost > b.heuristic + b.pathCost;
 }
 
 #define WALL_THRESHOLD 200
 
 vector<Node> getNeighbors(Node previous, Mat map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;
+
 	Point2i directions[4] = {Point2i(1,0),Point2i(-1,0),Point2i(0,1), Point2i(0,-1)};
 	for(int i = 0; i < 4; i++) {
 		int newX = previous.x + directions[i].x;
 		int newY = previous.y + directions[i].y;
-		if(newX > 0 && newX < map.rows && newY > 0 && newY < map.cols) {
+		
+		if(newX >= 0 && newX < map.rows && newY >= 0 && newY < map.cols) {
 			//okay, we're on the map. Now let's check to see if we're allowed
 			//to move here
-			if(nodeList[newX][newY] == NULL && map.at<ushort>(newX,newY) < WALL_THRESHOLD) {
+		
+			if(nodeList[newX][newY] == NULL && map.at<int>(newX,newY) < WALL_THRESHOLD) {
+			
 				Node n;
-				n.pathCost = cost(previous,map.at<ushort>(newX,newY));
+				n.pathCost = cost(previous,map.at<int>(newX,newY));
 				n.heuristic = heuristic(newX, newY, goal);
 				n.x = newX;
 				n.y = newY;
-				n.parent = &previous;
+				n.parent = nodeList[previous.x][previous.y];
 				nodes.push_back(n);
 			}
 		}
@@ -76,28 +80,32 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	{
 		nodeList[i] = (Node**) calloc(map.cols, sizeof(Node*));
 	}
-	
-	map.convertTo(map, CV_16U, 1, 129);
+	//allocate temp space because convertTo gets mad if I don't
+	Mat temp;
+	map.copyTo(temp);
+	temp.convertTo(map, CV_32S, 1, 129);
 	
 	//expand start
-	
+
 	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, heuristic(start.x,start.y,end), 0);
-	
 	//add all nearby start to the priority queue
-	vector<Node> neighbors = getNeighbors(*nodeList[start.x][start.y], map, nodeList, end);
+	vector<Node> neighbors = getNeighbors(*(nodeList[start.x][start.y]), map, nodeList, end);
 	for(int i = 0; i<(int)neighbors.size(); i++)
 	{
 		Q.push(neighbors[i]);
 	}
-	
+
 	//while we have not found the path, 
 	bool done = false;
-	Node *current;
+	Node *current = new Node();
 	while (!done)
 	{
 		//expand the best thing in the priority queue
 		*current = Q.top();
+		
 		Q.pop();
+		
+		if(nodeList[current->x][current->y]!=NULL) continue;
 		nodeList[current->x][current->y] =  new Node(*current);
 		
 		if(current->x == end.x&&current->y == end.y)
@@ -121,13 +129,14 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	{
 		//add the current point to the list of points
 		pathList.push_front(Point2i(current->x, current->y));
-		
+
 		//current = parent
 		current = current->parent;
 	}
 	
 	//make list into vector and return it.
 	vector<Point2i> pathVec (pathList.begin(),pathList.end());
+	delete current;
 	return pathVec;
 }
 

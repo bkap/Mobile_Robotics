@@ -42,7 +42,7 @@ class Node
 	double heuristic;
 	double pathCost;
 	
-	Node(int x, int, Node* parent, double heuristic, double pathCost)
+	Node(int x, int y, Node* parent, double heuristic, double pathCost)
 	{
 		this->x = x;
 		this->y = y;

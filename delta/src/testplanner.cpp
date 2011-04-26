@@ -15,19 +15,21 @@ vector<Point2i> path;
 Mat_<char> readImg()
 {
 	cvNamedWindow("original");
-	Mat img = imread("/home/beth/Documents/Mobile_Robotics/delta/mapimg.jpg", 0); // read in grayscale img
+	Mat img = imread("/home/wes/Desktop/Mobile_Robotics/delta/mapImg.bmp", 0); // read in grayscale img
 	imshow("original", img);
-	
+		waitKey(-1);
 	Mat_<char> converted = Mat::zeros(img.size().width, img.size().height, CV_8SC1);
 	
 	// loop through and convert
 	// the values in the image mat will be between 0 and 255
 	// want to normalize them to be between SCHAR_MIN and SCHAR_MAX
 	// which coincidentally is also a range of 255, so just subtract SCHAR_MAX from it
-	Mat_<char> testmat = Mat::zeros(100,100, CV_8SC1);
-	for (int i=0; i<(int)testmat.size().width; i++)
-		for (int j=0; j<(int)testmat.size().height; j++)
-			testmat[i][j] = (char)((int) testmat[i][j]-SCHAR_MAX);
+
+	img.convertTo(converted, CV_8SC1, 1, -127);
+	
+	//cvNamedWindow("converted");
+	//imshow("converted", converted);
+	//	waitKey(-1);
 	
 	return converted;
 }
@@ -50,7 +52,7 @@ int main(int argc,char **argv)
 	startPt.y = 0;
 	endPt.x = mapImg.size().width;
 	endPt.y = mapImg.size().height;
-	path = aStar(mapImg, startPt, endPt);
+	path = aStar(mapImg, startPt, endPt-Point2i(1,1));
 
     	cout<<"3\n";
   
