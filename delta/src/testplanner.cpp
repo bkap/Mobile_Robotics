@@ -35,21 +35,19 @@ Mat_<char> readImg()
 // Subscribe, visualize, etc
 int main(int argc,char **argv)
 {
-    // read in a picture
-	cvNamedWindow("original");
-	Mat mapImg = imread("/home/beth/Documents/Mobile_Robotics/delta/frame.jpg", 1);
-	imshow("original", mapImg);
+	// Read in the image
+    Mat_<char> mapImg = readImg();
     
     // call aStar
 	Point2i startPt, endPt; // yeah these need initialized
-	startPt.x = startPt.y = 0;
+	startPt.x = 0;
+	startPt.y = 0;
 	endPt.x = mapImg.size().width;
 	endPt.y = mapImg.size().height;
 	path = aStar(mapImg, startPt, endPt);
     
-    readImg();
-    
     // lol jk fake points
+    /*
     path.resize(10);
     for (int i=0; i<(int)path.size(); i++)
     {
@@ -58,17 +56,18 @@ int main(int argc,char **argv)
     	p.y = 250+10*i*pow(-1,i);
     	path[i] = p;
     }
+    */
     
     // pictures here
-	//Mat img = Mat::zeros(mapImg.size().width, mapImg.size().height); // actual size!
-	Mat_<Vec3f> img = Mat::zeros(500, 500, CV_32F); // for fake points
+	Mat img = Mat::zeros(mapImg.size().width, mapImg.size().height, CV_32F); // actual size!
+	//Mat_<Vec3f> img = Mat::zeros(500, 500, CV_32F); // for fake points
 	
 	cvNamedWindow("path");
 	
 	// put in lines, gradient really isn't that noticeable/useful, so alternate green/blue
 	int initColor = 10, curColor = 10;
 	int initGreen = 255, curGreen = 255;
-	circle(img, path[0], 10, Scalar(curColor, curGreen, 0), -1);
+	//circle(img, path[0], 10, Scalar(curColor, curGreen, 0), -1);
 	for (int i=0; i<(int)path.size()-1; i++)
 	{
 		(i%2==0) ? (curColor=0, curGreen=255) : (curColor=255, curGreen=0);
@@ -77,7 +76,7 @@ int main(int argc,char **argv)
 		//curGreen = initGreen - initGreen * (i+1) / path.size();
 		cout << "New color is: " << curColor << ", " << curGreen << "\n";
 	}
-	circle(img, path[path.size()-1], 10, Scalar(curColor, curGreen, 0), -1);
+	//circle(img, path[path.size()-1], 10, Scalar(curColor, curGreen, 0), -1);
 	imshow("path", img);
 	
 	waitKey(-1);
