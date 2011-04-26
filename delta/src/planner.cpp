@@ -21,6 +21,7 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include "CSpaceFuncs.h"
+#include "plannerFuncs.cpp"
 
 #define REFRESH_RATE 10
 
@@ -71,6 +72,14 @@ Point3f convertGeoPointToPoint3f(geometry_msgs::Point32 geopt)
     p3f.y = geopt.y;
     p3f.z = geopt.z;
     return p3f;
+}
+
+Point2i convertGeoPointToPoint2i(geometry_msgs::Point32 geopt)
+{
+	Point2i p2i;
+	p2i.x = geopt.x;
+	p2i.y = geopt.y;
+	return p2i;
 }
 
 // Get distance between two points
@@ -158,7 +167,7 @@ PathSegment MakeCurve(double InitAngle, double FinalAngle, Point3f A, Point3f B,
 	Point3f M = (A+B)*(0.5);  //midpoint
 	Point3f MA = M-A;  //vector from midpoint to A
 	Point3f Center = M - Point3f(MA.y, -MA.y, 0)*(1.0/tan((FinalAngle-InitAngle)/2.0)); //get the center point.  derived using basic trig
-	double Radius = getDistance(A, Center); //this may or may not work
+	//double Radius = getDistance(A, Center); //this may or may not work
 
 	PathSegment P;
 	P.seg_type = CURVE;
@@ -391,11 +400,44 @@ PathList joinPoints(double initial_heading,sensor_msgs::PointCloud pointList)
     return pathList;
 }
 
+// Call A* search for path, lots of conversions needed so put in separate function
+// pointList is the list of goal points (first point is assumed to be origin)
+PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
+{
+	PathList turns;
+
+    for (int i=0; i<pointList.points.size()-1; i++)
+    {
+    	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
+    	Mat_<char> mapChar;
+    	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
+    	
+    	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
+    	vector<Point2i> segPts = aStar(mapChar, convertGeoPointToPoint2i(pointList.points[i]), convertGeoPointToPoint2i(pointList.points[i+1]));
+
+    	// convert vector<Point2i> to sensor_msgs::PointCloud
+		sensor_msgs::PointCloud segPtCloud;
+		for (int j=0; j<segPts.size(); j++)
+		{
+			geometry_msgs::Point32 p;
+			p.x = segPts[j].x;
+			p.y = segPts[j].y;
+			pointList.points.push_back(p);
+		}
+
+		PathList pathseg = joinPoints(initial_heading, segPtCloud);
+		for (int j=0; j<pathseg.path_list.size(); j++)
+			turns.path_list.push_back(pathseg.path_list[j]);
+    }
+    return turns;
+}
+
 // Begin main loop, callbacks, etc
 
 cv::Mat_<bool> *lastCSpace_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
+cv::Mat_<char> lastCSpace_CharMap; // ... shady pointer or is this ok?
 
 geometry_msgs::PoseStamped poseDes;
 geometry_msgs::Pose goalPose; 
@@ -416,7 +458,11 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	if(lastCSpace_Map != NULL) {
 		delete lastCSpace_Map;
 	}
-	lastCSpace_Map = getMap(*CSpace_Map);
+	lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
+
+	lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,false);
+	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(gridMatSize.width);
+
 	mapOrigin = (*CSpace_Map).info.origin;
 	LIDARcalled = true;
 }
@@ -458,16 +504,14 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 
 int main(int argc,char **argv)
 {
-	cout<<argc<<"=argc, argv's=\n";
-	for (int i=0;i<argc;i++)
-	cout <<i<<": "<< *argv[i] << "\n";
-
 	ros::init(argc,argv,"pathPlanner");//name of this node
 	tfl = new tf::TransformListener();
-	double amount_to_change = 0.0;    
+	//double amount_to_change = 0.0;    
+	//double intial_heading;
+	
 	cout<<"3\n";
+	
 	ros::NodeHandle n;
-	double intial_heading;
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
 	ros::Subscriber sub4 = n.subscribe<geometry_msgs::PoseStamped>("poseActual", 10, poseActual_Callback);
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
@@ -486,103 +530,108 @@ int main(int argc,char **argv)
 	geometry_msgs::Point32 origin;
 	origin.x = poseActual.pose.position.x;
 	origin.y = poseActual.pose.position.y;
-	pointList.points.push_back(origin);
-	geometry_msgs::Point32 p;
-		//along front
-		//p.x = 4.326;
-		//p.y = 4.26;
-		/*//inside
-		p.x = 5.2;
-		p.y = 12.15; */
-		//along back
-		p.x = -67.4;
-		p.y = -20.2;
-		pointList.points.push_back(p);
-	    
-        geometry_msgs::Point32 p2;
-		//p2.x = 7.848;
-		//p2.y = 9.336;
-		//p2.x = -3.15;
-		//p2.y = 20.4;
-		p2.x = -63.8;
-		p2.y = -19.4;
-		pointList.points.push_back(p2);
-		
-        geometry_msgs::Point32 p3;
-		//p3.x = 16.227;
-		//p3.y = 18.893;
-		//p3.x = -0.75;
-		//p3.y = 23.05;
-		p3.x = -59.8;
-		p3.y = -16.6;
-		pointList.points.push_back(p3);
-		double initial_heading= tf::getYaw(poseActual.pose.orientation);
-	    PathList turns = joinPoints(initial_heading,pointList);
-	    
-	    // and print them out
-	    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
+	pointList.points.push_back(origin);	// start points
 	
-	    cout<<"3\n";
-	    ros::Duration elapsed_time; // define a variable to hold elapsed time
-	    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
-	    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
-          	cout<<"3\n";
-	    ros::Time birthday = ros::Time::now();
-	    //desired_pose.header.stamp = birthday;
-	   // while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
-	    cout<<"3\n";
-	    ROS_INFO("birthday started as %f", birthday.toSec());
-      
-	    while (ros::ok()) // do work here
-	    {
-		    ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
-		    ros::Time current_time = ros::Time::now();
-		    elapsed_time= ros::Time::now()-birthday;
-
-		    if(LIDARcalled && goalPosecalled && pointListcalled) {
-			    if(!poseDescalled) {
-				    //this means we haven't used yet, so use our actual pose
-				    poseDes.pose.position.x = 7.57;
-				    poseDes.pose.position.y = 14.26;
-				    poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
-			    }
+	// goal points (these need changed for actual demo)
+	geometry_msgs::Point32 p;
 		
-			    list<geometry_msgs::Point> points;
-			    geometry_msgs::Point p;
-			    /*for(int i=0;i<lastCSpace_Map->size().height; i++)
+	//along front
+	//p.x = 4.326;
+	//p.y = 4.26;
+	/*//inside
+	p.x = 5.2;
+	p.y = 12.15; */
+	//along back
+	p.x = -67.4;
+	p.y = -20.2;
+	pointList.points.push_back(p);
+    
+    geometry_msgs::Point32 p2;
+	//p2.x = 7.848;
+	//p2.y = 9.336;
+	//p2.x = -3.15;
+	//p2.y = 20.4;
+	p2.x = -63.8;
+	p2.y = -19.4;
+	pointList.points.push_back(p2);
+	
+    geometry_msgs::Point32 p3;
+	//p3.x = 16.227;
+	//p3.y = 18.893;
+	//p3.x = -0.75;
+	//p3.y = 23.05;
+	p3.x = -59.8;
+	p3.y = -16.6;
+	pointList.points.push_back(p3);
+	double initial_heading= tf::getYaw(poseActual.pose.orientation);
+	
+	PathList turns = callAStar(pointList, initial_heading);
+	
+    // and print them out
+    ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
+
+    cout<<"3\n";
+    ros::Duration elapsed_time; // define a variable to hold elapsed time
+    ros::Rate naptime(REFRESH_RATE); //will perform sleeps to enforce loop rate of "10" Hz
+    while (ros::ok()&&!ros::Time::isValid()) ros::spinOnce(); // simulation time sometimes initializes slowly. Wait until ros::Time::now() will be valid, but let any callbacks happen
+      	cout<<"3\n";
+    ros::Time birthday = ros::Time::now();
+    //desired_pose.header.stamp = birthday;
+   // while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce(); // wait until there is transform data available before starting our controller loopros::Time birthday= ros::Time::now(); // get the current time, which defines our start time, called "birthday"
+    cout<<"3\n";
+    ROS_INFO("birthday started as %f", birthday.toSec());
+  
+    while (ros::ok()) // do work here
+    {
+	    ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
+	    ros::Time current_time = ros::Time::now();
+	    elapsed_time= ros::Time::now()-birthday;
+
+	    if(LIDARcalled && goalPosecalled && pointListcalled) {
+		    if(!poseDescalled) {
+			    //this means we haven't used yet, so use our actual pose
+			    poseDes.pose.position.x = 7.57;
+			    poseDes.pose.position.y = 14.26;
+			    poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
+		    }
+	
+		    list<geometry_msgs::Point> points;
+		    geometry_msgs::Point p;
+		    /*for(int i=0;i<lastCSpace_Map->size().height; i++)
+		    {
+			    for(int j =0; j<lastCSpace_Map->size().width; j++)
 			    {
-				    for(int j =0; j<lastCSpace_Map->size().width; j++)
-				    {
-					    if((*lastCSpace_Map)(i,j)) {
-						    p.x = mapOrigin.position.x+.05*j;
-						    p.y = mapOrigin.position.y*.05*i;
-						    points.push_back(p); 
-					    }
+				    if((*lastCSpace_Map)(i,j)) {
+					    p.x = mapOrigin.position.x+.05*j;
+					    p.y = mapOrigin.position.y*.05*i;
+					    points.push_back(p); 
 				    }
 			    }
+		    }
 			*/
-			    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
-			    
-			    PathList turns = joinPoints(initial_heading,pointList);
+	
+		    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
+		    //PathList turns = joinPoints(initial_heading,pointList);
+			PathList turns = callAStar(pointList, initial_heading);
 			
-					// Publish a visualization of the points
-					//markers = visualizePoints(turns)
-					vis_pub.publish(markers);
-					
-			    cout<<"publishing\n";
-			    path_pub.publish(turns);
-			    cout<<"3published"<<"\n";	
-		    }
-		    else
-		    {
-			    if(!LIDARcalled)cout<<"No LIDAR\n";
-			    if(!poseDescalled)cout<<"No poseDes\n";
-			    if(!goalPosecalled)cout<<"No goalPose\n";
-			    
-			    //if(!poseActualcalled)cout<<"No poseActual\n";
-		    }
-		    naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
-		    //thus enforcing that we achieve the desired update rate (10Hz)
+			// Publish a visualization of the points
+			//markers = visualizePoints(turns)
+			vis_pub.publish(markers);
+		
+		    cout<<"publishing\n";
+		    path_pub.publish(turns);
+		    cout<<"3published"<<"\n";	
+	    }
+	    else
+	    {
+		    if(!LIDARcalled)cout<<"No LIDAR\n";
+		    if(!poseDescalled)cout<<"No poseDes\n";
+		    if(!goalPosecalled)cout<<"No goalPose\n";
+		    
+		    //if(!poseActualcalled)cout<<"No poseActual\n";
+	    }
+	    naptime.sleep(); // this will cause the loop to sleep for balance of time of desired (100ms) period
+	    //thus enforcing that we achieve the desired update rate (10Hz)
     }
 	return 0; // this code will only get here if this node was told to shut down, which is
 	// reflected in ros::ok() is false 
