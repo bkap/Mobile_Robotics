@@ -25,8 +25,8 @@ Mat_<char> readImg()
 	// want to normalize them to be between SCHAR_MIN and SCHAR_MAX
 	// which coincidentally is also a range of 255, so just subtract SCHAR_MAX from it
 	Mat_<char> testmat = Mat::zeros(100,100, CV_8SC1);
-	for (int i=0; i<testmat.size().width; i++)
-		for (int j=0; j<testmat.size().height; j++)
+	for (int i=0; i<(int)testmat.size().width; i++)
+		for (int j=0; j<(int)testmat.size().height; j++)
 			testmat[i][j] = (char)((int) testmat[i][j]-SCHAR_MAX);
 	
 	return converted;
@@ -51,7 +51,7 @@ int main(int argc,char **argv)
     
     // lol jk fake points
     path.resize(10);
-    for (int i=0; i<path.size(); i++)
+    for (int i=0; i<(int)path.size(); i++)
     {
     	Point2i p;
     	p.x = i*50;
@@ -69,7 +69,7 @@ int main(int argc,char **argv)
 	int initColor = 10, curColor = 10;
 	int initGreen = 255, curGreen = 255;
 	circle(img, path[0], 10, Scalar(curColor, curGreen, 0), -1);
-	for (int i=0; i<path.size()-1; i++)
+	for (int i=0; i<(int)path.size()-1; i++)
 	{
 		(i%2==0) ? (curColor=0, curGreen=255) : (curColor=255, curGreen=0);
 		line(img, path[i], path[i+1], Scalar(curColor, curGreen, 0));

@@ -38,33 +38,35 @@ class Node
 {
 	public:
 	int x, y;
-	Node* Parent;
+	Node* parent;
 	double heuristic;
 	double pathCost;
 	
-	Node(int x, int, Node* Parent, double heuristic, double pathCost)
+	Node(int x, int, Node* parent, double heuristic, double pathCost)
 	{
 		this->x = x;
 		this->y = y;
-		this->Parent = Parent;
+		this->parent = parent;
 		this->heuristic = heuristic;
 		this->pathCost = pathCost;
 	}
 	
-	Node(Node N)
+	Node(const Node& N)
 	{
 		this->x = N.x;
 		this->y = N.y;
-		this->Parent = N.Parent;
+		this->parent = N.parent;
 		this->heuristic = N.heuristic;
 		this->pathCost = N.pathCost;
 	}
-	int heuristic;
-	int pathCost;
-	
-	bool operator<(Node other) 
+
+	Node()
 	{
-		return heuristic+pathCost < other.heuristic + other.pathCost;
+		x = y = -1;
+		parent = NULL;
+		heuristic = DBL_MAX;
+		pathCost = DBL_MAX;
 	}
-}
+	
+};
 #endif
