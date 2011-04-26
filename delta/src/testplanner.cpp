@@ -53,7 +53,22 @@ int main(int argc,char **argv)
 	endPt.x = mapImg.size().width;
 	endPt.y = mapImg.size().height;
 	path = aStar(mapImg, startPt, endPt-Point2i(1,1));
-
+	
+	vector<Point2f> path2;
+	for(int i = 0; i<(int)path.size(); i++)
+	{
+		path2.push_back(Point2f(path[i].x, path[i].y));
+	}
+	
+	approxPolyDP(Mat(path2), path2, 3, false);
+	
+	path.clear();
+	
+	for(int i = 0; i<(int) path2.size(); i++)
+	{
+		path.push_back(Point2i(path2[i].x, path2[i].y));
+	}
+	
     	cout<<"3\n";
   
     	cout<<"4\n";
@@ -88,7 +103,7 @@ int main(int argc,char **argv)
 	for (int i=0; i<(int)path.size()-1; i++)
 	{
 		(i%2==0) ? (curColor=0, curGreen=255) : (curColor=255, curGreen=0);
-		line(img, path[i], path[i+1], Scalar(curColor, curGreen, 0));
+		line(mapImg, path[i], path[i+1], Scalar(curColor, curGreen, 0));
 		//curColor = initColor + (255-initColor) * (i+1) / path.size();
 		//curGreen = initGreen - initGreen * (i+1) / path.size();
 		cout << "New color is: " << curColor << ", " << curGreen << "\n";
@@ -96,7 +111,7 @@ int main(int argc,char **argv)
 cout<<"6\n";
 	//circle(img, path[path.size()-1], 10, Scalar(curColor, curGreen, 0), -1);
 
-	imshow("path", img);
+	imshow("path", mapImg);
 	
 	waitKey(-1);
 }

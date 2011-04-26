@@ -84,7 +84,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	Mat temp;
 	map.copyTo(temp);
 	temp.convertTo(map, CV_32S, 1, 129);
-	
+	map = map.t();
 	//expand start
 
 	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, heuristic(start.x,start.y,end), 0);
