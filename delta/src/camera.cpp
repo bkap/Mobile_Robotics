@@ -16,10 +16,31 @@
 #include <stdio.h>
 #include <list>
 #include "camera_funcs.h"
+#include "cvFuncs.h"
 
 using namespace cv;
 using namespace std;
-void ReadMat(Mat_<float> *mat, char* file);
+
+template <typename T>
+void readMat(cv::Mat_<T>& mat, char* file){
+	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
+	int rows = 0,cols = 0,type=0,size=0;
+	(*infile)>>rows;
+	(*infile)>>cols;
+	(*infile)>>type;
+	(*infile)>>size;
+	char* data = new char[size];
+	infile->read(data,size);
+	infile->close();
+
+	int sizes[2] = {rows,cols};
+	Mat_<T> temp = Mat(2,sizes,type,data);
+	temp.copyTo(mat);
+	delete[] data;
+}
+
+
+
 
 Mat cameraMat; //intrinsic parameters
 Mat distMat; //distortion parameters
@@ -30,153 +51,110 @@ class DemoNode {
 		DemoNode();
 		void publishNavLoc(list<Point2f> NavPoints);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
-		void infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
 		list<Point2f> transformPts(list<Point2i> NavPoints);
 		ros::NodeHandle nh_; // Made this public to access it
 	private:
 		image_transport::ImageTransport it_;
 		image_transport::Subscriber sub_image_;
-		ros::Subscriber sub_info_;
 		ros::Publisher pub_nav_pts;
 		sensor_msgs::PointCloud NavPts;
-		Mat_<float> rvec, tvec;
-		Mat R2;
-		Mat projector;
+		sensor_msgs::PointCloud pointCloud;
+		void transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCloud& mapCloud);
+		Mat_<double> viewToBase;
 };
 
-list<Point2f> DemoNode::transformPts(list<Point2i> NavPoints)
+/*
+	binarizes an image by settng all non-orange pixels to zero and all orange pixels to 255
+*/
+void findOrange(cv::Mat& src)
 {
-	list<Point2f> result; 
-	Point2f temp;
-	Point3f V;
-	
-	for(list<Point2i>::iterator it = NavPoints.begin(); it!=NavPoints.end(); it++)
-	{
-		V.x = it->x;
-		V.y = it->y;
-		V.z = 1;
-		
-		Mat_<float> W = projector*Mat(V);
-		temp.x = W(0) / W(2);
-		temp.y = W(1) / W(2);
+  Mat temp;
+  temp = src;
 
-		//cout<<"CAM:Nav Point at "<<temp.x<<","<<temp.y<<" with respect to the robot\n";
-		result.push_back(temp);
+  //Make a vector of Mats to hold the invidiual B,G,R channels
+  vector<Mat> mats;
+  //Split the input into 3 separate channels
+  split(temp, mats);
+  // Set all values below value to zero, leave rest the same
+  // Then inverse binary threshold the remaining pixels
+  // Threshold blue channel
+  threshold(mats[0], mats[0], 60, 255, THRESH_TOZERO_INV);
+  threshold(mats[0], mats[0], 0, 255, THRESH_BINARY);
+  // Threshold green channel
+  threshold(mats[1], mats[1], 120, 255, THRESH_TOZERO_INV);
+  threshold(mats[1], mats[1], 0, 255, THRESH_BINARY);
+  // Threshold red channel
+  threshold(mats[2], mats[2], 255, 255, THRESH_TOZERO_INV);
+  threshold(mats[2], mats[2], 180, 255, THRESH_BINARY);
+  multiply(mats[0], mats[1], src);
+  multiply(src, mats[2], src);
+  erode(src, src, Mat());
+  dilate(src, src, Mat(), Point(-1,-1), 5);
+}
+/*
+	converts vector<Point2f> of camera coordinates to corresponding PointCloud in map coordinates
+*/
+void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCloud& mapCloud){
+
+	sensor_msgs::PointCloud cloud;
+	cloud.header.frame_id = "base_laser1_link";
+
+	/* transform to base_link */
+	Mat_<Point2f> basePoints_;
+	perspectiveTransform(Mat(viewPoints),basePoints_,viewToBase);
+	
+	vector<Point2f> points;
+	for(int i = 0;i<viewPoints.size();i++){
+		points.push_back(basePoints_(i));
 	}
 	
-	return result;
-}
-
-//call this with a point32 to publish the blob's location
-void DemoNode::publishNavLoc(list<Point2f> NavPoints)
-{
-	NavPts.points.erase(NavPts.points.begin(), NavPts.points.end());
-  // Convert into geometry points, and transform from pixel to robot coordinates
-	ROS_INFO("starting publish");
-	while(NavPoints.size()>0)
-	{
+	/*convert to point cloud*/
+	//cloud.points.erase(cloud.points.begin(), cloud.points.end());
+	for(int i=0;i<points.size();i++){
 		geometry_msgs::Point32 geoPoint;
-		geoPoint.x =  -1.5 * NavPoints.begin()->x;
-		geoPoint.y =   -2 * NavPoints.begin()->y;
+		geoPoint.x =  points[i].x;
+		geoPoint.y =  points[i].y;
 		geoPoint.z = 0;
-		NavPts.points.push_back(geoPoint);
-		NavPoints.pop_front();
+		cloud.points.push_back(geoPoint);
 	}
-	
 
-  // Transform the point cloud from robot coordinates to map coordinates
-	sensor_msgs::PointCloud tNavPts;
-	tfl->transformPointCloud("map", NavPts, tNavPts);
-	for(int i = 0; i < NavPts.points.size(); i++) {
-		cout << NavPts.points[i].x << "," << NavPts.points[i].y << "::";
-		cout << tNavPts.points[i].x << "," << tNavPts.points[i].y << endl;
+	/*transform cloud to map*/
+	tfl->transformPointCloud("map", cloud, mapCloud);
+}
+
+void findPoints(Mat& image, vector<Point2f>& points){
+	findOrange(image);
+	vector<vector<Point> > points_;
+	findContours(image, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+	for(int i =0;i<points_.size();i++){
+		for(int j=0;j<points_[i].size();j++){
+			points.push_back(Point2f(points_[i][j].x, points_[i][j].y));
+		}
 	}
-	pub_nav_pts.publish(tNavPts);
 }
 
-DemoNode::DemoNode():
-  it_(nh_)
-{
-  // Read the extrinsic calibration parameters
-	ReadMat(&rvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/rvec");
-	ReadMat(&tvec, "/home/jinx/ROSCode/delta/Mobile_Robotics/tvec");
-	ROS_INFO("Camera got extrinsic calibration");
-
-  // Subscribe to the image and camera info
-	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
-	sub_info_  = nh_.subscribe<sensor_msgs::CameraInfo>("camera_info",1,&DemoNode::infoCallback,this);
-
-  // Publish a cloud of points on the orange line
-	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Cam_Cloud", 1);
- 
-	NavPts.header.frame_id = "base_laser1_link";
-	
-	//rvec_ = Mat(&rvec);
-	//tvec_ = Mat(&tvec);
-	Rodrigues(rvec, R2);
-	R2.col(1) = R2.col(2);
-	R2.col(2) = tvec;
-
-}
-
-bool cameraCalled = false;
-// Callback for CameraInfo (intrinsic parameters)
-void DemoNode::infoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
-	const double* K = (msg->K).data();
-	const double* D = (msg->D).data();
-	Mat(3,3,CV_64F,const_cast<double*>(K)).assignTo(cameraMat,CV_32F);
-	Mat(5,1,CV_64F,const_cast<double*>(D)).assignTo(distMat,CV_32F);
-	cameraCalled = true;
-	Rodrigues(rvec, R2);
-	R2.col(1) = R2.col(2);
-	R2.col(2) = tvec;
-	projector = (cameraMat * R2).inv();	
-}
-
-// Called whenever you get a new image
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-  // Don't do anything until you get the intrinsic parameters
-  if(!cameraCalled) 
-  {
-    return;
-  }
 
-  cout << "imageCallback" << endl;
+  ROS_INFO("image callback");
 
-  sensor_msgs::CvBridge bridge;
+  static sensor_msgs::CvBridge bridge;
   cv::Mat image;
   // Convert image from ROS format to OpenCV format
   try
   {
-    image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
-    vector<Vec4i> vickyTheVector;
-    getOrangeLines(image, vickyTheVector);
-    list<Point2i> imPts = getUnsortedPoints(vickyTheVector);
-    cout << "preparing to transform" << endl;
-    list<Point2f> crtPts = transformPts(imPts);
- 
-    ROS_INFO("1:Created a path %d points long",crtPts.size());
-    crtPts = linesToNastyPolyLine(crtPts, 0, 0, .05);
-     ROS_INFO("%lu points remaining", crtPts.size());
-    //crtPts = cleanNastyPolyLine(crtPts, 10);
-
-
-    // Spit out the coordinates of the points
-    ROS_INFO("Created a path %d points long",crtPts.size());
-    /*for( int i=0; i<crtPts.size(); i++ )
-    {
-      ROS_INFO("(%d,%d)",crtPts[i].x,crtPts[i].y);
-    }
-*/
-    if(crtPts.size() > 1)
-    {
-	    this->publishNavLoc(crtPts);
-    }
-    else
-    {
-	    ROS_INFO("Camera: no lines detected\n");
-    }
+	image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
+	vector<Point2f> points;
+	findPoints(image,points);
+	
+	if(points.size() > 1){
+		transformPoints(points,pointCloud);
+		pub_nav_pts.publish(pointCloud);
+	}
+	else{
+		ROS_INFO("Camera: nothing detected");
+	}
   }
   catch (sensor_msgs::CvBridgeException& e)
   {
@@ -185,39 +163,20 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 }
 
-//reads a mat from the file in ~/.ros
-void ReadMat(Mat_<float> *mat, char* file)
+DemoNode::DemoNode():
+  it_(nh_)
 {
-  //cout<<"camout1\n";
-  ifstream* infile = new ifstream(file, ifstream::in&ifstream::binary);
-  cout << "file opened" << endl;
-  int rows, cols, type;
-  rows = cols = type = 0;
-  (*infile)>>rows;
-  cout<<"Scanned Rows, there are/is "<<rows<<" of them\n";
-  (*infile)>>cols;
-  cout<<"Scanned Columns, there are/is "<<cols<<" of them\n";
-  (*infile)>>type;
-  cout<<"Scanned Type that number is like "<<type<<" kthxbai\n";
-  //cout<<"camout2\n";
-  *mat = Mat_<float> (rows, cols); 
-  //cout<<"camout3\n";
-  unsigned int i, j;
-  float f;
-	for (i = 0; i < mat->rows; i++)
-	{
-		//fprintf(mfile,"\n");
-		for (j = 0; j < mat->cols; j++)
-		{
-      (*infile)>>f;
-			((*mat)(i,j)) = f;
-			cout << f << ",";
-		}     
-		cout << endl;
-	}
-	//cout<<"camout4\n";
-	infile->close();
+        readMat(viewToBase,"/home/connor/Code/Mobile_Robotics/delta/viewToBase");
+	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
+
+  // Publish a cloud of points on the orange line
+	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Camera_Cloud", 1);
+ 
+	NavPts.header.frame_id = "base_laser1_link";
+
+
 }
+
 
 int main(int argc, char **argv)
 {

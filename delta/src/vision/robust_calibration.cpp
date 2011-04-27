@@ -44,40 +44,43 @@ Size orthoImageSize(2 * orthoBounds.y * ppm + 1 , orthoBounds.x * ppm + 1);
 
 Mat lastImage;			//last image pulled from the callback
 Mat firstImage;
-
-
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
-	ifstream* infile = new ifstream(file,ifstream::in&ifstream::binary);
-	int rows = 0,cols = 0;
+	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
+	int rows = 0,cols = 0,type=0,size=0;
 	(*infile)>>rows;
 	(*infile)>>cols;
-	mat = Mat_<T>(rows,cols);
-	T val;
-	for(int i=0;i<mat.rows;i++){
-		for(int j=0;j<mat.cols;j++){
-			(*infile)>>val;
-			mat(i,j)=val;
-		}
-	}
+	(*infile)>>type;
+	(*infile)>>size;
+	char* data = new char[size];
+	infile->read(data,size);
 	infile->close();
+
+	int sizes[2] = {rows,cols};
+	Mat_<T> temp = Mat(2,sizes,type,data);
+	temp.copyTo(mat);
+	delete[] data;
 }
 template <typename T>
 void writeMat(cv::Mat_<T>& mat, char* file){
-	ofstream* ofile = new ofstream(file,ofstream::out&ofstream::binary);
+	ofstream* ofile = new ofstream(file,ofstream::out|ofstream::binary);
 	(*ofile)<<mat.rows<<" ";
 	(*ofile)<<mat.cols<<" ";
+	(*ofile)<<mat.type()<<" ";
+	(*ofile)<<mat.total()*mat.elemSize();
 	
-	for(int i = 0;i<mat.rows;i++){
-		for(int j = 0;j<mat.cols;j++){
-			(*ofile)<<(T) mat(i,j)<<" ";
-		}
-	}
+	ofile->write((char*) mat.data,mat.total()*mat.elemSize());
 	ofile->close();
 }
-
-
-
+template<typename T>
+void printMat(cv::Mat_<T>& mat, ostream stream = cout){
+	for(int i=0;i<mat.rows;i++){
+		for(int j=0;j<mat.cols;j++){
+			stream << mat(i,j);
+			stream << (j+1==mat.cols ? ";\n":" , ");
+		}
+	} 
+}
 
 class DemoNode {
   public:
@@ -173,7 +176,7 @@ return last_scan_valid;
 // Callback triggered whenever you receive a laser scan
 void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   sensor_msgs::LaserScan scan = *msg;
-
+  ROS_INFO("lidar callback starting");
 //  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
 
   // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
@@ -188,28 +191,42 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
 //  cout<<"IMAGE CALLBACK\n";
-  sensor_msgs::CvBridge bridge;
+ROS_INFO("image callback starting");
+  static sensor_msgs::CvBridge bridge;
   cv::Mat image;
   cv::Mat output;
   static bool first = true;
   try
   {
-    Mat im_ = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
-    flip(im_,image,-1);
+	image = cv::Mat(bridge.imgMsgToCv(msg,"bgr8"));
+	
+	/* code for flipping from harlie bag */  
+    //Mat im_ = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
+    //flip(im_,image,-1);
+	  
     lastImage = image.clone();
+
 	if(first)	firstImage = image.clone();
 	first = false;
+	ROS_INFO("converted image:\n\trxc:\t%dx%d\n\tdepth:\t%d",image.rows,image.cols,image.depth());
   }
-  catch (sensor_msgs::CvBridgeException& e)
+  catch(...) //(sensor_msgs::CvBridgeException& e)
   {
-    ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
+	ROS_ERROR("failed to convert");
+    //ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
   }
   try {
+	//cvNamedWindow("image",CV_WINDOW_AUTOSIZE);
+	//imshow("image",image);
+	//waitKey(0);
+	ROS_INFO("Image callback finding blob");
     normalizeColors(image, output);
+     ROS_INFO("normalized colors");
     CvPoint2D64f Center = blobfind(image, output);
+  ROS_INFO("Image callback checked for blob");
     cv::Point2f center (Center.x, Center.y);
     if(center.x>0 && last_scan_valid){
-//	cout<<"Matched a blob and a ping.\n";
+	ROS_INFO("calbiration point acquired");
 	viewIJ.push_back(Point2f(center.y, center.x));	//image points are in (i,j) instead of (x,y) so co-ordinates are reversed
 	baseXY.push_back(Point2f(rodLocation.x,rodLocation.y));
 	birdsIJ.push_back(Point2f(
@@ -222,21 +239,25 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     }
     IplImage temp = output;
    image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
+   ROS_INFO("ending blob finding");
   }
-  catch (sensor_msgs::CvBridgeException& e)
+  catch (...)
   {
-    ROS_ERROR("Could not convert to 'bgr8'. Ex was %s", e.what());
+    ROS_ERROR("failed for some reason");
   }
+   ROS_INFO("ending image callback");
 }
 
 int main(int argc, char **argv)
 {
+
+
 	if(PRECAL){
 	        //readMat<double>(viewToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/viewToBaseInv");
 	        //readMat<double>(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
 	        //readMat<double>(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/orthoBaseInv");
 	}
-  ros::init(argc, argv, "eecs376_vision_demo1");
+  ros::init(argc, argv, "robust_calibration");
   DemoNode motion_tracker;
   cvNamedWindow("birdseye",CV_WINDOW_AUTOSIZE); //these cv* calls are need if you want to use cv::imshow anywhere in your program
   //cvStartWindowThread();
@@ -252,7 +273,7 @@ int main(int argc, char **argv)
 	if(PRECAL){
 		return 0;
 	}
-	cout<<"beginning calibration"<<endl;
+	ROS_INFO("beginning calibration");
 
 
 
@@ -291,9 +312,9 @@ int main(int argc, char **argv)
 	invert(viewToBaseInv,viewToBase); 
 	invert(viewToOrthoInv,viewToOrtho);
 	/*	Logging and Verification	*/
-	writeMat<double>(viewToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/viewToBaseInv");
-	writeMat<double>(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
-	writeMat<double>(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/baseToOrthoInv");
+	writeMat(viewToBase,"/home/connor/Code/Mobile_Robotics/delta/viewToBase");
+	writeMat(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
+	writeMat(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/baseToOrthoInv");
 
 	cout<<"viewToBase inliers "<<countNonZero(Mat(mask1))<<"\nviewToOrtho inliers "<<countNonZero(Mat(mask2))<<"\northoToBase inliers "<<countNonZero(Mat(mask3))<<endl;
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
@@ -304,7 +325,7 @@ int main(int argc, char **argv)
 	perspectiveTransform(Mat(viewCornersIJ),viewCornersBaseXY_,viewToBase);
 	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
 
-	writeMat<Point2f>(viewCornersBaseXY_,"/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link");
+	writeMat(viewCornersBaseXY_,"/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link");
 
 
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);

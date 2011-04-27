@@ -16,12 +16,13 @@
 #include "opencv2/core/core.hpp"
 #include <fstream>
 #include <iostream>
-#include "cvFuncs.h"
+#include <cvFuncs.h>
 
 #define FILL_RATE 25
 #define CLEAR_RATE 5
-#define CAMERA_ROIx_FILE "delta/cameraROIx_base_link"
-#define CAMERA_ROIy_FILE "delta/cameraROIy_base_link"
+#define CAMERA_ROI_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link"
+//#define CAMERA_ROIx_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIx_base_link"
+//#define CAMERA_ROIy_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROIy_base_link"
 
 
 using namespace std;
@@ -59,7 +60,7 @@ sensor_msgs::PointCloud scanCloud;
 geometry_msgs::PoseStamped last_map_pose;
 nav_msgs::Odometry last_odom;
 
-Mat_<Vec2f> cameraROICorners(2,2,Vec2f(0,0));
+Mat_<Point2f> cameraROICorners(2,2,Point2f(0,0));
 
 const float gridWidth= 45;	//meters
 const float gridRes = 0.05;	//meters per pixel
@@ -86,44 +87,37 @@ bool init = false;
 */
 
 //initializes the CSpace grid.
-
-
-
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
-	ifstream* infile = new ifstream(file,ifstream::in&ifstream::binary);
-	int rows = 0,cols = 0;
+	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
+	int rows = 0,cols = 0,type=0,size=0;
 	(*infile)>>rows;
 	(*infile)>>cols;
-	mat = Mat_<T>(rows,cols);
-	T val;
-	for(int i=0;i<mat.rows;i++){
-		for(int j=0;j<mat.cols;j++){
-			(*infile)>>val;
-			mat(i,j)=val;
-		}
-	}
+	(*infile)>>type;
+	(*infile)>>size;
+	char* data = new char[size];
+	infile->read(data,size);
 	infile->close();
+
+	int sizes[2] = {rows,cols};
+	Mat_<T> temp = Mat(2,sizes,type,data);
+	temp.copyTo(mat);
+	delete[] data;
 }
-template <typename T>
-void writeMat(cv::Mat_<T>& mat, char* file){
-	ofstream* ofile = new ofstream(file,ofstream::out&ofstream::binary);
-	(*ofile)<<mat.rows<<" ";
-	(*ofile)<<mat.cols<<" ";
+
+Mat_<char> patchInit(){
 	
-	for(int i = 0;i<mat.rows;i++){
-		for(int j = 0;j<mat.cols;j++){
-			(*ofile)<<(T) mat(i,j)<<" ";
-		}
-	}
-	ofile->close();
+	Mat patch_ = getGaussianKernel(2 * fattening / gridRes, -1, CV_32F);
+	Mat_<char> patch;
+	patch_.convertTo(patch,CV_8S,FILL_RATE);
+	return patch;
 }
-
-
 
 void cSpaceInit()
 {
+
 	cout<<"creating cSpace grid:"<<endl;
+
 	grid.header.seq = 0;
 	grid.header.frame_id = "map";
 	//Output.header.stamp = time(NULL);
@@ -140,18 +134,23 @@ void cSpaceInit()
 	gridMat = cv::Mat(grid.data,false);
 	gridMat = gridMat.reshape(gridMatSize.width);
 
-	Mat_<float> x(2,2,0.f);
-	Mat_<float> y(2,2,0.f);
+
+	last_map_pose.pose.position.x = 0;
+	last_map_pose.pose.position.y = 0;
+	last_map_pose.pose.orientation = tf::createQuaternionMsgFromYaw(0);
+	
+	//Mat_<float> x(2,2,0.f);
+	//Mat_<float> y(2,2,0.f);
 
 	
-	readMat<float>(x,CAMERA_ROIx_FILE);
-	readMat<float>(y,CAMERA_ROIy_FILE);
+	//readMat<float>(x,CAMERA_ROIx_FILE);
+	//readMat<float>(y,CAMERA_ROIy_FILE);
 
-	for (int i=0;i<4;i++){
-		cameraROICorners(i) = Vec2f(x(i), y(i));
-	}
-
-	//cout<<"\tcreated cSpace grid with "<<gridMat.total()<<" elements"<<endl;
+	//for (int i=0;i<4;i++){
+	//	cameraROICorners(i) = Vec2f(x(i), y(i));
+	//}
+	readMat(cameraROICorners,CAMERA_ROI_FILE);
+	cout<<"\tcreated cSpace grid with "<<gridMat.total()<<" elements"<<endl;
 }
 
 //return index in grid corresponding to x,y coordinate in frame
@@ -174,9 +173,13 @@ Point pointToGridPoint(Point2f point, size_t shift = 0){
 }
 void drawHit(Mat_<char>& grid, Point2f hit){
 	static int radius = static_cast<int>(fattening / gridRes * (1 << fixedPoints));
-	Point center = pointToGridPoint(hit,fixedPoints);
-
-	circle(gridMat, center, radius, fillColor, -1, 8,fixedPoints);
+	static Mat_<char> patch = patchInit();
+	//Point center = pointToGridPoint(hit,fixedPoints);
+	//circle(gridMat, center, radius, fillColor, -1, 8,fixedPoints);
+	Point center = pointToGridPoint(hit);	//roi doesn't support fixedpoint
+	Rect roi = Rect(center.x,center.y,radius,radius) - Point(radius,radius);	//rect centered on hit
+	Mat_<char> t(grid,roi);
+	t += patch;
 }
 
 /*
@@ -197,6 +200,7 @@ void addHits(Mat_<char>& grid, const sensor_msgs::PointCloud& cloud, vector<bool
 	}
 }
 void updateGrid(){
+	ROS_INFO("updating grid");
 	cv::MatIterator_<char> it=gridMat.begin(), it_end = gridMat.end();
 	cv::MatIterator_<char> camerait=cameraGrid.begin(), camerait_end = cameraGrid.end();
 	cv::MatIterator_<char> lidarit=LIDARGrid.begin(), lidarit_end = LIDARGrid.end();
@@ -204,6 +208,7 @@ void updateGrid(){
         for(;it!=it_end;++it,++camerait,++lidarit){
                 *it = (*lidarit) > (*camerait)? *lidarit : *camerait;
         }
+	//imshow("grid",gridMat);
 }
 
 /*
@@ -228,6 +233,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 */
 void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
+	ROS_INFO("camera callback");
 	if (!init)	return;
 	//clearCamera();
 	subtract(cameraGrid,clearColor,cameraGrid,cameraROI);
@@ -240,11 +246,11 @@ void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 /*
 	returns a point representing the vector wrt the given pose
 */
-Point2f relativeTo(Vec2f point, geometry_msgs::Pose& pose){
+Point2f relativeTo(Point2f point, geometry_msgs::Pose& pose){
 	Vec2f refDir,refPos,rDir,newDir;
 	ROS2CVPose(pose,refPos,refDir);
 
-	Vec2f r = point - refPos;//(point.x - refPos[0],point.y - refPos[1]);
+	Vec2f r(point.x - refPos[0],point.y - refPos[1]);// = point - refPos;
 	getUnitVec(rDir,angle(r));
 	getUnitVec(newDir,angle(r)+angle(refDir));
 	Vec2f dest = newDir * (float) norm(r);
@@ -335,6 +341,7 @@ void maskLIDAR(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
 	if (!init)	return;
+	return;
 	vector<bool> mask;
 	maskLIDAR(*scan_cloud, mask);
 	clearLIDAR(*scan_cloud,mask);
@@ -352,6 +359,7 @@ tf::TransformListener *tfl;
 */
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
+	ROS_INFO("odom callback");
 //	cout<<"lidarmapper odom callback occured\n";
 	last_odom = *odom;
         temp.pose = last_odom.pose.pose;
@@ -378,6 +386,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 int main(int argc,char **argv)
 {
 	cout<<"2\n";
+	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
 	ros::init(argc,argv,"mapper");//name of this node
 
 	tfl = new tf::TransformListener();
