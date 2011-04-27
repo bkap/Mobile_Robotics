@@ -27,6 +27,11 @@ Mat_<char> readImg()
 
 	img.convertTo(converted, CV_8SC1, 1, -127);
 	
+	FileStorage F("someShit.xml", FileStorage::WRITE);
+	F<<"someShit"<<img;
+	
+	
+
 	//cvNamedWindow("converted");
 	//imshow("converted", converted);
 	//	waitKey(-1);
@@ -45,6 +50,13 @@ int main(int argc,char **argv)
 
 	// Read in the image
     Mat_<char> mapImg = readImg();
+
+	Mat someShit;
+   FileStorage F("someShit.xml", FileStorage::READ);
+	F["someShit"]>>someShit;
+	imshow("someShit", someShit);
+		waitKey(-1);
+
     	cout<<"2\n";
     // call aStar
 	Point2i startPt, endPt; // yeah these need initialized
