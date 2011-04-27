@@ -327,14 +327,8 @@ Point2f getStartLocation(vector<PathSegment> path, int segnum) {
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
-PathList insertTurns(double initial_heading,sensor_msgs::PointCloud pointCloud)
+PathList insertTurns(double initial_heading,vector<Point3f> points)
 {
-    int pointListSize = pointCloud.points.size();
-	Point3f* PointList = (Point3f*)calloc(sizeof(Point3f),pointCloud.points.size());
-	// convert pointCloud to PointList
-	for (int i=0; i<pointListSize; i++) {
-	    PointList[i] = convertGeoPointToPoint3f(pointCloud.points[i]);
-	}
 PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
 if(FirstTime)
@@ -342,12 +336,12 @@ if(FirstTime)
 	FirstTime = false;
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
-	path = vector<PathSegment>(pointListSize * 2);
-	for(int i =0; i<pointListSize-1; i++)
+	path = vector<PathSegment>(points.size() * 2);
+	for(int i =0; i<points.size()-1; i++)
 	{
-		double new_heading = atan2(PointList[i+1].y - PointList[i].y,PointList[i+1].x-PointList[i].x);
-	 	path[2*i] = MakeTurnInPlace(old_heading, new_heading, PointList[i], 2*i);
-	     path[2*i+1] = MakeLine(PointList[i], PointList[i+1], 2*i+1);
+		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
+	 	path[2*i] = MakeTurnInPlace(old_heading, new_heading, points[i], 2*i);
+	     path[2*i+1] = MakeLine(points[i], points[i+1], 2*i+1);
 		old_heading = new_heading;
 	}
 	path.pop_back();
@@ -359,15 +353,15 @@ else
 	//get the first point on the suggested path list which is not too close to the current pose
 	//TODO make this function and get the current segment by subscribing to it
 	
-	if(StartIndex != -1) {
+	if(segnum != -1) {
 		
 	
-		path = vector<PathSegment>(pointListSize-StartIndex+segnum+1); //the +1 is because segNum's start at 0
+		path = vector<PathSegment>(points + segnum); //the +1 is because segNum's start at 0
 		for(int i = 0; i<segnum+1; i++)
 		{
 			path[i] = oldPath[i];
 		}
-		for(int i = StartIndex; i < (pointListSize / 2 - StartIndex); ++i) {
+		for(int i = segnum / 2; i <path.size() / 2 ; ++i) {
 	
 	 		path[2*i] = MakeTurnInPlace(old_heading, new_heading, PointList[i], 2*i);
 		     path[2 *i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
@@ -379,7 +373,6 @@ else
 	oldPath = path;
 	ReturnVal.path_list.assign(path.begin(), path.end());
 }
-    free(PointList);	
 	return ReturnVal;//return the pathlist
 }
 //finds a point along a curve given initial parameters
@@ -426,29 +419,24 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 {
 	PathList turns;
 
-    for (int i=0; i<pointList.points.size()-1; i++)
-    {
     	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
     	Mat_<char> mapChar;
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
     	
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
-    	vector<Point2i> segPts = aStar(mapChar, convertGeoPointToPoint2i(pointList.points[i]), convertGeoPointToPoint2i(pointList.points[i+1]));
+    	vector<Point2i> segPts = aStar(mapChar, convertGeoPointToPoint2i(pointList.points[goalnum]), convertGeoPointToPoint2i(pointList.points[goalnum]));
 
     	// convert vector<Point2i> to sensor_msgs::PointCloud
 		sensor_msgs::PointCloud segPtCloud;
 		for (int j=0; j<segPts.size(); j++)
 		{
-			geometry_msgs::Point32 p;
-			p.x = segPts[j].x;
-			p.y = segPts[j].y;
+			convertPoint2iToGeoPoint(segPts[i]);
 			pointList.points.push_back(p);
 		}
 
 		PathList pathseg = joinPoints(initial_heading, segPtCloud);
 		for (int j=0; j<pathseg.path_list.size(); j++)
 			turns.path_list.push_back(pathseg.path_list[j]);
-    }
     return turns;
 }
 
