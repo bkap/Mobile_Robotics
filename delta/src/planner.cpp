@@ -304,7 +304,25 @@ int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 	}
 	return -1;
 }
+Point2f getStartLocation(vector<PathSegment> path, int segnum) {
+	PathSegment curseg = path[segnum];
+	switch(curseg.seg_type) {
+		case 1 :
+			//line
+			return Point2f(curseg.pose.position.x + cos(tf::getYaw(curseg.pose.orientation)) * curseg.seg_length, curseg.pose.position.y + sin(tf::getYaw(curseg.pose.orientation)) * curseg.seg_length);
+			break;
+		case 2 :
+			return Point2f(DBL_MAX, DBL_MAX);
+		case 3 :
+			return Point2f(curseg.pose.position.x, curseg.pose.position.y);
+			break;
+		default :
+			return Point2f(DBL_MAX,DBL_MAX);
+	}
 
+
+	}
+}
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
@@ -320,7 +338,7 @@ PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
 if(FirstTime)
 {
-	//FirstTime = false;
+	FirstTime = false;
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
 	path = vector<PathSegment>(pointListSize * 2);
@@ -339,7 +357,7 @@ else
 {
 	//get the first point on the suggested path list which is not too close to the current pose
 	//TODO make this function and get the current segment by subscribing to it
-	int StartIndex = getFirstNotTooClose(segnum, PointList, pointCloud.points.size());
+	
 	if(StartIndex != -1) {
 		
 	
@@ -348,9 +366,10 @@ else
 		{
 			path[i] = oldPath[i];
 		}
-		for(int i = 0; i < pointListSize - StartIndex; ++i) {
+		for(int i = StartIndex; i < (pointListSize / 2 - StartIndex); ++i) {
 	
-		     path[i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
+	 		path[2*i] = MakeTurnInPlace(old_heading, new_heading, PointList[i], 2*i);
+		     path[2 *i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
 		}
 	} else {
 		path = oldPath;
