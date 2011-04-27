@@ -33,7 +33,7 @@ inline double heuristic(int x, int y, Point2i goal) {
 }
 
 inline double cost(Node expanding, double locCost) {
-	return expanding.pathCost + locCost;
+	return expanding.pathCost+10*locCost;//+ exp(locCost/20.0);
 }
 
 bool operator<(Node a, Node b) 
@@ -136,7 +136,23 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	
 	//make list into vector and return it.
 	vector<Point2i> pathVec (pathList.begin(),pathList.end());
-	delete current;
+	
+	
+	for(int i = 0; i<map.rows; i++)
+	{
+		for(int j = 0; j<map.cols; j++)
+		{
+			if(nodeList[i][j]!=NULL)
+			{
+				delete nodeList[i][j];
+			}
+		}
+		free(nodeList[i]);
+	}
+	
+	free(nodeList);
+	
+	//delete current;
 	return pathVec;
 }
 

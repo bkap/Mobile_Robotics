@@ -60,8 +60,8 @@ int main(int argc,char **argv)
 		path2.push_back(Point2f(path[i].x, path[i].y));
 	}
 	
-	approxPolyDP(Mat(path2), path2, 3, false);
-	
+	approxPolyDP(Mat(path2), path2, 2, false);
+
 	path.clear();
 	
 	for(int i = 0; i<(int) path2.size(); i++)
