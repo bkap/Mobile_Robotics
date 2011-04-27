@@ -34,7 +34,10 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	infile->close();
 
 	int sizes[2] = {rows,cols};
+
 	Mat_<T> temp = Mat(2,sizes,type,data);
+
+	
 	temp.copyTo(mat);
 	delete[] data;
 }
@@ -104,13 +107,13 @@ void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCl
 	perspectiveTransform(Mat(viewPoints),basePoints_,viewToBase);
 	
 	vector<Point2f> points;
-	for(int i = 0;i<viewPoints.size();i++){
+	for(int i = 0;i<(int)viewPoints.size();i++){
 		points.push_back(basePoints_(i));
 	}
 	
 	/*convert to point cloud*/
 	//cloud.points.erase(cloud.points.begin(), cloud.points.end());
-	for(int i=0;i<points.size();i++){
+	for(int i=0;i<(int)points.size();i++){
 		geometry_msgs::Point32 geoPoint;
 		geoPoint.x =  points[i].x;
 		geoPoint.y =  points[i].y;
@@ -127,8 +130,8 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	vector<vector<Point> > points_;
 	findContours(image, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 
-	for(int i =0;i<points_.size();i++){
-		for(int j=0;j<points_[i].size();j++){
+	for(int i =0;i<(int)points_.size();i++){
+		for(int j=0;j<(int)points_[i].size();j++){
 			points.push_back(Point2f(points_[i][j].x, points_[i][j].y));
 		}
 	}
