@@ -221,28 +221,31 @@ int main(int argc,char **argv)
 		elapsed_time= ros::Time::now()-birthday;
 		//ROS_INFO("birthday is %f", birthday.toSec());
 		//ROS_INFO("elapsed time is %f", elapsed_time.toSec());	
-		if(stalePos || staleDes)	{cout << "stale\n";continue;}
-		//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
-		
-		sdp = calculateSteeringParameters(poseActual.pose, desired.des_pose);
-		ROS_INFO("\tactual:      %f,%f,%f", poseActual.pose.position.x, poseActual.pose.position.y, tf::getYaw(poseActual.pose.orientation));
-		ROS_INFO("\tdesired:     %f,%f,%f", desired.des_pose.position.x, desired.des_pose.position.y, tf::getYaw(desired.des_pose.orientation));
-		ROS_INFO("\tserrors:                   %f,%f,%f ",sdp[0],sdp[1],sdp[2]);		
-		vw = getNominalVelocities(desired);
-		bool requestReverse = vw[0] < 0;
-		vw += calculateSteeringCorrections(sdp,desired);
-
-		if(!requestReverse){	//only allow reverse if desired speed < 0		
-			vw[0]  = max(vw[0], 0);
+		if(stalePos || staleDes)	{
+			cout << "stale\n";
 		}
-			
-		vel_object.linear.x = vw[0];
-		vel_object.angular.z= vw[1];
-		stalePos = true,
-	  	staleDes = true;
-
-		cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		else{
+			//cout<<"Steering activate! "<<(int)desired.seg_type<<"  "<<desired.seg_number<<endl;
 		
+			sdp = calculateSteeringParameters(poseActual.pose, desired.des_pose);
+			ROS_INFO("\tactual:      %f,%f,%f", poseActual.pose.position.x, poseActual.pose.position.y, tf::getYaw(poseActual.pose.orientation));
+			ROS_INFO("\tdesired:     %f,%f,%f", desired.des_pose.position.x, desired.des_pose.position.y, tf::getYaw(desired.des_pose.orientation));
+			ROS_INFO("\tserrors:                   %f,%f,%f ",sdp[0],sdp[1],sdp[2]);		
+			vw = getNominalVelocities(desired);
+			bool requestReverse = vw[0] < 0;
+			vw += calculateSteeringCorrections(sdp,desired);
+
+			if(!requestReverse){	//only allow reverse if desired speed < 0		
+				vw[0]  = max(vw[0], 0);
+			}
+			
+			vel_object.linear.x = vw[0];
+			vel_object.angular.z= vw[1];
+			stalePos = true,
+				staleDes = true;
+
+			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
+		}
 		pub.publish(vel_object);
 	}
 }
