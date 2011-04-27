@@ -46,6 +46,7 @@ using namespace eecs376_msgs;
 tf::TransformListener *tfl;
 
 int segnum = 0;
+int goalnum = 0;
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -521,6 +522,10 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
     pointListcalled = true;
 }
 
+void gotThere_Callback(const eecs376_msgs::GotThere::ConstPtr& finishedSeg) {
+	goalnum = (*finishedSeg).goalNum+1;
+}
+
 int main(int argc,char **argv)
 {
 	ros::init(argc,argv,"pathPlanner");//name of this node
@@ -536,7 +541,7 @@ int main(int argc,char **argv)
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
 	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);
-
+	ros::Subscriber sub3 = n.subscribe<eecs376_msgs::GotThere>("gotThere",1,gotThere_Callback);
 	// Stuff for path visualization
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
 	visualization_msgs::MarkerArray markers;
