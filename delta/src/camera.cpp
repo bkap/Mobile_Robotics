@@ -18,6 +18,8 @@
 #include "camera_funcs.h"
 #include "cvFuncs.h"
 
+#define CAMERA_ROI_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link"
+
 using namespace cv;
 using namespace std;
 
@@ -34,10 +36,7 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	infile->close();
 
 	int sizes[2] = {rows,cols};
-
 	Mat_<T> temp = Mat(2,sizes,type,data);
-
-	
 	temp.copyTo(mat);
 	delete[] data;
 }
@@ -59,8 +58,8 @@ class DemoNode {
 	private:
 		image_transport::ImageTransport it_;
 		image_transport::Subscriber sub_image_;
-		ros::Publisher pub_nav_pts;
-		sensor_msgs::PointCloud NavPts;
+		ros::Publisher pub_nav_pts,pub_view_pts;
+		sensor_msgs::PointCloud viewCloud;
 		sensor_msgs::PointCloud pointCloud;
 		void transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCloud& mapCloud);
 		Mat_<double> viewToBase;
@@ -101,19 +100,18 @@ void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCl
 
 	sensor_msgs::PointCloud cloud;
 	cloud.header.frame_id = "base_laser1_link";
-
 	/* transform to base_link */
 	Mat_<Point2f> basePoints_;
 	perspectiveTransform(Mat(viewPoints),basePoints_,viewToBase);
 	
 	vector<Point2f> points;
-	for(int i = 0;i<(int)viewPoints.size();i++){
+	for(unsigned int i = 0;i<viewPoints.size();i++){
 		points.push_back(basePoints_(i));
 	}
 	
 	/*convert to point cloud*/
 	//cloud.points.erase(cloud.points.begin(), cloud.points.end());
-	for(int i=0;i<(int)points.size();i++){
+	for(unsigned int i=0;i<points.size();i++){
 		geometry_msgs::Point32 geoPoint;
 		geoPoint.x =  points[i].x;
 		geoPoint.y =  points[i].y;
@@ -125,13 +123,36 @@ void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCl
 	tfl->transformPointCloud("map", cloud, mapCloud);
 }
 
+void normalizeColor(cv::Mat& img){
+	cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
+	cv::Vec<uchar,3> p;
+	for(;it!=it_end;++it){
+		//p=*it; 
+		double scale = (*it)[0]+(*it)[1]+(*it)[2];
+		//p = scale * *it;// (255.0/scale));
+		*it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
+	}
+}
+
+
 void findPoints(Mat& image, vector<Point2f>& points){
+	normalizeColor(image);
+	//cvNamedWindow("image");
+	//imshow("image",image);
+	//waitKey(2);
 	findOrange(image);
+	//cvNamedWindow("orange");
+	//imshow("orange",image);
+	//waitKey(2);
 	vector<vector<Point> > points_;
 	findContours(image, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-
-	for(int i =0;i<(int)points_.size();i++){
-		for(int j=0;j<(int)points_[i].size();j++){
+	//Mat outline(image.size(),(uchar)0);
+	//drawContours(outline,points_,-1,255);
+	//cvNamedWindow("outline");
+	//imshow("outline",outline);
+	//waitKey(2);
+	for(int i =0;i<points_.size();i++){
+		for(int j=0;j<points_[i].size();j++){
 			points.push_back(Point2f(points_[i][j].x, points_[i][j].y));
 		}
 	}
@@ -140,23 +161,33 @@ void findPoints(Mat& image, vector<Point2f>& points){
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
 
-  ROS_INFO("image callback");
+  //ROS_INFO("image callback");
 
   static sensor_msgs::CvBridge bridge;
+  static bool init = false;
+  static vector<Point2f> viewCorners;
   cv::Mat image;
   // Convert image from ROS format to OpenCV format
   try
   {
 	image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
+	if(!init){
+		viewCorners.push_back(Point2f(0,0));
+		viewCorners.push_back(Point2f(0,image.size().width-1));
+		viewCorners.push_back(Point2f(image.size().height-1,image.size().width-1));
+		viewCorners.push_back(Point2f(image.size().height-1,0));
+	}
+	
 	vector<Point2f> points;
 	findPoints(image,points);
-	
+	transformPoints(viewCorners,viewCloud);
+	pub_view_pts.publish(viewCloud);
 	if(points.size() > 1){
 		transformPoints(points,pointCloud);
 		pub_nav_pts.publish(pointCloud);
 	}
 	else{
-		ROS_INFO("Camera: nothing detected");
+		//ROS_INFO("Camera: nothing detected");
 	}
   }
   catch (sensor_msgs::CvBridgeException& e)
@@ -166,6 +197,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 }
 
+
 DemoNode::DemoNode():
   it_(nh_)
 {
@@ -174,9 +206,7 @@ DemoNode::DemoNode():
 
   // Publish a cloud of points on the orange line
 	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Camera_Cloud", 1);
- 
-	NavPts.header.frame_id = "base_laser1_link";
-
+	pub_view_pts =nh_.advertise<sensor_msgs::PointCloud>("Camera_view",1);
 
 }
 

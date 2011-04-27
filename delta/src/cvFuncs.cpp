@@ -19,31 +19,31 @@ TODO
 */
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
-	ifstream* infile = new ifstream(file,ifstream::in&ifstream::binary);
-	int rows = 0,cols = 0;
+	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
+	int rows = 0,cols = 0,type=0,size=0;
 	(*infile)>>rows;
 	(*infile)>>cols;
-	mat = Mat_<T>(rows,cols);
-	T val;
-	for(int i=0;i<mat.rows;i++){
-		for(int j=0;j<mat.cols;j++){
-			(*infile)>>val;
-			mat(i,j)=val;
-		}
-	}
+	(*infile)>>type;
+	(*infile)>>size;
+	char* data = new char[size];
+	infile->read(data,size);
 	infile->close();
+
+	int sizes[2] = {rows,cols};
+	Mat_<T> temp = Mat(2,sizes,type,data);
+	temp.copyTo(mat);
+	delete[] data;
 }
+
 template <typename T>
 void writeMat(cv::Mat_<T>& mat, char* file){
-	ofstream* ofile = new ofstream(file,ofstream::out&ofstream::binary);
+	ofstream* ofile = new ofstream(file,ofstream::out|ofstream::binary);
 	(*ofile)<<mat.rows<<" ";
 	(*ofile)<<mat.cols<<" ";
+	(*ofile)<<mat.type()<<" ";
+	(*ofile)<<mat.total()*mat.elemSize();
 	
-	for(int i = 0;i<mat.rows;i++){
-		for(int j = 0;j<mat.cols;j++){
-			(*ofile)<<(T) mat(i,j)<<" ";
-		}
-	}
+	ofile->write((char*) mat.data,mat.total()*mat.elemSize());
 	ofile->close();
 }
 

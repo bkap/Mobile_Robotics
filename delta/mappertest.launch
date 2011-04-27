@@ -1,4 +1,5 @@
 <launch>
+<param name="/use_sim_time" value="true" />
 <node name="map_server" pkg="map_server" type="map_server" args="$(find cwru_maps)/maps/2nd_floor_one_door.yaml" />
 <node pkg="tf" type="static_transform_publisher" name="base_laser1_broadcaster" args="0.1016 0 0.5588 0 0 0 base_link base_laser1_link 100" />
 <node pkg="delta" type="lidar"  name="lidarNode"  output="screen"/>
