@@ -364,7 +364,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			}
 			startLoop = goalnum + 1;
 			for(int i = 0; i < segnum; i++) {
-				turns.points.push_back(prevList->path_list[i]);
+				turns.path_list.push_back(prevList->path_list[i]);
 			}
 			//TODO: might have an off-by-one here
 			PathSegment oldSeg = oldPath[segnum];
@@ -381,7 +381,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			
 					startPos.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
 				//shrink the segment length
-					oldPath[segnum].seg_length = destanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
+					oldPath[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
 				} else {
 					startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
 					startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
@@ -392,16 +392,16 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				heading += oldSeg.seg_length - distanceOnSeg;
 			}
 		} else {
-			prevList = malloc(sizeof(PathList)); 
+			prevList = (PathList*)malloc(sizeof(PathList)); 
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 		for(uint i = startLoop; i < pointList.points.size(); i++) {
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point3f> mapPts(segPts.size());
 		
-			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertMapToGridCoords);
-			goalSegnums[i-1] = turns.points.size() + mapPts.size();
-    	if(i + 1 < pointList.points.size()) {
+			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
+			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
+    	if(i + 1 < pointList.path_list.size()) {
 			//get startPos for next iteration
 			startPoint = convertGeoPointToPoint3f(pointList.points[i+1]);
 		}
