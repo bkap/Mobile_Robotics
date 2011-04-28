@@ -360,52 +360,23 @@ Point2f getStartLocation(vector<PathSegment> path, int segnum, double distanceOn
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
-PathList insertTurns(double initial_heading,vector<Point3f> points)
+PathList insertTurns(double initial_heading,vector<Point3f> points, int initialSegNum)
 {
 PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
-if(FirstTime)
-{
-	FirstTime = false;
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
 	path = vector<PathSegment>(points.size() * 2);
 	for(int i =0; i<points.size()-1; i++)
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
-	 	path[2*i] = MakeTurnInPlace(old_heading, new_heading, points[i], 2*i);
-	     path[2*i+1] = MakeLine(points[i], points[i+1], 2*i+1);
+		if(fabs(old_heading - new_heading) < 0.2) {
+	 		path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
+		}
+	     path.push_back(MakeLine(points[i], points[i+1], path.size() + initialSegNum));
 		old_heading = new_heading;
 	}
-	path.pop_back();
-	oldPath = path;
 	ReturnVal.path_list.assign(path.begin(), path.end());
-}
-else
-{
-	//get the first point on the suggested path list which is not too close to the current pose
-	//TODO make this function and get the current segment by subscribing to it
-	
-	if(segnum != -1) {
-		
-	
-		path = vector<PathSegment>(points + segnum); //the +1 is because segNum's start at 0
-		for(int i = 0; i<segnum+1; i++)
-		{
-			path[i] = oldPath[i];
-		}
-		for(int i = segnum / 2; i <path.size() / 2 ; ++i) {
-	
-	 		path[2*i] = MakeTurnInPlace(old_heading, new_heading, PointList[i], 2*i);
-		     path[2 *i+segnum + 1] = MakeLine(PointList[i], PointList[i+1], i+segnum+1);
-		}
-	} else {
-		path = oldPath;
-	}
-	path.pop_back();
-	oldPath = path;
-	ReturnVal.path_list.assign(path.begin(), path.end());
-}
 	return ReturnVal;//return the pathlist
 }
 //finds a point along a curve given initial parameters
@@ -440,12 +411,13 @@ PathList joinPoints(double initial_heading,sensor_msgs::PointCloud pointList)
     */
     
     // with smoothing, oh hey, this was already written
-    PathList pathList = insertTurns(initial_heading,pointList);
+    //PathList pathList = insertTurns(initial_heading,pointList);
     // write mah own
     //pathList = smoothLine(pointList);
     return pathList;
 }
 PathList *prevList;
+vector<int> goalSegnums;
 // Call A* search for path, lots of conversions needed so put in separate function
 // pointList is the list of goal points (first point is assumed to be origin)
 PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
@@ -453,49 +425,65 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 	PathList turns;
 
     	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
-    	Mat_<char> mapChar;
+    	//Mat_<char> mapChar;
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
     	//find starting point
 		Point3f startPoint;
+		int startLoop = 1;
 		if(prevList != NULL) {
-		for(int i = 0; i < segnum; i++) {
-			turns.points.push_back(prevList->points[i]);
-		}
-		//TODO: might have an off-by-one here
-		PathSegment oldSeg = oldPath[segnum];
-		//put all segments up to segnum into turns
-		
-		Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
-		double heading = tf::getYaw(des_pose.orientation);
-		if(oldSeg.type == 1) {
-			//it's a line
-			//probably shouldn't hardcode acceleration, but we have to
-			if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
-			
-				startPos.x += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
-			
-				startPos.y += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
-				//shrink the segment length
-				oldPath[segnum].seg_length = destanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
-			} else {
-				startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
-				startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
+			if(segnum > goalSegnums[goalNum ]) {
+				goalNum++;
 			}
-		} else if (oldSeg.type == 3) {
+			startLoop = goalNum + 1;
+			for(int i = 0; i < segnum; i++) {
+				turns.points.push_back(prevList->points[i]);
+			}
+			//TODO: might have an off-by-one here
+			PathSegment oldSeg = oldPath[segnum];
+			//put all segments up to segnum into turns
+		
+			Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
+			double heading = tf::getYaw(des_pose.orientation);
+			if(oldSeg.type == 1) {
+				//it's a line
+				//probably shouldn't hardcode acceleration, but we have to
+				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
+			
+					startPos.x += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+			
+					startPos.y += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+				//shrink the segment length
+					oldPath[segnum].seg_length = destanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
+				} else {
+					startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
+					startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
+				}
+			} else if (oldSeg.type == 3) {
 
 			//turn in place, adjust heading
-			heading += oldSeg.seg_length - distanceOnSeg;
+				heading += oldSeg.seg_length - distanceOnSeg;
+			}
+		} else {
+			prevList = malloc(sizeof(PathList)); 
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
-    	vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPos), convertGeoPointToPoint2i(pointList.points[goalNum]));
-		vector<Point3f> mapPts(segPts.size());
+		for(int i = StartLoop; i < pointList.points.size(); i++) {
+    		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPos), convertGeoPointToPoint2i(pointList.points[i]));
+			vector<Point3f> mapPts(segPts.size());
 		
-		transform(segPts.begin(), segPts.end(), mapPts.begin(), convertMapToGridCoords);
-	} //if(prevList != NULL)
-    	// convert vector<Point2i> to vector<Point3f>
-		PathList pathseg = joinPoints(initial_heading, mapPts);
+			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertMapToGridCoords);
+			goalSegnums[i-1] = turns->points.size() + mapPts.size();
+    	if(i + 1 < pointList.points.size()) {
+			//get startPos for next iteration
+			startPos = convertGeoPointToPoint3f(pointList.points[i+1]);
+		}
+			
+		// convert vector<Point2i> to vector<Point3f>
+		PathList pathseg = insertTurns(initial_heading, mapPts, turns->points.size());
 		for (int j=0; j<pathseg.path_list.size(); j++)
 			turns.path_list.push_back(pathseg.path_list[j]);
+			
+		}
 	*prevList = turns;
     return turns;
 }
