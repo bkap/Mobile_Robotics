@@ -75,27 +75,33 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 {
 	Node*** nodeList;
 	priority_queue<Node> Q;
-	
+	cout<<"a*1\n";
 	nodeList = (Node***) calloc(map.rows, sizeof(Node**));
 	for(int i = 0; i<map.rows; i++)
 	{
 		nodeList[i] = (Node**) calloc(map.cols, sizeof(Node*));
 	}
+	cout<<"a*2\n";
 	//allocate temp space because convertTo gets mad if I don't
 	Mat temp;
 	map.copyTo(temp);
+	cout<<"a*3\n";
 	temp.convertTo(map, CV_32S, 1, 129);
 	map = map.t();
 	//expand start
-
-	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, heuristic(start.x,start.y,end), 0);
+	cout<<"a*4\n";
+	double h = heuristic(start.x,start.y,end);
+	cout<<"heuristic of "<<h<<"\n";
+	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, h, 0);
 	//add all nearby start to the priority queue
+	cout<<"a*4a\n";
 	vector<Node> neighbors = getNeighbors(*(nodeList[start.x][start.y]), map, nodeList, end);
+	cout<<"a*4b\n";
 	for(int i = 0; i<(int)neighbors.size(); i++)
 	{
 		Q.push(neighbors[i]);
 	}
-
+	cout<<"a*5\n";
 	//while we have not found the path, 
 	bool done = false;
 	Node *current = new Node();
@@ -127,7 +133,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 			Q.push(neighbors[i]);
 		}
 	}
-	
+	cout<<"a*6\n";
 	list<Point2i> pathList;
 	//reconstruct the path
 	//while the point we are reconstructing which is not the start point
@@ -139,7 +145,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 		//current = parent
 		current = current->parent;
 	}
-	
+	cout<<"a*7\n";
 	//make list into vector and return it.
 	vector<Point2i> pathVec (pathList.begin(),pathList.end());
 	

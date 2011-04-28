@@ -264,7 +264,7 @@ int main(int argc, char **argv)
   ROS_INFO("Calibration procedure started");
   ros::Rate naptime(75);
 
-  while(ros::ok() && (PRECAL || viewIJ.size()<200))
+  while(ros::ok() && (PRECAL || viewIJ.size()<120))
   {
         naptime.sleep();
   	ros::spinOnce();
@@ -304,9 +304,9 @@ int main(int argc, char **argv)
 	Mat_<Point2f> orthoCornersIJ_,viewCornersBaseXY_;
 	vector<unsigned char> mask1,mask2,mask3;
 	/*	Computation	*/
-	Mat_<double> viewToBaseInv = findHomography(baseXY_,viewIJ_,mask1,RANSAC,.5);	//transform between camera pixel co-ordinates and base_link (x,y)
-	Mat_<double> viewToOrthoInv= findHomography(birdsIJ_,viewIJ_,mask2,RANSAC,.5);	//transform between camera and birds-eye pixel co-ordinates
-	Mat_<double> orthoToBaseInv= findHomography(baseXY_,birdsIJ_,mask3,RANSAC,.5);	//transform between birds-eye pixel co-ordinates and base_link (x,y)
+	Mat_<double> viewToBaseInv = findHomography(baseXY_,viewIJ_,mask1,RANSAC,10);	//transform between camera pixel co-ordinates and base_link (x,y)
+	Mat_<double> viewToOrthoInv= findHomography(birdsIJ_,viewIJ_,mask2,RANSAC,10);	//transform between camera and birds-eye pixel co-ordinates
+	Mat_<double> orthoToBaseInv= findHomography(baseXY_,birdsIJ_,mask3,RANSAC,10);	//transform between birds-eye pixel co-ordinates and base_link (x,y)
 	Mat_<double> orthoToBase,viewToBase,viewToOrtho;
 	invert(orthoToBaseInv,orthoToBase);
 	invert(viewToBaseInv,viewToBase); 

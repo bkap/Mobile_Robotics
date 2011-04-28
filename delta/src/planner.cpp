@@ -353,11 +353,13 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 	PathList turns;
 
     	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
+	cout<<"PLANNER: make char map\n";
     	Mat_<char> mapChar = lastCSpace_CharMap;
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
     	//find starting point
 		Point3f startPoint;
 		int startLoop = 1;
+		cout<<"PLANNER:if condition that checks for null\n";
 		if(prevList != NULL) {
 			if(segnum > goalSegnums[goalnum ]) {
 				goalnum++;
@@ -369,7 +371,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			//TODO: might have an off-by-one here
 			PathSegment oldSeg = oldPath[segnum];
 			//put all segments up to segnum into turns
-		
+			cout<<"PLANNER:start pos\n";
 			Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
 			double heading = tf::getYaw(des_pose.orientation);
 			if(oldSeg.seg_type == 1) {
@@ -395,17 +397,19 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			prevList = (PathList*)malloc(sizeof(PathList)); 
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
+cout<<"PLANNER:calling a*\n";
 		for(uint i = startLoop; i < pointList.points.size(); i++) {
+		cout<<i<<"\n";
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point3f> mapPts(segPts.size());
-		
+		cout<<"PLANNER:transform\n";
 			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
     	if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
 			startPoint = convertGeoPointToPoint3f(pointList.points[i+1]);
 		}
-			
+			cout<<"almost done\n";
 		// convert vector<Point2i> to vector<Point3f>
 		PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
 		for (uint j=0; j<pathseg.path_list.size(); j++)
@@ -426,7 +430,7 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	}
 	lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
 
-	lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,false);
+	lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(gridMatSize.width);
 
 	mapOrigin = (*CSpace_Map).info.origin;
@@ -477,7 +481,7 @@ int main(int argc,char **argv)
 	//double amount_to_change = 0.0;    
 	//double intial_heading;
 	
-	cout<<"3\n";
+	cout<<"PLANNER:Subscribing to stuff!\n";
 	
 	ros::NodeHandle n;
 	ros::Subscriber sub1 = n.subscribe<nav_msgs::OccupancyGrid>("CSpace_Map", 10, LIDAR_Callback);
@@ -486,12 +490,16 @@ int main(int argc,char **argv)
 	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);
 	// Stuff for path visualization
+
+	cout<<"PLANNER:Publishing stuff\n";
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
 	visualization_msgs::MarkerArray markers;
 	
 	// hax to test
 	while(!poseActualcalled) {ros::spinOnce();}
 
+
+	cout<<"PLANNER:WOOOO\n";
 	// let's make some fake points for a path WOO
 	sensor_msgs::PointCloud pointList;
 	geometry_msgs::Point32 origin;
@@ -499,6 +507,8 @@ int main(int argc,char **argv)
 	origin.y = poseActual.pose.position.y;
 	pointList.points.push_back(origin);	// start points
 	
+
+	cout<<"PLANNER:making goal points\n";
 	// goal points (these need changed for actual demo)
 	geometry_msgs::Point32 p;
 		
@@ -509,8 +519,8 @@ int main(int argc,char **argv)
 	p.x = 5.2;
 	p.y = 12.15; */
 	//along back
-	p.x = -67.4;
-	p.y = -20.2;
+	p.x = 5.47;
+	p.y = 12.24;
 	pointList.points.push_back(p);
     
     geometry_msgs::Point32 p2;
@@ -518,8 +528,8 @@ int main(int argc,char **argv)
 	//p2.y = 9.336;
 	//p2.x = -3.15;
 	//p2.y = 20.4;
-	p2.x = -63.8;
-	p2.y = -19.4;
+	p2.x = -1.03;
+	p2.y = 18.09;
 	pointList.points.push_back(p2);
 	
     geometry_msgs::Point32 p3;
@@ -527,13 +537,14 @@ int main(int argc,char **argv)
 	//p3.y = 18.893;
 	//p3.x = -0.75;
 	//p3.y = 23.05;
-	p3.x = -59.8;
-	p3.y = -16.6;
+	p3.x = .57;
+	p3.y = 24.59;
 	pointList.points.push_back(p3);
 	double initial_heading= tf::getYaw(poseActual.pose.orientation);
 	
+	cout<<"PLANNER:calling A*\n";
 	PathList turns = callAStar(pointList, initial_heading);
-	
+	cout<<"PLANNER:called A*\n";
     // and print them out
     ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
 
