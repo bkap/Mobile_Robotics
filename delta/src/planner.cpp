@@ -407,7 +407,7 @@ cout<<"PLANNER:calling a*\n";
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
     	if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
-			startPoint = convertGeoPointToPoint3f(pointList.points[i+1]);
+			startPoint = convertGeoPointToPoint3f(pointList.points[i]);
 		}
 			cout<<"almost done\n";
 		// convert vector<Point2i> to vector<Point3f>
