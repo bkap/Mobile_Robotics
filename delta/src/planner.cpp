@@ -291,39 +291,6 @@ void GetCurveAndLines2(Point3f a, Point3f b, Point3f c, PathSegment* line1, Path
     *line2 = MakeLine(b2, c, (*segNum)++);
 }
 
-/*
-// this was designed for use in the insertTurns function
-// uses shady vectors and appears to be wrongish
-void GetCurveAndLines( Point3f A, Point3f B, Point3f C, PathSegment* FirstLine, PathSegment* Curve, PathSegment* SecondLine, int* SegNum)
-{
-    cout << "shady vector getcurveandlines\n";
-	//find the points needed to generate 2 lines with a curve in between
-	double Theta = acos(dotProduct(A-B, B-C)/(getDistance(A-B)*getDistance(B-C)));  //implement the math that I did earlier
-	Point3f D = (A+C)*0.5;
-	Point3f Center = B+(D-B)*(1/getDistance(D-B))*(STD_TURN_RAD/acos(tan(Theta/2.0))); //???
-	Point3f Bprime = A+dotProduct(Center-A,B-A)*(B-A)*(1/getDistance(B-A));
-
-	Point3f Bdoubleprime = B+dotProduct(Center-C,B-C)*(B-C)*(1/getDistance(B-C));
-	//the equation in the pic ben sent me is wrong I think.  C should substitute for A, not B for A and C for B like I did.
-	Point3f Midpoint1 = A+(A-B)*0.5;  //midpoints are used in a sec
-	Point3f Midpoint2 = C-(C-B)*0.5;
-	if (dotProduct(Midpoint1, B-A) < dotProduct(Bprime, B-A) || dotProduct(Midpoint2, B-C) < dotProduct(Bdoubleprime, B-C))
-	{
-		(*FirstLine) = MakeLine(Midpoint1, B, (*SegNum)++);
-		(*SecondLine)  = MakeLine(B,Midpoint2, (*SegNum)+1);
-		(*Curve) = MakeTurnInPlace(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
-		(*SegNum)++;
-	}
-	else 
-	{
-		(*FirstLine) = MakeLine(Midpoint1, Bprime, (*SegNum)++);
-		(*SecondLine) = MakeLine(Bdoubleprime, Midpoint2,(*SegNum)+1);
-		(*Curve) = MakeCurve(tf::getYaw(FirstLine->init_tan_angle), tf::getYaw(SecondLine->init_tan_angle), convertGeoPointToPoint3f(FirstLine->ref_point), convertGeoPointToPoint3f(SecondLine->ref_point), (*SegNum)++) ;
-		(*SegNum)++;
-	}
-}
-*/
-
 vector<PathSegment> oldPath;
 int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 	Point3f p = convertGeoPointToPoint3f(oldPath[segnum].ref_point);
@@ -376,28 +343,7 @@ Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double 
 		return Point3f(center.x + cos(heading)*radius, center.y + sin(heading)*radius, 0.0);
 }
 
-// Takes the list of points and joins them into lines with orientation, etc
-// Assumes that the points are in order (this should be done in camera)
-PathList joinPoints(double initial_heading,sensor_msgs::PointCloud pointList)
-{
-    vector<PathSegment> lines;
-    
-    // This is the stupid way - no smooth rotations
-    /*
-    for (int i=0; i<pointList.points.size()-2; i++)
-    {
-        Point3f A = convertGeoPointToPoint3f(pointList.points[i]);
-        Point3f B = convertGeoPointToPoint3f(pointList.points[i+1]);
-        lines.push_back(MakeLine(A, B, i));
-    }
-    */
-    
-    // with smoothing, oh hey, this was already written
-    //PathList pathList = insertTurns(initial_heading,pointList);
-    // write mah own
-    //pathList = smoothLine(pointList);
-    return pathList;
-}
+
 PathList *prevList;
 vector<int> goalSegnums;
 // Call A* search for path, lots of conversions needed so put in separate function
@@ -413,12 +359,12 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		Point3f startPoint;
 		int startLoop = 1;
 		if(prevList != NULL) {
-			if(segnum > goalSegnums[goalNum ]) {
-				goalNum++;
+			if(segnum > goalSegnums[goalnum ]) {
+				goalnum++;
 			}
-			startLoop = goalNum + 1;
+			startLoop = goalnum + 1;
 			for(int i = 0; i < segnum; i++) {
-				turns.points.push_back(prevList->points[i]);
+				turns.points.push_back(prevList->path_list[i]);
 			}
 			//TODO: might have an off-by-one here
 			PathSegment oldSeg = oldPath[segnum];
@@ -426,21 +372,21 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		
 			Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
 			double heading = tf::getYaw(des_pose.orientation);
-			if(oldSeg.type == 1) {
+			if(oldSeg.seg_type == 1) {
 				//it's a line
 				//probably shouldn't hardcode acceleration, but we have to
 				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
 			
-					startPos.x += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+					startPos.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
 			
-					startPos.y += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+					startPos.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
 				//shrink the segment length
 					oldPath[segnum].seg_length = destanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
 				} else {
 					startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
 					startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
 				}
-			} else if (oldSeg.type == 3) {
+			} else if (oldSeg.seg_type == 3) {
 
 			//turn in place, adjust heading
 				heading += oldSeg.seg_length - distanceOnSeg;
@@ -449,20 +395,20 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			prevList = malloc(sizeof(PathList)); 
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
-		for(int i = StartLoop; i < pointList.points.size(); i++) {
-    		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPos), convertGeoPointToPoint2i(pointList.points[i]));
+		for(uint i = startLoop; i < pointList.points.size(); i++) {
+    		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point3f> mapPts(segPts.size());
 		
 			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertMapToGridCoords);
-			goalSegnums[i-1] = turns->points.size() + mapPts.size();
+			goalSegnums[i-1] = turns.points.size() + mapPts.size();
     	if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
-			startPos = convertGeoPointToPoint3f(pointList.points[i+1]);
+			startPoint = convertGeoPointToPoint3f(pointList.points[i+1]);
 		}
 			
 		// convert vector<Point2i> to vector<Point3f>
-		PathList pathseg = insertTurns(initial_heading, mapPts, turns->points.size());
-		for (int j=0; j<pathseg.path_list.size(); j++)
+		PathList pathseg = insertTurns(initial_heading, mapPts, turns.points.size());
+		for (uint j=0; j<pathseg.path_list.size(); j++)
 			turns.path_list.push_back(pathseg.path_list[j]);
 			
 		}
@@ -484,7 +430,7 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(gridMatSize.width);
 
 	mapOrigin = (*CSpace_Map).info.origin;
-	mapresolution = (*CSpace_Map).info.grid_size;
+	mapResolution = (*CSpace_Map).info.resolution;
 	LIDARcalled = true;
 }
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
@@ -539,7 +485,6 @@ int main(int argc,char **argv)
 	ros::Subscriber sub5 = n.subscribe<geometry_msgs::Pose>("goalPose", 10, goalPose_Callback);
 	ros::Subscriber sub6 = n.subscribe<sensor_msgs::PointCloud>("Cam_Cloud", 10, pointList_Callback);
 	ros::Subscriber sub2 = n.subscribe<eecs376_msgs::CrawlerDesiredState>("crawlerDesState",1,segnum_Callback);
-	ros::Subscriber sub3 = n.subscribe<eecs376_msgs::GotThere>("gotThere",1,gotThere_Callback);
 	// Stuff for path visualization
 	ros::Publisher vis_pub = n.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
 	visualization_msgs::MarkerArray markers;
