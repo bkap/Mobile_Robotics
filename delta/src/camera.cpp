@@ -147,9 +147,9 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
 	drawContours(outline,points_,-1,255);
-	//cvNamedWindow("outline");
-	//imshow("outline",outline);
-	//waitKey(2);
+	cvNamedWindow("outline");
+	imshow("outline",outline);
+	waitKey(2);
 	int s = 0,s2=0;
 	for(int i =0;i<points_.size();i++){
 		s+=points_[i].size();
