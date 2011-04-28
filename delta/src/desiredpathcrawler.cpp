@@ -97,7 +97,7 @@ int main(int argc,char **argv)
 	{
                // update total distance traveled and compute the x, y, psi
 	    if(desState.seg_number >= pathlist.path_list.size()) {
-		ROSWarn("Oh noes segNum is too high!!!!!");
+		ROS_WARN("Oh noes segNum is too high!!!!!");
 		}
             double psiDes = tf::getYaw(desState.des_pose.orientation);
             switch (desState.seg_type) {
