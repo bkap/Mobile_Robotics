@@ -78,7 +78,7 @@ Mat_<uchar> cameraROI(gridMatSize,CV_8U);	//mask containing current viewable are
 Mat_<uchar> cameraGrid(gridMatSize,CV_8U);	//occupancy grid based solely on camera
 Mat_<uchar> LIDARGrid(gridMatSize,CV_8U);	//occupancy grid based solely on lidar
 
-
+ros::Publisher *P;
 nav_msgs::OccupancyGrid grid;
 bool init = false;
 
@@ -221,12 +221,13 @@ void updateGrid(){
                 	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j))-128;
 		}
         }
-	
-	cvNamedWindow("camGrid",CV_WINDOW_AUTOSIZE);
-	imshow("camGrid", cameraGrid);
+
+	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	imshow("grid",cameraGrid);
 	waitKey(2);
 
 
+		P->publish(grid);
 }
 
 /*
@@ -245,7 +246,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 		Point cell = pointToGridPoint(hit);
 		mask.push_back(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0);
 		//if(!gridBounds.contains(hit))	ROS_INFO("hit off map");
-		//if(!cameraROI(cell))	ROS_INFO("hit not viewable");
+		if(!cameraROI(cell))	ROS_INFO("hit not viewable");
 		//if(!lidarROI(cell))	ROS_INFO("hit not in lidar");
 		//if(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0) ROS_INFO("hit accepted");
 	}
@@ -380,7 +381,7 @@ tf::TransformListener *tfl;
 */
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_) 
 {
-	//return;
+	return;
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
@@ -451,7 +452,7 @@ void cameraROICallback(const sensor_msgs::PointCloud::ConstPtr& cloud){
 	updateCameraROI2(corners);
 }
 
-ros::Publisher *P;
+
 
 int main(int argc,char **argv)
 {
@@ -480,15 +481,16 @@ int main(int argc,char **argv)
 
 	P = new ros::Publisher();
 	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
-	P->publish(grid);
+//	P->publish(grid);
 
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
-		ros::spinOnce();
-		P->publish(grid);
-		loopTimer.sleep();
+		ros::spin();
+//		ros::spinOnce();
+//		P->publish(grid);
+//		loopTimer.sleep();
 	}
 	ROS_INFO("Mapper terminated");
 	return 0;
