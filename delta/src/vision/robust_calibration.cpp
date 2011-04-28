@@ -264,7 +264,7 @@ int main(int argc, char **argv)
   ROS_INFO("Calibration procedure started");
   ros::Rate naptime(75);
 
-  while(ros::ok() && (PRECAL || viewIJ.size()<100))
+  while(ros::ok() && (PRECAL || viewIJ.size()<200))
   {
         naptime.sleep();
   	ros::spinOnce();
@@ -320,16 +320,16 @@ int main(int argc, char **argv)
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
 
 	perspectiveTransform(Mat(orthoCornersBaseXY),orthoCornersIJ_,orthoToBaseInv);
-//	cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+	//cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
 	perspectiveTransform(Mat(viewCornersIJ),viewCornersBaseXY_,viewToBase);
-//	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
+	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
 
 	writeMat(viewCornersBaseXY_,"cameraROI_base_link");
 
 
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);
-//	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
 
 	Mat out_;

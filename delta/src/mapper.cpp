@@ -19,7 +19,7 @@
 #include "cvFuncs.h"
 
 #define FILL_RATE 25
-#define CLEAR_RATE 5
+#define CLEAR_RATE 100
 #define CAMERA_ROI_FILE "cameraROI_base_link"
 
 
@@ -381,14 +381,14 @@ tf::TransformListener *tfl;
 */
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_) 
 {
-	//return;
+
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
-
+	return;
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
 	clearLIDAR(scan_cloud,mask);
@@ -474,13 +474,15 @@ int main(int argc,char **argv)
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout<<"2\n";
 
+	P = new ros::Publisher();
+	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, lidarCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",5,cameraCallback);
 	ros::Subscriber S4 = n.subscribe<sensor_msgs::PointCloud>("Camera_view",10,cameraROICallback);
 
-	P = new ros::Publisher();
-	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+
 //	P->publish(grid);
 
 	cout<<"2\n";
