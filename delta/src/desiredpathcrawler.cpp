@@ -7,7 +7,7 @@
 #include <eecs376_msgs/PathSegment.h>
 #include <eecs376_msgs/PathList.h>
 #include <eecs376_msgs/CrawlerDesiredState.h>
-#include <eecs376_msgs/GotThere.h>
+//#include <eecs376_msgs/GotThere.h>
 using namespace eecs376_msgs;
 using namespace std;
 double f; // frequency
@@ -22,9 +22,9 @@ bool speedProfilerInit = false;
 
 void pathListCallback(const PathList::ConstPtr& newPathList)
 {
-	if(finishedPath && newPathList.) {
-		finishedPath = false;
-	}
+//	if(finishedPath && newPathList.) {
+//		finishedPath = false;
+//	}
     pathlist = *newPathList;
     // hax to make it turn 1/2 the desired angle on arcs because this is probably wrong elsewhere
     /*for (int i=0; i<pathlist.path_list.size(); i++)
@@ -52,7 +52,7 @@ int main(int argc,char **argv)
 
     ros::NodeHandle n;
     ros::Publisher pub = n.advertise<CrawlerDesiredState>("crawlerDesState",1);
-	ros::Publisher areWeThereYet = n.advertise<GotThere>("gotThere",1);
+//	ros::Publisher areWeThereYet = n.advertise<GotThere>("gotThere",1);
 	// Load parameters
 	if (n.getParam("/crawler/REFRESH_RATE", f)){
 		ROS_INFO("Crawler: loaded f=%f",f);
@@ -82,7 +82,7 @@ int main(int argc,char **argv)
     des_pose.position = pathlist.path_list[0].ref_point;
     des_pose.orientation = pathlist.path_list[0].init_tan_angle;
     desState.des_pose = des_pose;
-	int goalNum = 0;
+//	int goalNum = 0;
     // ref
     bool finishedPath = false;
 
@@ -93,8 +93,12 @@ int main(int argc,char **argv)
         ros::spinOnce(); // allow any subscriber callbacks that have been queued up to fire, but don't spin infinitely
 
         // only update if it still has path segments left...
+	if(!finishedPath)
+	{
                // update total distance traveled and compute the x, y, psi
 	    if(desState.seg_number >= pathlist.path_list.size()) {
+		ROS_WARN("Oh noes segNum is too high!!!!!");
+		}
             double psiDes = tf::getYaw(desState.des_pose.orientation);
             switch (desState.seg_type) {
                 case 1: // line
@@ -216,9 +220,9 @@ int main(int argc,char **argv)
                     cout << "\n\ndpc: LAST segment\n";
                     // desState.seg_number == pathlist.size() - 1 (last element of array)
                     finishedPath = true;
-					GotThere gt;
-					gt.goalNum = goalNum++;
-					areWeThereYet.publish(gt);
+		//			GotThere gt;
+		//			gt.goalNum = goalNum++;
+		//			areWeThereYet.publish(gt);
                 }
                 desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
                 cout << "\n\ndpc: NEW SEGMENT type " << (int)desState.seg_type;
