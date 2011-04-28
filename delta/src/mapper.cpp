@@ -253,7 +253,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 */
 void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	return;
+	//return;
 	if (!init){
 		ROS_INFO("skipping camera until initialization");
 		return;
@@ -265,7 +265,7 @@ void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 	vector<bool> mask;
 	maskCamera(*scan_cloud,mask);
 	addHits(cameraGrid,*scan_cloud,mask);
-	//updateGrid();
+	updateGrid();
 }
 
 /*
@@ -385,17 +385,17 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
-	cout<<"1\n";
+	
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
-	cout<<"2\n";
+	
 	clearLIDAR(scan_cloud,mask);
-	cout<<"3\n";
+	
 	//ROS_INFO("adding hit");
 	addHits(LIDARGrid,scan_cloud,mask);
-	cout<<"4\n";
-	updateGrid();
-	cout<<"5\n";
+	
+	//updateGrid();
+	
 }
 
 

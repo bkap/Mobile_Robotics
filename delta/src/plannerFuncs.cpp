@@ -36,6 +36,7 @@ inline double cost(Node expanding, double locCost) {
 	return expanding.pathCost+10*locCost;//+ exp(locCost/20.0);
 }
 
+
 bool operator<(Node a, Node b) 
 {
 	return a.heuristic+a.pathCost > b.heuristic + b.pathCost;
@@ -103,7 +104,12 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 		//expand the best thing in the priority queue
 		*current = Q.top();
 		
-		Q.pop();
+		if(Q.size()==0) 
+		{
+			cout<<"AAAWWWW SHIIIITTTT!!!! THERE IS NO VALID PATH WTF WTF WTF!!!!!!!!!!!!!\n";
+			break;
+		}
+		else Q.pop();
 		
 		if(nodeList[current->x][current->y]!=NULL) continue;
 		nodeList[current->x][current->y] =  new Node(*current);

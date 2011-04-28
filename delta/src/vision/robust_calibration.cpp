@@ -67,9 +67,9 @@ void writeMat(cv::Mat_<T>& mat, char* file){
 	(*ofile)<<mat.rows<<" ";
 	(*ofile)<<mat.cols<<" ";
 	(*ofile)<<mat.type()<<" ";
-	(*ofile)<<mat.total()*mat.elemSize();
+	(*ofile)<<mat.rows*mat.cols*mat.elemSize();
 	
-	ofile->write((char*) mat.data,mat.total()*mat.elemSize());
+	ofile->write((char*) mat.data,mat.rows*mat.cols*mat.elemSize());
 	ofile->close();
 }
 template<typename T>
@@ -320,16 +320,16 @@ int main(int argc, char **argv)
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
 
 	perspectiveTransform(Mat(orthoCornersBaseXY),orthoCornersIJ_,orthoToBaseInv);
-	cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+//	cout<< "project base_link co-ordinates:\n"<<Mat(orthoCornersBaseXY)<<"\n to birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
 	perspectiveTransform(Mat(viewCornersIJ),viewCornersBaseXY_,viewToBase);
-	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
+//	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
 
 	writeMat(viewCornersBaseXY_,"cameraROI_base_link");
 
 
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);
-	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
+//	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
 
 	Mat out_;
