@@ -136,28 +136,16 @@ void cSpaceInit()
 	}
 	cout<<"died after\n";	
 	//gridMat = cv::Mat(grid.data,false);
-	ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
+	//ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
 	//gridMat = gridMat.reshape(gridMatSize.width);
-
+	//gridMat = 0;
 	LIDARGrid = 128;
 	cameraGrid = 128;
 	last_map_pose.pose.position.x = 0;
 	last_map_pose.pose.position.y = 0;
 	last_map_pose.pose.orientation = tf::createQuaternionMsgFromYaw(0);
 	
-	//Mat_<float> x(2,2,0.f);
-	//Mat_<float> y(2,2,0.f);
-
-	
-	//readMat<float>(x,CAMERA_ROIx_FILE);
-	//readMat<float>(y,CAMERA_ROIy_FILE);
-
-	//for (int i=0;i<4;i++){
-	//	cameraROICorners(i) = Vec2f(x(i), y(i));
-	//}
-	ROS_INFO("mapper reading params");
-	//readMat(cameraROICorners,CAMERA_ROI_FILE);
-	ROS_INFO("created cSpace grid with %d elements",gridMat.rows*gridMat.cols);
+	//ROS_INFO("created cSpace grid with %d elements",gridMat.rows*gridMat.cols);
 }
 
 //return index in grid corresponding to x,y coordinate in frame
@@ -218,13 +206,16 @@ void addHits(Mat_<uchar>& grid, const sensor_msgs::PointCloud& cloud, vector<boo
 	}
 }
 void updateGrid(){
+
 	ROS_INFO("updating grid");
+
 	
         for(int i =0; i<cameraGrid.rows; i++)
 	{
 		//cout<<"row "<<i<<"\n";
 		for (int j = 0; j<cameraGrid.cols; j++)
 		{
+
 			//cout<<" col "<<j<<"\n"; 
                 	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j))-128;
 		}
@@ -233,6 +224,7 @@ void updateGrid(){
 	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
 	//imshow("grid",gridMat);
 	//waitKey(2);
+
 }
 
 /*
@@ -273,7 +265,7 @@ void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 	vector<bool> mask;
 	maskCamera(*scan_cloud,mask);
 	addHits(cameraGrid,*scan_cloud,mask);
-	updateGrid();
+	//updateGrid();
 }
 
 /*
