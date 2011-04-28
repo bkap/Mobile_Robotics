@@ -47,6 +47,41 @@ tf::TransformListener *tfl;
 
 int segnum = 0;
 int goalnum = 0;
+geometry_msgs::Pose des_pose;
+double distanceOnSeg = 0.0;
+
+cv::Mat_<bool> *lastCSpace_Map;
+cv::Mat_<bool> *lastVISION_Map;
+cv::Mat_<bool> *lastSONAR_Map;
+cv::Mat_<char> lastCSpace_CharMap; // ... shady pointer or is this ok?
+
+geometry_msgs::PoseStamped poseDes;
+geometry_msgs::Pose goalPose; 
+geometry_msgs::Pose mapOrigin;
+double mapResolution;
+geometry_msgs::PoseStamped poseActual;
+sensor_msgs::PointCloud pointList;
+
+
+bool LIDARcalled = true;
+bool poseDescalled = false;
+bool goalPosecalled = false;
+bool poseActualcalled = false;
+bool pointListcalled = true;
+
+Point3f convertGridToMapCoords(Point2i grid) {
+	Point3f mapcoords;
+	mapcoords.x = grid.x * mapResolution + mapOrigin.x;
+	mapcoords.y = grid.y * mapResolution + mapOrigin.y;
+	mapcoords.z = 0;
+	return mapcoords
+}
+Point2i convetMapToGridCoords(Point3f map) {
+	Point2i gridcoords;
+	gridcoords.x = (int)((map.x - mapOrigin.x) / mapResolution);
+	gridcoords.y = (int)((map.y - mapOrigin.y) / mapResolution);
+	return gridcoords;
+}
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -77,10 +112,8 @@ Point3f convertGeoPointToPoint3f(geometry_msgs::Point32 geopt)
 
 Point2i convertGeoPointToPoint2i(geometry_msgs::Point32 geopt)
 {
-	Point2i p2i;
-	p2i.x = geopt.x;
-	p2i.y = geopt.y;
-	return p2i;
+	
+	return convertMapToGridCoords(convertGeoPointToPoint3f(geopt));
 }
 
 // Get distance between two points
@@ -305,7 +338,7 @@ int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 	}
 	return -1;
 }
-Point2f getStartLocation(vector<PathSegment> path, int segnum) {
+Point2f getStartLocation(vector<PathSegment> path, int segnum, double distanceOnLocation) {
 	PathSegment curseg = path[segnum];
 	switch(curseg.seg_type) {
 		case 1 :
@@ -412,7 +445,7 @@ PathList joinPoints(double initial_heading,sensor_msgs::PointCloud pointList)
     //pathList = smoothLine(pointList);
     return pathList;
 }
-
+PathList *prevList;
 // Call A* search for path, lots of conversions needed so put in separate function
 // pointList is the list of goal points (first point is assumed to be origin)
 PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
@@ -422,43 +455,52 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
     	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
     	Mat_<char> mapChar;
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
-    	
-    	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
-    	vector<Point2i> segPts = aStar(mapChar, convertGeoPointToPoint2i(pointList.points[goalnum]), convertGeoPointToPoint2i(pointList.points[goalnum]));
-
-    	// convert vector<Point2i> to sensor_msgs::PointCloud
-		sensor_msgs::PointCloud segPtCloud;
-		for (int j=0; j<segPts.size(); j++)
-		{
-			convertPoint2iToGeoPoint(segPts[i]);
-			pointList.points.push_back(p);
+    	//find starting point
+		Point3f startPoint;
+		if(prevList != NULL) {
+		for(int i = 0; i < segnum; i++) {
+			turns.points.push_back(prevList->points[i]);
 		}
+		//TODO: might have an off-by-one here
+		PathSegment oldSeg = oldPath[segnum];
+		//put all segments up to segnum into turns
+		
+		Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
+		double heading = tf::getYaw(des_pose.orientation);
+		if(oldSeg.type == 1) {
+			//it's a line
+			//probably shouldn't hardcode acceleration, but we have to
+			if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
+			
+				startPos.x += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+			
+				startPos.y += (oldSeg.max_seeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+				//shrink the segment length
+				oldPath[segnum].seg_length = destanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
+			} else {
+				startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
+				startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
+			}
+		} else if (oldSeg.type == 3) {
 
-		PathList pathseg = joinPoints(initial_heading, segPtCloud);
+			//turn in place, adjust heading
+			heading += oldSeg.seg_length - distanceOnSeg;
+		}
+    	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
+    	vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPos), convertGeoPointToPoint2i(pointList.points[goalNum]));
+		vector<Point3f> mapPts(segPts.size());
+		
+		transform(segPts.begin(), segPts.end(), mapPts.begin(), convertMapToGridCoords);
+	} //if(prevList != NULL)
+    	// convert vector<Point2i> to vector<Point3f>
+		PathList pathseg = joinPoints(initial_heading, mapPts);
 		for (int j=0; j<pathseg.path_list.size(); j++)
 			turns.path_list.push_back(pathseg.path_list[j]);
+	*prevList = turns;
     return turns;
 }
 
 // Begin main loop, callbacks, etc
-
-cv::Mat_<bool> *lastCSpace_Map;
-cv::Mat_<bool> *lastVISION_Map;
-cv::Mat_<bool> *lastSONAR_Map;
-cv::Mat_<char> lastCSpace_CharMap; // ... shady pointer or is this ok?
-
-geometry_msgs::PoseStamped poseDes;
-geometry_msgs::Pose goalPose; 
-geometry_msgs::Pose mapOrigin;
-geometry_msgs::PoseStamped poseActual;
-sensor_msgs::PointCloud pointList;
-
-
-bool LIDARcalled = true;
-bool poseDescalled = false;
-bool goalPosecalled = false;
-bool poseActualcalled = false;
-bool pointListcalled = true;
 
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSpace_Map)
 {
@@ -472,10 +514,12 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(gridMatSize.width);
 
 	mapOrigin = (*CSpace_Map).info.origin;
+	mapresolution = (*CSpace_Map).info.grid_size;
 	LIDARcalled = true;
 }
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
 	segnum = (*crawledState).seg_number+1;
+	distanceOnSeg = (*crawledState).des_lseg;
 } 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
@@ -508,10 +552,6 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 {
     //pointList = *newPointList;
     pointListcalled = true;
-}
-
-void gotThere_Callback(const eecs376_msgs::GotThere::ConstPtr& finishedSeg) {
-	goalnum = (*finishedSeg).goalNum+1;
 }
 
 int main(int argc,char **argv)
