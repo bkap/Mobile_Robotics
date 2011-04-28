@@ -18,8 +18,8 @@
 #include <iostream>
 #include "cvFuncs.h"
 
-#define FILL_RATE 50
-#define CLEAR_RATE 1
+#define FILL_RATE 25
+#define CLEAR_RATE 5
 #define CAMERA_ROI_FILE "cameraROI_base_link"
 
 
@@ -81,6 +81,7 @@ Mat_<uchar> LIDARGrid(gridMatSize,CV_8U);	//occupancy grid based solely on lidar
 
 nav_msgs::OccupancyGrid grid;
 bool init = false;
+
 /*
 	In accordance with OccupancyGrid, columns correspond to x and rows correspond to y
 */
@@ -219,10 +220,10 @@ void updateGrid(){
 			grid.data[i*cameraGrid.rows + j] = cameraGrid(i,j) > LIDARGrid(i,j)? (char)(cameraGrid(i,j) - 128) : (char)(LIDARGrid(i,j) - 128);
 		}
         }
-	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",gridMat);
-	waitKey(2);
 	*/
+	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	imshow("grid",cameraGrid);
+	waitKey(2);
 	
 	for(int i = 0;i<gridMat.rows;i++){
 		for(int j = 0;j<gridMat.cols;j++){
@@ -247,9 +248,9 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 		Point cell = pointToGridPoint(hit);
 		mask.push_back(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0);
 		//if(!gridBounds.contains(hit))	ROS_INFO("hit off map");
-		if(!cameraROI(cell))	ROS_INFO("hit not viewable");
+		//if(!cameraROI(cell))	ROS_INFO("hit not viewable");
 		//if(!lidarROI(cell))	ROS_INFO("hit not in lidar");
-		if(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0) ROS_INFO("hit accepted");
+		//if(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0) ROS_INFO("hit accepted");
 	}
 }
 /*
@@ -257,19 +258,19 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 */
 void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	return;
+	//return;
 	if (!init){
 		ROS_INFO("skipping camera until initialization");
 		return;
 	}
+	ROS_INFO("MAPPER found %d points",scan_cloud->points.size());
 	ROS_INFO("camera callback");
-	//clearCamera();
 	subtract(cameraGrid,clearColor,cameraGrid,cameraROI);
 	//ROS_INFO("cleared ROI");
 	vector<bool> mask;
 	maskCamera(*scan_cloud,mask);
 	addHits(cameraGrid,*scan_cloud,mask);
-	//updateGrid();
+	updateGrid();
 }
 
 /*
@@ -389,17 +390,12 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
-	cout<<"1\n";
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
-	cout<<"2\n";
 	clearLIDAR(scan_cloud,mask);
-	cout<<"3\n";
 	//ROS_INFO("adding hit");
 	addHits(LIDARGrid,scan_cloud,mask);
-	cout<<"4\n";
-	updateGrid();
-	cout<<"5\n";
+	//updateGrid();
 }
 
 
@@ -478,9 +474,10 @@ int main(int argc,char **argv)
 
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, lidarCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
-	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",1,cameraCallback);
-	ros::Subscriber S4 = n.subscribe<sensor_msgs::PointCloud>("Camera_view",1,cameraROICallback);
+	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",5,cameraCallback);
+	ros::Subscriber S4 = n.subscribe<sensor_msgs::PointCloud>("Camera_view",10,cameraROICallback);
 	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+	P.publish(grid);
 
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);

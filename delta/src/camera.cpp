@@ -68,15 +68,12 @@ class DemoNode {
 /*
 	binarizes an image by settng all non-orange pixels to zero and all orange pixels to 255
 */
-void findOrange(cv::Mat& src)
+void findOrange(cv::Mat& src,cv::Mat& dst)
 {
-  Mat temp;
-  temp = src;
-
   //Make a vector of Mats to hold the invidiual B,G,R channels
   vector<Mat> mats;
   //Split the input into 3 separate channels
-  split(temp, mats);
+  split(src, mats);
   // Set all values below value to zero, leave rest the same
   // Then inverse binary threshold the remaining pixels
   // Threshold blue channel
@@ -88,10 +85,10 @@ void findOrange(cv::Mat& src)
   // Threshold red channel
   threshold(mats[2], mats[2], 255, 255, THRESH_TOZERO_INV);
   threshold(mats[2], mats[2], 180, 255, THRESH_BINARY);
-  multiply(mats[0], mats[1], src);
-  multiply(src, mats[2], src);
-  erode(src, src, Mat());
-  dilate(src, src, Mat(), Point(-1,-1), 5);
+  multiply(mats[0], mats[1], dst);
+  multiply(dst, mats[2], dst);
+  erode(dst, dst, Mat());
+  dilate(dst, dst, Mat(), Point(-1,-1), 7);
 }
 /*
 	converts vector<Point2f> of camera coordinates to corresponding PointCloud in map coordinates
@@ -140,22 +137,28 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	//cvNamedWindow("image");
 	//imshow("image",image);
 	//waitKey(2);
-	findOrange(image);
+	Mat orange = Mat::zeros(image.rows,image.cols,CV_8U);
+	findOrange(image,orange);
+	//cout<< orange.channels()<<endl;
 	//cvNamedWindow("orange");
-	//imshow("orange",image);
+	//imshow("orange",orange);
 	//waitKey(2);
 	vector<vector<Point> > points_;
-	findContours(image, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-	//Mat outline(image.size(),(uchar)0);
-	//drawContours(outline,points_,-1,255);
+	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
+	drawContours(outline,points_,-1,255);
 	//cvNamedWindow("outline");
 	//imshow("outline",outline);
 	//waitKey(2);
+	int s = 0,s2=0;
 	for(int i =0;i<points_.size();i++){
+		s+=points_[i].size();
 		for(int j=0;j<points_[i].size();j++){
 			points.push_back(Point2f(points_[i][j].x, points_[i][j].y));
+			s2++;
 		}
 	}
+	ROS_INFO("CAMERA FINDS %d (%d) points",s,s2);
 }
 
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -165,7 +168,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
   static sensor_msgs::CvBridge bridge;
   static bool init = false;
-  static vector<Point2f> viewCorners;
+  static vector<Point2f> viewCorners,foundPoints;
   cv::Mat image;
   // Convert image from ROS format to OpenCV format
   try
@@ -178,12 +181,13 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		viewCorners.push_back(Point2f(image.size().height-1,0));
 	}
 	
-	vector<Point2f> points;
-	findPoints(image,points);
 	transformPoints(viewCorners,viewCloud);
 	pub_view_pts.publish(viewCloud);
-	if(points.size() > 1){
-		transformPoints(points,pointCloud);
+	
+	foundPoints.clear();
+	findPoints(image,foundPoints);
+	if(foundPoints.size() > 1){
+		transformPoints(foundPoints,pointCloud);
 		pub_nav_pts.publish(pointCloud);
 	}
 	else{
