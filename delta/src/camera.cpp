@@ -36,7 +36,7 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	infile->close();
 
 	int sizes[2] = {rows,cols};
-	Mat_<T> temp = Mat(2,sizes,type,data);
+	Mat_<T> temp = Mat(rows, cols,type,data);
 	temp.copyTo(mat);
 	delete[] data;
 }
@@ -222,7 +222,10 @@ int main(int argc, char **argv)
 	cout << "READY"  << endl;
 	DemoNode motion_tracker;
 
+	
+
 	ROS_INFO("Camera Node Started");
-	while(ros::ok()){ros::spinOnce();}
+	ros::spin();
+	
 	return 0;
 }
