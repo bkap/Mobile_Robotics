@@ -19,7 +19,7 @@
 #include "cvFuncs.h"
 
 #define FILL_RATE 25
-#define CLEAR_RATE 5
+#define CLEAR_RATE 100
 #define CAMERA_ROI_FILE "cameraROI_base_link"
 
 
@@ -221,10 +221,11 @@ void updateGrid(){
                 	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j))-128;
 		}
         }
-	
+
 	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
 	imshow("grid",cameraGrid);
 	waitKey(2);
+
 
 		P->publish(grid);
 }
@@ -245,7 +246,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 		Point cell = pointToGridPoint(hit);
 		mask.push_back(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0);
 		//if(!gridBounds.contains(hit))	ROS_INFO("hit off map");
-		if(!cameraROI(cell))	ROS_INFO("hit not viewable");
+		//if(!cameraROI(cell))	ROS_INFO("hit not viewable");
 		//if(!lidarROI(cell))	ROS_INFO("hit not in lidar");
 		//if(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0) ROS_INFO("hit accepted");
 	}
@@ -380,14 +381,14 @@ tf::TransformListener *tfl;
 */
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_) 
 {
-	return;
+
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
-
+	return;
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
 	clearLIDAR(scan_cloud,mask);
@@ -473,13 +474,15 @@ int main(int argc,char **argv)
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout<<"2\n";
 
+	P = new ros::Publisher();
+	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, lidarCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",5,cameraCallback);
 	ros::Subscriber S4 = n.subscribe<sensor_msgs::PointCloud>("Camera_view",10,cameraROICallback);
 
-	P = new ros::Publisher();
-	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+
 //	P->publish(grid);
 
 	cout<<"2\n";
