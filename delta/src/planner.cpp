@@ -71,15 +71,15 @@ bool pointListcalled = true;
 
 Point3f convertGridToMapCoords(Point2i grid) {
 	Point3f mapcoords;
-	mapcoords.x = grid.x * mapResolution + mapOrigin.x;
-	mapcoords.y = grid.y * mapResolution + mapOrigin.y;
+	mapcoords.x = grid.x * mapResolution + mapOrigin.position.x;
+	mapcoords.y = grid.y * mapResolution + mapOrigin.position.y;
 	mapcoords.z = 0;
-	return mapcoords
+	return mapcoords;
 }
-Point2i convetMapToGridCoords(Point3f map) {
+Point2i convertMapToGridCoords(Point3f map) {
 	Point2i gridcoords;
-	gridcoords.x = (int)((map.x - mapOrigin.x) / mapResolution);
-	gridcoords.y = (int)((map.y - mapOrigin.y) / mapResolution);
+	gridcoords.x = (int)((map.x - mapOrigin.position.x) / mapResolution);
+	gridcoords.y = (int)((map.y - mapOrigin.position.y) / mapResolution);
 	return gridcoords;
 }
 // Point type conversions
@@ -338,25 +338,7 @@ int getFirstNotTooClose(int segnum, Point3f* PointList, int size) {
 	}
 	return -1;
 }
-Point2f getStartLocation(vector<PathSegment> path, int segnum, double distanceOnLocation) {
-	PathSegment curseg = path[segnum];
-	switch(curseg.seg_type) {
-		case 1 :
-			//line
-			return Point2f(curseg.pose.position.x + cos(tf::getYaw(curseg.pose.orientation)) * curseg.seg_length, curseg.pose.position.y + sin(tf::getYaw(curseg.pose.orientation)) * curseg.seg_length);
-			break;
-		case 2 :
-			return Point2f(DBL_MAX, DBL_MAX);
-		case 3 :
-			return Point2f(curseg.pose.position.x, curseg.pose.position.y);
-			break;
-		default :
-			return Point2f(DBL_MAX,DBL_MAX);
-	}
 
-
-	}
-}
 bool FirstTime = true;
 // this was supposed to take a list of points and turn them into a series of lines and turns, following 
 // the pattern (line, turn, line, line, turn, line ...)
