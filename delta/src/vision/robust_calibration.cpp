@@ -312,9 +312,9 @@ int main(int argc, char **argv)
 	invert(viewToBaseInv,viewToBase); 
 	invert(viewToOrthoInv,viewToOrtho);
 	/*	Logging and Verification	*/
-	writeMat(viewToBase,"/home/connor/Code/Mobile_Robotics/delta/viewToBase");
-	writeMat(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
-	writeMat(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/baseToOrthoInv");
+	writeMat(viewToBase,"viewToBase");
+	//writeMat(viewToOrthoInv,"viewToOrthoInv");
+	//writeMat(orthoToBaseInv,"baseToOrthoInv");
 
 	cout<<"viewToBase inliers "<<countNonZero(Mat(mask1))<<"\nviewToOrtho inliers "<<countNonZero(Mat(mask2))<<"\northoToBase inliers "<<countNonZero(Mat(mask3))<<endl;
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
@@ -325,7 +325,7 @@ int main(int argc, char **argv)
 	perspectiveTransform(Mat(viewCornersIJ),viewCornersBaseXY_,viewToBase);
 	cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto base_link co-ordinates:\n"<<viewCornersBaseXY_<<endl<<endl;
 
-	writeMat(viewCornersBaseXY_,"/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link");
+	writeMat(viewCornersBaseXY_,"cameraROI_base_link");
 
 
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);

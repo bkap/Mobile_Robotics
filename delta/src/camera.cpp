@@ -18,7 +18,7 @@
 #include "camera_funcs.h"
 #include "cvFuncs.h"
 
-#define CAMERA_ROI_FILE "/home/connor/Code/Mobile_Robotics/delta/cameraROI_base_link"
+#define CAMERA_ROI_FILE "cameraROI_base_link"
 
 using namespace cv;
 using namespace std;
@@ -201,7 +201,7 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 DemoNode::DemoNode():
   it_(nh_)
 {
-        readMat(viewToBase,"/home/connor/Code/Mobile_Robotics/delta/viewToBase");
+        readMat(viewToBase,"viewToBase");
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 
   // Publish a cloud of points on the orange line
