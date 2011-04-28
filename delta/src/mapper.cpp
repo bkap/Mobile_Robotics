@@ -127,31 +127,21 @@ void cSpaceInit()
 	grid.info.origin.position.z = 0;
 	grid.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
 	vector<char>* data = new vector<char>((grid.info.width) * (grid.info.height));
+
 	ROS_INFO("created occupancy grid with %d x %d elements",(grid.info.width),(grid.info.height));
-	grid.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.	
-	gridMat = cv::Mat(grid.data,false);
-	ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
-	gridMat = gridMat.reshape(gridMatSize.width);
-	gridMat = 0;
+	grid.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
+	cout<<"died after\n";	
+	//gridMat = cv::Mat(grid.data,false);
+	//ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
+	//gridMat = gridMat.reshape(gridMatSize.width);
+	//gridMat = 0;
 	LIDARGrid = 128;
 	cameraGrid = 128;
 	last_map_pose.pose.position.x = 0;
 	last_map_pose.pose.position.y = 0;
 	last_map_pose.pose.orientation = tf::createQuaternionMsgFromYaw(0);
 	
-	//Mat_<float> x(2,2,0.f);
-	//Mat_<float> y(2,2,0.f);
-
-	
-	//readMat<float>(x,CAMERA_ROIx_FILE);
-	//readMat<float>(y,CAMERA_ROIy_FILE);
-
-	//for (int i=0;i<4;i++){
-	//	cameraROICorners(i) = Vec2f(x(i), y(i));
-	//}
-	ROS_INFO("mapper reading params");
-	//readMat(cameraROICorners,CAMERA_ROI_FILE);
-	ROS_INFO("created cSpace grid with %d elements",gridMat.total());
+	//ROS_INFO("created cSpace grid with %d elements",gridMat.rows*gridMat.cols);
 }
 
 //return index in grid corresponding to x,y coordinate in frame
@@ -217,9 +207,17 @@ void updateGrid(){
 	cv::MatIterator_<char> it=gridMat.begin(), it_end = gridMat.end();
 	cv::MatIterator_<uchar> camerait=cameraGrid.begin(), camerait_end = cameraGrid.end();
 	cv::MatIterator_<uchar> lidarit=LIDARGrid.begin(), lidarit_end = LIDARGrid.end();
+
+	//cv::MatIterator_<char> it=gridMat.begin(), it_end = gridMat.end();
+	//cv::MatIterator_<uchar> camerait=cameraGrid.begin(), camerait_end = cameraGrid.end();
+	//cv::MatIterator_<uchar> lidarit=LIDARGrid.begin(), lidarit_end = LIDARGrid.end();
 	
-        for(;it!=it_end;++it,++camerait,++lidarit){
-                *it = (char) (((*lidarit) > (*camerait)? *lidarit : *camerait)-128);
+        for(int i =0; i<cameraGrid.rows; i++)
+	{
+		for (int j = 0; j<cameraGrid.cols; j++)
+		{
+			grid.data[i*cameraGrid.rows + j] = cameraGrid(i,j) > LIDARGrid(i,j)? (char)(cameraGrid(i,j) - 128) : (char)(LIDARGrid(i,j) - 128);
+		}
         }
 	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
 	imshow("grid",gridMat);
@@ -300,7 +298,7 @@ void updateCameraROI(){
 		cameraROI = (uchar) 0;
 		corners.clear();	
 	}
-	cout<<cameraROICorners<<endl;
+	//cout<<cameraROICorners<<endl;
 	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,0),last_map_pose.pose),fixedPoints));
 	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,1),last_map_pose.pose),fixedPoints));
 	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(1,1),last_map_pose.pose),fixedPoints));
@@ -391,12 +389,17 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
+	cout<<"1\n";
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
+	cout<<"2\n";
 	clearLIDAR(scan_cloud,mask);
+	cout<<"3\n";
 	//ROS_INFO("adding hit");
 	addHits(LIDARGrid,scan_cloud,mask);
+	cout<<"4\n";
 	updateGrid();
+	cout<<"5\n";
 }
 
 
