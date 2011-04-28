@@ -353,7 +353,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 	PathList turns;
 
     	// TODO: need a Mat not a Mat_<bool> as given by mapper ... mapper publishes an occupancyGrid which is converted into a Mat_<bool> in CSpaceFuncs
-    	//Mat_<char> mapChar;
+    	Mat_<char> mapChar = lastCSpace_CharMap;
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
     	//find starting point
 		Point3f startPoint;
@@ -401,13 +401,13 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		
 			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
-    	if(i + 1 < pointList.path_list.size()) {
+    	if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
 			startPoint = convertGeoPointToPoint3f(pointList.points[i+1]);
 		}
 			
 		// convert vector<Point2i> to vector<Point3f>
-		PathList pathseg = insertTurns(initial_heading, mapPts, turns.points.size());
+		PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
 		for (uint j=0; j<pathseg.path_list.size(); j++)
 			turns.path_list.push_back(pathseg.path_list[j]);
 			
