@@ -246,7 +246,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 		Point cell = pointToGridPoint(hit);
 		mask.push_back(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0);
 		//if(!gridBounds.contains(hit))	ROS_INFO("hit off map");
-		if(!cameraROI(cell))	ROS_INFO("hit not viewable");
+		//if(!cameraROI(cell))	ROS_INFO("hit not viewable");
 		//if(!lidarROI(cell))	ROS_INFO("hit not in lidar");
 		//if(gridBounds.contains(hit) && gridMatBounds.contains(cell) && cameraROI(cell)!=0 && lidarROI(cell)!=0) ROS_INFO("hit accepted");
 	}
@@ -381,7 +381,7 @@ tf::TransformListener *tfl;
 */
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_) 
 {
-	return;
+	//return;
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
