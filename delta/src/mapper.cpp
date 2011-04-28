@@ -220,7 +220,7 @@ void updateGrid(){
                 *it = (char) (((*lidarit) > (*camerait)? *lidarit : *camerait)-128);
         }
 	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",cameraGrid);
+	imshow("grid",gridMat);
 	waitKey(2);
 }
 
@@ -250,7 +250,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 */
 void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
-	//return;
+	return;
 	if (!init){
 		ROS_INFO("skipping camera until initialization");
 		return;
@@ -375,7 +375,7 @@ tf::TransformListener *tfl;
 */
 void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_) 
 {
-	return;
+	//return;
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
@@ -387,7 +387,7 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	clearLIDAR(scan_cloud,mask);
 	//ROS_INFO("adding hit");
 	addHits(LIDARGrid,scan_cloud,mask);
-	//updateGrid();
+	updateGrid();
 }
 
 
