@@ -130,6 +130,10 @@ void cSpaceInit()
 
 	ROS_INFO("created occupancy grid with %d x %d elements",(grid.info.width),(grid.info.height));
 	grid.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
+	for(int i = 0; i<(int)grid.data.size(); i++)
+	{
+		grid.data[i] = 0;
+	}
 	cout<<"died after\n";	
 	//gridMat = cv::Mat(grid.data,false);
 	ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
@@ -214,21 +218,21 @@ void addHits(Mat_<uchar>& grid, const sensor_msgs::PointCloud& cloud, vector<boo
 	}
 }
 void updateGrid(){
-	//ROS_INFO("updating grid");
-	//cv::MatIterator_<char> it=gridMat.begin(), it_end = gridMat.end();
-	//cv::MatIterator_<uchar> camerait=cameraGrid.begin(), camerait_end = cameraGrid.end();
-	//cv::MatIterator_<uchar> lidarit=LIDARGrid.begin(), lidarit_end = LIDARGrid.end();
+	ROS_INFO("updating grid");
 	
         for(int i =0; i<cameraGrid.rows; i++)
 	{
+		//cout<<"row "<<i<<"\n";
 		for (int j = 0; j<cameraGrid.cols; j++)
 		{
-                	grid.data[i*cameraGrid.cols+j]=(((LIDARGrid(i,j)) > (cameraGrid(i,j))? LIDARGrid(i,j) : cameraGrid(i,j))-128);
+			//cout<<" col "<<j<<"\n"; 
+                	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j))-128;
 		}
         }
-	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",gridMat);
-	waitKey(2);
+	cout<<"survived\n";
+	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	//imshow("grid",gridMat);
+	//waitKey(2);
 }
 
 /*
