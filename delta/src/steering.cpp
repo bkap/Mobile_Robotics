@@ -243,9 +243,9 @@ int main(int argc,char **argv)
 			vel_object.angular.z= vw[1];
 			stalePos = true,
 				staleDes = true;
-
+			pub.publish(vel_object);
 			cout<<"steering:\n\tNominalSpeed "<<desired.des_speed<<"\n\tcommanded "<<vw[0]<<" , "<<vw[1]<<endl;
 		}
-		pub.publish(vel_object);
+		
 	}
 }

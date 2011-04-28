@@ -54,8 +54,8 @@ int main(int argc,char **argv)
 	Mat someShit;
    FileStorage F("someShit.xml", FileStorage::READ);
 	F["someShit"]>>someShit;
-	imshow("someShit", someShit);
-		waitKey(-1);
+	//imshow("someShit", someShit);
+	//	waitKey(-1);
 
     	cout<<"2\n";
     // call aStar
