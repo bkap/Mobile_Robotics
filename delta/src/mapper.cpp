@@ -451,6 +451,8 @@ void cameraROICallback(const sensor_msgs::PointCloud::ConstPtr& cloud){
 	updateCameraROI2(corners);
 }
 
+ros::Publisher *P;
+
 int main(int argc,char **argv)
 {
 	cout<<"2\n";
@@ -475,15 +477,17 @@ int main(int argc,char **argv)
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",5,cameraCallback);
 	ros::Subscriber S4 = n.subscribe<sensor_msgs::PointCloud>("Camera_view",10,cameraROICallback);
-	ros::Publisher P = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
-	P.publish(grid);
+
+	P = new ros::Publisher();
+	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
+	P->publish(grid);
 
 	cout<<"2\n";
 //	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
 		ros::spinOnce();
-		P.publish(grid);
+		P->publish(grid);
 		loopTimer.sleep();
 	}
 	ROS_INFO("Mapper terminated");
