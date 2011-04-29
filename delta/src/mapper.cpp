@@ -19,7 +19,7 @@
 #include "cvFuncs.h"
 
 #define FILL_RATE 25
-#define CLEAR_RATE 100
+#define CLEAR_RATE 5
 #define CAMERA_ROI_FILE "cameraROI_base_link"
 
 
@@ -78,8 +78,8 @@ Mat_<uchar> cameraROI(gridMatSize,CV_8U);	//mask containing current viewable are
 Mat_<uchar> cameraGrid(gridMatSize,CV_8U);	//occupancy grid based solely on camera
 Mat_<uchar> LIDARGrid(gridMatSize,CV_8U);	//occupancy grid based solely on lidar
 
-ros::Publisher *P;
-nav_msgs::OccupancyGrid grid;
+ros::Publisher *P,*Plid,*Pcam;
+nav_msgs::OccupancyGrid grid,grid_cam,grid_lid;
 bool init = false;
 
 /*
@@ -127,21 +127,30 @@ void cSpaceInit()
 	grid.info.origin.position.y = gridOrigin.y;//InitY-GRID_HEIGHT/2.0;
 	grid.info.origin.position.z = 0;
 	grid.info.origin.orientation = tf::createQuaternionMsgFromYaw(0);
+	grid_lid.info = grid.info;
+	grid_cam.info = grid.info;
+	grid_lid.header.frame_id="map";
+	grid_cam.header.frame_id="map";
+	grid_cam.header.seq = 0;
+	grid_lid.header.seq = 0;
 	vector<char>* data = new vector<char>((grid.info.width) * (grid.info.height));
-
+	vector<char>* data1 = new vector<char>((grid.info.width) * (grid.info.height));
+	vector<char>* data2 = new vector<char>((grid.info.width) * (grid.info.height));
 	ROS_INFO("created occupancy grid with %d x %d elements",(grid.info.width),(grid.info.height));
-	grid.data.assign(data->begin(),data->end()); //I realize that this size should be 8 by definition, but this is good practice.
-	for(int i = 0; i<(int)grid.data.size(); i++)
-	{
-		grid.data[i] = 0;
-	}
-	cout<<"died after\n";	
-	//gridMat = cv::Mat(grid.data,false);
-	//ROS_INFO("wrapping in mat with width %d",gridMatSize.width);
-	//gridMat = gridMat.reshape(gridMatSize.width);
-	//gridMat = 0;
-	LIDARGrid = 128;
-	cameraGrid = 128;
+	
+	gridMat = Mat::zeros(gridMatSize.height,gridMatSize.width,CV_8S);
+	cameraGrid = Mat::zeros(gridMatSize.height,gridMatSize.width,CV_8U);
+	LIDARGrid  = Mat::zeros(gridMatSize.height,gridMatSize.width,CV_8U);
+	grid.data.assign(data->begin(),data->end());	
+	grid_cam.data.assign(data1->begin(),data1->end());	
+	grid_lid.data.assign(data2->begin(),data2->end());
+	gridMat.data = (uchar *) &grid.data[0];		//kind of shifty, but cturtle demands it.
+	cameraGrid.data=(uchar *)&grid_cam.data[0];
+	LIDARGrid.data=(uchar *)&grid_lid.data[0];
+	
+	gridMat = 0;
+	//LIDARGrid = 128;
+	//cameraGrid = 128;
 	last_map_pose.pose.position.x = 0;
 	last_map_pose.pose.position.y = 0;
 	last_map_pose.pose.orientation = tf::createQuaternionMsgFromYaw(0);
@@ -210,7 +219,6 @@ void updateGrid(){
 
 	ROS_INFO("updating grid");
 
-	
         for(int i =0; i<cameraGrid.rows; i++)
 	{
 		//cout<<"row "<<i<<"\n";
@@ -218,15 +226,16 @@ void updateGrid(){
 		{
 
 			//cout<<" col "<<j<<"\n"; 
-                	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j))-128;
+                	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j));//-128;
 		}
         }
 	
-	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",cameraGrid);
-	waitKey(2);
-
+	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	//imshow("grid",cameraGrid);
+	//waitKey(2);
 		P->publish(grid);
+		Pcam->publish(grid_cam);
+		Plid->publish(grid_lid);
 }
 
 /*
@@ -285,29 +294,7 @@ Point2f relativeTo(Point2f point, geometry_msgs::Pose& pose){
 	return Point2f(dest[0],dest[1]);
 }
 
-/*
-	updates cameraROI to reflect presently viewable camera area
-*/
-void updateCameraROI(){
-	//ROS_INFO("updating camera ROI");
-	static vector<Point> corners;
-	if(corners.size()!=0){
-		//may be bad pointer
-		cameraROI = (uchar) 0;
-		corners.clear();	
-	}
-	//cout<<cameraROICorners<<endl;
-	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,0),last_map_pose.pose),fixedPoints));
-	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(0,1),last_map_pose.pose),fixedPoints));
-	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(1,1),last_map_pose.pose),fixedPoints));
-	corners.push_back(pointToGridPoint(relativeTo(cameraROICorners(1,0),last_map_pose.pose),fixedPoints));
-	for(int i = 0;i<corners.size();i++){
-	//	ROS_INFO("ROI corner at index (x,y) %d,%d",corners[i].x,corners[i].y);
-	}
-	//may be bad pointer	
-	fillConvexPoly(cameraROI,&(corners.front()),4,(uchar) 255,8,fixedPoints);
-	//ROS_INFO("camera ROI updated: %d x %d, %d set", cameraROI.rows,cameraROI.cols,countNonZero(cameraROI));
-}
+
 
 /*
 	Given a PointCloud of lidar pings in map frame,
@@ -386,7 +373,7 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
-	return;
+	//return;
 	vector<bool> mask;
 	maskLIDAR(scan_cloud, mask);
 	clearLIDAR(scan_cloud,mask);
@@ -407,11 +394,9 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom) 
 {
 	//ROS_INFO("odom callback");
-//	cout<<"lidarmapper odom callback occured\n";
 	last_odom = *odom;
         temp.pose = last_odom.pose.pose;
         temp.header = last_odom.header;
-	//cout<<"temp "<<temp.pose.position.x<<" , "<<temp.pose.position.y<<endl;
         try 
 	{
           tfl->transformPose("map", temp, last_map_pose);
@@ -426,28 +411,22 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 		cSpaceInit();
 		init = true;
 	}
-	//updateCameraROI();
-	
 }
 
-void updateCameraROI2(vector<Point> corners){
-	//ROS_INFO("updating camera ROI");
-	cameraROI = (uchar) 0;
-	//may be bad pointer	
-	fillConvexPoly(cameraROI,&(corners.front()),4,(uchar) 255,8,fixedPoints);
-	//ROS_INFO("camera ROI updated: %d x %d, %d set", cameraROI.rows,cameraROI.cols,countNonZero(cameraROI));
-}
 
 /* takes roi corners in map frame and sets roi mask */
 void cameraROICallback(const sensor_msgs::PointCloud::ConstPtr& cloud){
+	/*	convert to vector<Point>	*/
 	vector<Point3f> points;
 	ROS2CVPointCloud(*cloud,points);
 	vector<Point> corners;
 	for(int i=0;i<4;i++){
 		corners.push_back(pointToGridPoint(Point2f(points[i].x,points[i].y),fixedPoints));
-		//ROS_INFO("ROI corner at index (x,y) %d,%d",corners[i].x,corners[i].y);
 	}
-	updateCameraROI2(corners);
+
+	/*	update roi	*/
+	cameraROI = (uchar) 0;
+	fillConvexPoly(cameraROI,&(corners.front()),4,(uchar) 255,8,fixedPoints);
 }
 
 
@@ -473,8 +452,11 @@ int main(int argc,char **argv)
 	cout<<"2\n";
 
 	P = new ros::Publisher();
+	Pcam = new ros::Publisher();
+	Plid = new ros::Publisher();
 	(*P) = n.advertise<nav_msgs::OccupancyGrid>("CSpace_Map", 10);
-
+	(*Pcam) = n.advertise<nav_msgs::OccupancyGrid>("cam_Map", 10);
+	(*Plid) = n.advertise<nav_msgs::OccupancyGrid>("lid_Map", 10);
 	ros::Subscriber S1 = n.subscribe<sensor_msgs::PointCloud>("LIDAR_Cloud", 20, lidarCallback);
 	ros::Subscriber S2 = n.subscribe<nav_msgs::Odometry>("odom", 10, odomCallback);
 	ros::Subscriber S3 = n.subscribe<sensor_msgs::PointCloud>("Camera_Cloud",5,cameraCallback);
@@ -488,9 +470,6 @@ int main(int argc,char **argv)
 	while(ros::ok())
 	{
 		ros::spin();
-//		ros::spinOnce();
-//		P->publish(grid);
-//		loopTimer.sleep();
 	}
 	ROS_INFO("Mapper terminated");
 	return 0;

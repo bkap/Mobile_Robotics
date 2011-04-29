@@ -101,20 +101,25 @@ void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCl
 	Mat_<Point2f> basePoints_;
 	perspectiveTransform(Mat(viewPoints),basePoints_,viewToBase);
 	
-	vector<Point2f> points;
+	/*convert to point cloud*/
+	//vector<Point2f> points;
 	for(unsigned int i = 0;i<viewPoints.size();i++){
-		points.push_back(basePoints_(i));
+		geometry_msgs::Point32 point;
+		point.x = basePoints_(i).x;
+		point.y = basePoints_(i).y;
+		cloud.points.push_back(point);
+		//points.push_back(basePoints_(i));
 	}
 	
 	/*convert to point cloud*/
 	//cloud.points.erase(cloud.points.begin(), cloud.points.end());
-	for(unsigned int i=0;i<points.size();i++){
-		geometry_msgs::Point32 geoPoint;
-		geoPoint.x =  points[i].x;
-		geoPoint.y =  points[i].y;
-		geoPoint.z = 0;
-		cloud.points.push_back(geoPoint);
-	}
+	//for(unsigned int i=0;i<points.size();i++){
+	//	geometry_msgs::Point32 geoPoint;
+	//	geoPoint.x =  points[i].x;
+	//	geoPoint.y =  points[i].y;
+	//	geoPoint.z = 0;
+	//	cloud.points.push_back(geoPoint);
+	//}
 
 	/*transform cloud to map*/
 	tfl->transformPointCloud("map", cloud, mapCloud);
@@ -138,6 +143,7 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	//imshow("image",image);
 	//waitKey(2);
 	Mat orange = Mat::zeros(image.rows,image.cols,CV_8U);
+	//image = image.t();
 	findOrange(image,orange);
 	//cout<< orange.channels()<<endl;
 	//cvNamedWindow("orange");
@@ -147,14 +153,14 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
 	drawContours(outline,points_,-1,255);
-	cvNamedWindow("outline");
-	imshow("outline",outline);
-	waitKey(2);
+	//cvNamedWindow("outline");
+	//imshow("outline",outline);
+	//waitKey(2);
 	int s = 0,s2=0;
 	for(int i =0;i<points_.size();i++){
 		s+=points_[i].size();
 		for(int j=0;j<points_[i].size();j++){
-			points.push_back(Point2f(points_[i][j].x, points_[i][j].y));
+			points.push_back(Point2f(points_[i][j].y, points_[i][j].x));
 			s2++;
 		}
 	}
