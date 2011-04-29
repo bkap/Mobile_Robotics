@@ -475,15 +475,15 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//if(lastCSpace_Map != NULL) {
 	//	delete lastCSpace_Map;
 	//}
-	cout<<"PLANNER: lidar 1\n";
+	//cout<<"PLANNER: lidar 1\n";
 	//lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
-	cout<<"PLANNER: lidar 2\n";
+	//cout<<"PLANNER: lidar 2\n";
 	//lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
 
 	Mat_<char> temp = Mat::zeros(ceil(cspace.info.width),ceil(cspace.info.width),CV_8S);
 	ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
 	temp.data = (uchar*) &(CSpace_Map->data[0]);
-	cout<<"WTFWTFWTF\n";
+	//cout<<"WTFWTFWTF\n";
 	for(int i = 0; i<(int)cspace.data.size(); i++)
 	{
 		lastCSpace_CharMap(i/lastCSpace_CharMap.cols, i%lastCSpace_CharMap.cols)=(char)cspace.data[i];
@@ -494,9 +494,9 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//imshow("last map",lastCSpace_CharMap);
 	//waitKey(-1);
 	//temp.copyTo(lastCSpace_CharMap);
-	cout<<"PLANNER: lidar 3\n";
+	//cout<<"PLANNER: lidar 3\n";
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);
-	cout<<"PLANNER: lidar 4\n";
+	//cout<<"PLANNER: lidar 4\n";
 	mapOrigin = cspace.info.origin;
 	mapResolution = cspace.info.resolution;
 	LIDARcalled = true;
