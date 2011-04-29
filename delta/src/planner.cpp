@@ -372,11 +372,11 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				goalnum++;
 			}
 			startLoop = goalnum + 1;
-			for(int i = 0; i < segnum; i++) {
+			for(int i = 0; i <= segnum; i++) {
 				turns.path_list.push_back(prevList.path_list[i]);
 			}
 			//TODO: might have an off-by-one here
-			PathSegment oldSeg = oldPath[segnum];
+			PathSegment oldSeg = prevList.path_list[segnum];
 			//put all segments up to segnum into turns
 
 		cout<<"PLANNER:start pos\n";
@@ -392,7 +392,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			
 					startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
 				//shrink the segment length
-					oldPath[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
+					turns.path_list[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
 				} else {
 					startPoint.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
 					startPoint.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
