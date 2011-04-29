@@ -416,9 +416,9 @@ cout<<"PLANNER:calling a*\n";
 		cout<<i<<"\n";
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point2f> path2;
-		for(int i = 0; i<(int)path.size(); i++)
+		for(int z = 0; z<(int)segPts.size(); z++)
 		{
-			path2.push_back(Point2f(segPts[i].x, segPts[i].y));
+			path2.push_back(Point2f(segPts[z].x, segPts[z].y));
 		}
 	
 		approxPolyDP(Mat(path2), path2, 2, false);

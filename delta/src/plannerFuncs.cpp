@@ -33,7 +33,7 @@ inline double heuristic(int x, int y, Point2i goal) {
 }
 
 inline double cost(Node expanding, double locCost) {
-	return expanding.pathCost+10*locCost;//+ exp(locCost/20.0);
+	return expanding.pathCost+locCost;//+ exp(locCost/20.0);
 }
 
 
@@ -85,7 +85,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	{
 		for(int j = 0; j<map.rows; j++)
 		{
-			map(j,i) = (int) map_(j,i);
+			map(j,i) = (int) map_(j,i)+129;
 		}
 	}
 	
