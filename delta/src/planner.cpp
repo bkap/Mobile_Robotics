@@ -79,6 +79,9 @@ Point3f convertGridToMapCoords(Point2i grid) {
 	mapcoords.z = 0;
 	return mapcoords;
 }
+Point3f convertGridToMapCoords(Point2f grid) {
+	return convertGridToMapCoords(Point2i((int)grid.x, (int)grid.y));
+}
 Point2i convertMapToGridCoords(Point3f map) {
 
 	cout<<"Map Resolution "<<mapResolution<<"\n";
@@ -412,11 +415,19 @@ cout<<"PLANNER:calling a*\n";
 		for(uint i = startLoop; i < pointList.points.size(); i++) {
 		cout<<i<<"\n";
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
-			vector<Point3f> mapPts(segPts.size());
+			vector<Point2f> path2;
+		for(int i = 0; i<(int)path.size(); i++)
+		{
+			path2.push_back(Point2f(segPts[i].x, segPts[i].y));
+		}
+	
+		approxPolyDP(Mat(path2), path2, 2, false);
+
+			vector<Point3f> mapPts(path2.size());
 		cout<<"PLANNER:transform\n";
 
-			for(int k = 0; k <(int)segPts.size(); k++) {
-				mapPts[k] = convertGridToMapCoords(segPts[k]);
+			for(int k = 0; k <(int)path2.size(); k++) {
+				mapPts[k] = convertGridToMapCoords(path2[k]);
 
 			}
 			cout<<"PLANNER:transformed\n";
