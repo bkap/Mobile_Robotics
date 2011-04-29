@@ -195,7 +195,7 @@ void drawHit(Mat_<uchar>& grid, Point2f hit){
 	Rect roi_ = Rect(center.x-radius/2.0,center.y-radius/2.0, radius,radius);	//rect centered on hit
 	Rect roi = roi_ & gridMatBounds;
 	if(roi.size() != roi_.size()){
-		cerr<<"MAPPER: OH NOES!!!!\n";
+		//cerr<<"MAPPER: OH NOES!!!!\n";
 		ROS_INFO("roi doesnt fit: %i,%i ",center.x, center.y);
 		return;
 	}

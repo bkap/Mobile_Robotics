@@ -696,10 +696,10 @@ int main(int argc,char **argv)
 		    cout<<"publishing\n";
 		    cout<<" the path has "<<turns.path_list.size()<<" points\n";
 
-		    for(int r = 0; r<(int)turns.path_list.size(); r++)
+		    /*for(int r = 0; r<(int)turns.path_list.size(); r++)
 			{
 				cerr<<"seg_num, seg_type, length "<<turns.path_list[r].seg_number<<","<<(int)turns.path_list[r].seg_type<<","<<turns.path_list[r].seg_length << "," << turns.path_list[r].max_speeds.linear.x << "," << turns.path_list[r].max_speeds.angular.z << "\n";
-			}
+			}*/
 		    path_pub.publish(turns);
 		    cout<<"3published"<<"\n";	
 	    }

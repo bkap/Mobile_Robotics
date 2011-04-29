@@ -190,7 +190,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		}
 	}
 
-			vector<Point2f> path2;
+	/*		vector<Point2f> path2;
 		for(int z = 0; z<(int)pathVec.size(); z++)
 		{
 			path2.push_back(Point2f(pathVec[z].x, pathVec[z].y));
@@ -207,7 +207,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	//cvNamedWindow("PATH",CV_WINDOW_AUTOSIZE);
 	//imshow("PATH",map_);
 	//waitKey(2);
-
+*/
 	//delete current;
 	return pathVec;
 }
