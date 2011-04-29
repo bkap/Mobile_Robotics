@@ -231,9 +231,9 @@ void updateGrid(){
         }
 
 
-	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	//imshow("grid",cameraGrid);
-	//waitKey(2);
+	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	imshow("grid",LIDARGrid);
+	waitKey(2);
 
 
 		P->publish(grid);
@@ -374,7 +374,6 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
-	//return;
 	ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
 	//return;

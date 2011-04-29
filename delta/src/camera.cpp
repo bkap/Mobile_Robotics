@@ -143,7 +143,6 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	//imshow("image",image);
 	//waitKey(2);
 	Mat orange = Mat::zeros(image.rows,image.cols,CV_8U);
-	//image = image.t();
 	findOrange(image,orange);
 	//cout<< orange.channels()<<endl;
 	//cvNamedWindow("orange");
