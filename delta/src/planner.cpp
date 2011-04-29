@@ -413,7 +413,9 @@ cout<<"PLANNER:calling a*\n";
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point3f> mapPts(segPts.size());
 		cout<<"PLANNER:transform\n";
-			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
+			if(int i = 0; i < segPts.size(); i++) {
+				mapPts[i] = convertGridToMapCoords(segPts[i]);
+			}
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
     		if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
