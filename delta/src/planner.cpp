@@ -663,6 +663,7 @@ int main(int argc,char **argv)
 			vis_pub.publish(markers);
 		
 		    cout<<"publishing\n";
+		    cout<<" the path has "<<turns.path_list.size()<<" points\n";
 		    path_pub.publish(turns);
 		    cout<<"3published"<<"\n";	
 	    }
