@@ -44,7 +44,7 @@ bool operator<(Node a, Node b)
 
 #define WALL_THRESHOLD 200
 
-vector<Node> getNeighbors(Node previous, Mat_<char> &map, Node*** nodeList, Point2i goal) {
+vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;
 
 	Point2i directions[4] = {Point2i(1,0),Point2i(-1,0),Point2i(0,1), Point2i(0,-1)};
@@ -56,10 +56,10 @@ vector<Node> getNeighbors(Node previous, Mat_<char> &map, Node*** nodeList, Poin
 			//okay, we're on the map. Now let's check to see if we're allowed
 			//to move here
 		
-			if(nodeList[newX][newY] == NULL && map.at<int>(newX,newY) < WALL_THRESHOLD) {
+			if(nodeList[newX][newY] == NULL && map(newX,newY) < WALL_THRESHOLD) {
 			
 				Node n;
-				n.pathCost = cost(previous,map.at<int>(newX,newY));
+				n.pathCost = cost(previous,map(newX,newY));
 				n.heuristic = heuristic(newX, newY, goal);
 				n.x = newX;
 				n.y = newY;
@@ -71,13 +71,16 @@ vector<Node> getNeighbors(Node previous, Mat_<char> &map, Node*** nodeList, Poin
 	return nodes;
 }
 
-vector<Point2i> aStar (Mat_<char> &map, Point2i start, Point2i end)
+vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 {
+	ROS_INFO("astar: map size %dx%d",map_.rows,map_.cols);
 	cout<<"start x,y "<<start.x<<","<<start.y<<"\n";
 	cout<<"end x,y "<<end.x<<","<<end.y<<"\n";
 	Node*** nodeList;
 	priority_queue<Node> Q;
 	cout<<"a*1\n";
+	Mat_<int> map;
+	map_.convertTo(map,CV_32S);
 	nodeList = (Node***) calloc(map.rows, sizeof(Node**));
 	cout<<"map rows, cols "<<map.rows<<","<<map.cols<<"\n";
 	for(int i = 0; i<map.rows; i++)
@@ -86,10 +89,10 @@ vector<Point2i> aStar (Mat_<char> &map, Point2i start, Point2i end)
 	}
 	cout<<"a*2\n";
 	//allocate temp space because convertTo gets mad if I don't
-	Mat temp;
-	map.copyTo(temp);
+	//Mat temp;
+	//map.copyTo(temp);
 	cout<<"a*3\n";
-	temp.convertTo(map, CV_32S, 1, 129);
+	//temp.convertTo(map, CV_32S, 1, 129);
 	map = map.t();
 	//expand start
 	cout<<"a*4\n";
