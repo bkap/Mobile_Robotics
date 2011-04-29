@@ -404,7 +404,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				heading += oldSeg.seg_length - distanceOnSeg;
 			}
 		} else {
-			prevList = (PathList*)malloc(sizeof(PathList));
+			//prevList = (PathList*)malloc(sizeof(PathList));
 			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
 	
 		}
