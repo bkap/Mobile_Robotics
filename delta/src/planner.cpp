@@ -375,17 +375,21 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				goalnum++;
 			}
 			startLoop = goalnum + 1;
-			for(int i = 0; i <= segnum; i++) {
+			for(int i = 0; i < segnum; i++) {
 				turns.path_list.push_back(prevList.path_list[i]);
 			}
 			//TODO: might have an off-by-one here
-			PathSegment oldSeg = prevList.path_list[segnum];
+			PathSegment oldSeg = prevList.path_list[segnum-1];
 			//put all segments up to segnum into turns
 
 		cout<<"PLANNER:start pos\n";
+		if(segnum != 0) {
 			startPoint = convertGeoPointToPoint3f(des_pose.position);
 
 			double heading = tf::getYaw(des_pose.orientation);
+		} else {
+			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
+		}
 			if(oldSeg.seg_type == 1) {
 				//it's a line
 				//probably shouldn't hardcode acceleration, but we have to
