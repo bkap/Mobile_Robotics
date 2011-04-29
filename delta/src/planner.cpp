@@ -515,6 +515,7 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
 	segnum = (*crawledState).seg_number+1;
 	distanceOnSeg = (*crawledState).des_lseg;
+	des_pose = crawledState->des_pose;
 } 
 /*
 void SONAR_Callback(const boost::shared_ptr<cv::Mat  const>& SONAR_Map)
