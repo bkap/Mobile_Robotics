@@ -106,6 +106,7 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	delete[] data;
 }
 
+// Creates a 2D gaussian that is overlayed on map hits
 Mat_<uchar> patchInit(){
 	Mat_<uchar> patch=Mat::zeros(2 * fattening / gridRes, 2 * fattening / gridRes, CV_8U);
 	circle(patch,Point(patch.size().width/2.0,patch.size().width/2.0), fattening / gridRes - 3, FILL_RATE, -1, 8,1);
@@ -121,10 +122,12 @@ Mat_<uchar> patchInit(){
 	return patch;
 }
 
+// Sets up all of the mapper data structures
 void cSpaceInit()
 {
 
 	ROS_INFO("initializing mapper");
+	// Initialize the map grid
 	grid.header.seq = 0;
 	grid.header.frame_id = "map";
 	//Output.header.stamp = time(NULL);
@@ -174,6 +177,7 @@ int pointToGridIndex(Point2f point){
 	return gx + gridMatSize.width * gy;
 }
 
+// Rounds a floating-point point into an integer point
 Point pointToGridPoint(Point2f point, size_t shift = 0){
 	float gx = (point.x - gridOrigin.x)/gridRes;
 	float gy = (point.y - gridOrigin.y)/gridRes;
@@ -185,6 +189,8 @@ Point pointToGridPoint(Point2f point, size_t shift = 0){
 	int gys = static_cast<int>(gy*s);
 	return Point(gxs,gys);	
 }
+
+// Takes the patch, and overlays it on the map at the specified location
 void drawHit(Mat_<uchar>& grid, Point2f hit){
 	static int radius = static_cast<int>(fattening / gridRes * (1 << fixedPoints));
 	static Mat_<uchar> patch = patchInit();
@@ -228,35 +234,35 @@ void addHits(Mat_<uchar>& grid, const sensor_msgs::PointCloud& cloud, vector<boo
 		}
 	}
 }
-void updateGrid(){
 
-	//ROS_INFO("updating grid");
-
-       for(int i =0; i<cameraGrid.rows; i++)
+/*
+	Combines the LIDAR and camera maps into a single representation for the planner
+*/
+void updateGrid()
+{
+	for(int i =0; i<cameraGrid.rows; i++)
 	{
 		//cout<<"row "<<i<<"\n";
 		for (int j = 0; j<cameraGrid.cols; j++)
 		{
-
 			//cout<<" col "<<j<<"\n"; 
-                	//grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j)-128);
+			//grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j)-128);
 
-		uchar lidar = LIDARGrid(i,j);
-		uchar cam = cameraGrid(i,j);
-		int max;
+			uchar lidar = LIDARGrid(i,j);
+			uchar cam = cameraGrid(i,j);
+			int max;
 
-		if (lidar>cam) max = lidar;
-		else max = cam;
-		
-		grid.data[i*cameraGrid.cols+j] = (char)(max-127);
+			if (lidar>cam) max = lidar;
+			else max = cam;
 
-		//gridMat(i,j) =  (char)(LIDARGrid(i,j)>cameraGrid(i,j)?saturate_cast<char>(LIDARGrid(i,j)-128) : saturate_cast<char>(cameraGrid(i,j)-128));//saturate_cast<char>(max(LIDARGrid(i,j), cameraGrid(i,j))-128));
+			grid.data[i*cameraGrid.cols+j] = (char)(max-127);
+
+			//gridMat(i,j) =  (char)(LIDARGrid(i,j)>cameraGrid(i,j)?saturate_cast<char>(LIDARGrid(i,j)-128) : saturate_cast<char>(cameraGrid(i,j)-128));//saturate_cast<char>(max(LIDARGrid(i,j), cameraGrid(i,j))-128));
 		}
-        }
-		
+	}
 	//Mat(max(LIDARGrid, cameraGrid)).convertTo(,CV_8S,1,128);
 	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	
+
 	//Mat_<uchar> g2 = Mat::zeros(gridMat.cols, gridMat.rows, CV_8U);
 	//for (int i =0; i<gridMat.rows; i++)
 	//{
@@ -268,10 +274,9 @@ void updateGrid(){
 	//imshow("grid",g2);
 	//waitKey(2);
 
-
-		P->publish(grid);
-		Pcam->publish(grid_cam);
-		Plid->publish(grid_lid);
+	P->publish(grid);
+	Pcam->publish(grid_cam);
+	Plid->publish(grid_lid);
 }
 
 /*
@@ -296,7 +301,7 @@ void maskCamera(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 	}
 }
 /*
-	
+	Detects orange in the camera, and draws the hits on the camera map
 */
 void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud) 
 {
@@ -330,8 +335,6 @@ Point2f relativeTo(Point2f point, geometry_msgs::Pose& pose){
 	dest = dest + refPos;
 	return Point2f(dest[0],dest[1]);
 }
-
-
 
 /*
 	Given a PointCloud of lidar pings in map frame,
@@ -420,10 +423,6 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	updateGrid();
 
 }
-
-
-
-
 
 /*
 	tracks robot location and triggers updates of cameraROI when robot moves
