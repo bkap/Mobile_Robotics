@@ -53,7 +53,7 @@ double distanceOnSeg = 0.0;
 cv::Mat_<bool> *lastCSpace_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
-cv::Mat_<char> lastCSpace_CharMap; // ... shady pointer or is this ok?
+cv::Mat_<char> lastCSpace_CharMap = Mat::zeros(900,900,CV_8S); // ... shady pointer or is this ok?
 
 geometry_msgs::PoseStamped poseDes;
 geometry_msgs::Pose goalPose; 
@@ -63,7 +63,7 @@ geometry_msgs::PoseStamped poseActual;
 sensor_msgs::PointCloud pointList;
 
 
-bool LIDARcalled = true;
+bool LIDARcalled = false;
 bool poseDescalled = false;
 bool goalPosecalled = false;
 bool poseActualcalled = false;
@@ -71,12 +71,18 @@ bool pointListcalled = true;
 
 Point3f convertGridToMapCoords(Point2i grid) {
 	Point3f mapcoords;
+
+	cout<<"Map Resolution "<<mapResolution<<"\n";
+	cout<<"Origin "<<mapOrigin.position.x<<","<<mapOrigin.position.y<<"\n";
 	mapcoords.x = grid.x * mapResolution + mapOrigin.position.x;
 	mapcoords.y = grid.y * mapResolution + mapOrigin.position.y;
 	mapcoords.z = 0;
 	return mapcoords;
 }
 Point2i convertMapToGridCoords(Point3f map) {
+
+	cout<<"Map Resolution "<<mapResolution<<"\n";
+	cout<<"Origin "<<mapOrigin.position.x<<","<<mapOrigin.position.y<<"\n";
 	Point2i gridcoords;
 	gridcoords.x = (int)((map.x - mapOrigin.position.x) / mapResolution);
 	gridcoords.y = (int)((map.y - mapOrigin.position.y) / mapResolution);
@@ -454,11 +460,14 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	if(lastCSpace_Map != NULL) {
 		delete lastCSpace_Map;
 	}
+	cout<<"PLANNER: lidar 1\n";
 	lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
-
-	lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
-	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(gridMatSize.width);
-
+	cout<<"PLANNER: lidar 2\n";
+	//lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
+	lastCSpace_CharMap.data = (uchar*) &(CSpace_Map->data[0]);
+	cout<<"PLANNER: lidar 3\n";
+	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);
+	cout<<"PLANNER: lidar 4\n";
 	mapOrigin = (*CSpace_Map).info.origin;
 	mapResolution = (*CSpace_Map).info.resolution;
 	LIDARcalled = true;
@@ -503,6 +512,7 @@ void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 int main(int argc,char **argv)
 {
 	ros::init(argc,argv,"pathPlanner");//name of this node
+
 	tfl = new tf::TransformListener();
 	//double amount_to_change = 0.0;    
 	//double intial_heading;
@@ -568,9 +578,9 @@ int main(int argc,char **argv)
 	pointList.points.push_back(p3);
 	double initial_heading= tf::getYaw(poseActual.pose.orientation);
 	
-	cout<<"PLANNER:calling A*\n";
-	PathList turns = callAStar(pointList, initial_heading);
-	cout<<"PLANNER:called A*\n";
+	
+//	PathList turns = callAStar(pointList, initial_heading);
+	
     // and print them out
     ros::Publisher path_pub = n.advertise<eecs376_msgs::PathList>("pathList",10);
 
@@ -616,8 +626,9 @@ int main(int argc,char **argv)
 	
 		    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 		    //PathList turns = joinPoints(initial_heading,pointList);
+			cout<<"PLANNER:calling A*\n";
 			PathList turns = callAStar(pointList, initial_heading);
-			
+			cout<<"PLANNER:called A*\n";
 			// Publish a visualization of the points
 			//markers = visualizePoints(turns)
 			vis_pub.publish(markers);

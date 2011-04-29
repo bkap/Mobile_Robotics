@@ -44,7 +44,7 @@ bool operator<(Node a, Node b)
 
 #define WALL_THRESHOLD 200
 
-vector<Node> getNeighbors(Node previous, Mat map, Node*** nodeList, Point2i goal) {
+vector<Node> getNeighbors(Node previous, Mat_<char> &map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;
 
 	Point2i directions[4] = {Point2i(1,0),Point2i(-1,0),Point2i(0,1), Point2i(0,-1)};
@@ -71,7 +71,7 @@ vector<Node> getNeighbors(Node previous, Mat map, Node*** nodeList, Point2i goal
 	return nodes;
 }
 
-vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
+vector<Point2i> aStar (Mat_<char> &map, Point2i start, Point2i end)
 {
 	cout<<"start x,y "<<start.x<<","<<start.y<<"\n";
 	cout<<"end x,y "<<end.x<<","<<end.y<<"\n";
@@ -79,6 +79,7 @@ vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 	priority_queue<Node> Q;
 	cout<<"a*1\n";
 	nodeList = (Node***) calloc(map.rows, sizeof(Node**));
+	cout<<"map rows, cols "<<map.rows<<","<<map.cols<<"\n";
 	for(int i = 0; i<map.rows; i++)
 	{
 		nodeList[i] = (Node**) calloc(map.cols, sizeof(Node*));

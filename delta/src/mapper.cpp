@@ -229,10 +229,12 @@ void updateGrid(){
                 	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j));//-128;
 		}
         }
-	
+
+
 	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
 	//imshow("grid",cameraGrid);
 	//waitKey(2);
+
 
 		P->publish(grid);
 		Pcam->publish(grid_cam);
