@@ -106,9 +106,14 @@ void readMat(cv::Mat_<T>& mat, char* file){
 }
 
 Mat_<uchar> patchInit(){
-	Mat_<uchar> patch(2 * fattening / gridRes, 2 * fattening / gridRes, (uchar) 0);
-	circle(patch,Point(patch.size().width,patch.size().width), fattening / gridRes - 3, FILL_RATE, -1, 8,1);
+	Mat_<uchar> patch=Mat::zeros(2 * fattening / gridRes, 2 * fattening / gridRes, CV_8U);
+	circle(patch,Point(patch.size().width/2.0,patch.size().width/2.0), fattening / gridRes - 3, FILL_RATE, -1, 8,1);
+	cout<<"patchSize "<<patch.size().width<<","<<patch.size().height<<"\n";
 	GaussianBlur(patch,patch,Size(3,3),0,0);
+		
+	cvNamedWindow("patch", CV_WINDOW_AUTOSIZE);
+	imshow("patch", patch);
+	waitKey(-1);
 	return patch;
 }
 
@@ -179,16 +184,20 @@ Point pointToGridPoint(Point2f point, size_t shift = 0){
 void drawHit(Mat_<uchar>& grid, Point2f hit){
 	static int radius = static_cast<int>(fattening / gridRes * (1 << fixedPoints));
 	static Mat_<uchar> patch = patchInit();
+	
 	//Point center = pointToGridPoint(hit,fixedPoints);
 	//circle(gridMat, center, radius, fillColor, -1, 8,fixedPoints);
 	Point center = pointToGridPoint(hit);	//roi doesn't support fixedpoint
-	Rect roi_ = Rect(center.x,center.y,radius,radius) - Point(radius,radius);	//rect centered on hit
+	Rect roi_ = Rect(center.x-radius/2.0,center.y-radius/2.0, radius,radius);	//rect centered on hit
 	Rect roi = roi_ & gridMatBounds;
 	if(roi.size() != roi_.size()){
-		//ROS_INFO("roi doesnt fit: %i,%i : %i,%i",roi.width,roi.height,roi_.width,roi_.height);
+		cerr<<"MAPPER: OH NOES!!!!\n";
+		ROS_INFO("roi doesnt fit: %i,%i : %i,%i",roi.width,roi.height,roi_.width,roi_.height);
 		return;
 	}
 	Mat_<uchar> t(grid,roi);
+//	cout<<"t has size of "<<t.size().width<<","<<t.size().height<<"\n";
+//	cout<<"patch has size of "<<patch.size().width<<","<<patch.size().height<<"\n";
 	if(t.size()!= patch.size()){
 		//ROS_INFO("hit doesnt fit: %i,%i : %i,%i",t.rows,t.cols,patch.rows,patch.cols);
 		return;

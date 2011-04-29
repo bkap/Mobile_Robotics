@@ -370,7 +370,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		double heading = initial_heading;
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
-		if(!FirstTime) {
+		if(segnum!=0) {
 			if(segnum > goalSegnums[goalnum ]) {
 				goalnum++;
 			}
