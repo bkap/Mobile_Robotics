@@ -222,9 +222,9 @@ void updateGrid(){
 		}
         }
 
-	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",cameraGrid);
-	waitKey(2);
+	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	//imshow("grid",cameraGrid);
+	//waitKey(2);
 
 
 		P->publish(grid);

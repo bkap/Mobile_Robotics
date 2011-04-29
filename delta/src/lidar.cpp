@@ -34,7 +34,7 @@ int main(int argc,char **argv)
   ros::NodeHandle n;
   cout<<"1\n";
   tfl = new tf::TransformListener();
-  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "base_laser1_scan", 1); //Subscriber object, but now we want to apply filters to it, so it's not just a standard ros::Subscriber
+  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "base_scan", 1); //Subscriber object, but now we want to apply filters to it, so it's not just a standard ros::Subscriber
   tf::MessageFilter<sensor_msgs::LaserScan> laser_filter(laser_sub, *tfl, "map", 1); //Make a MessageFilter for the laser_sub that will only allow a message through when we can transform it into the given frame (in this case, map)
   cout<<"1\n";
   laser_filter.registerCallback(boost::bind(laserCallback, _1)); //When a message passes through the laser_filter, we want it to call laserCallback

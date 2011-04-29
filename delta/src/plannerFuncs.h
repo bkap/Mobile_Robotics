@@ -30,7 +30,7 @@ using namespace eecs376_msgs;
 #ifndef PLANNER_FUNCS
 #define PLANNER_FUNCS
 
-vector<Point2i> aStar (Mat map, Point2i start, Point2i end);
+vector<Point2i> aStar (Mat_<char>& map, Point2i start, Point2i end);
 vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution);
 vector<Point2f> reducePoints(vector<Point2f> victor);
 
