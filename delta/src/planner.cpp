@@ -72,8 +72,8 @@ bool pointListcalled = true;
 Point3f convertGridToMapCoords(Point2i grid) {
 	Point3f mapcoords;
 
-	cout<<"Map Resolution "<<mapResolution<<"\n";
-	cout<<"Origin "<<mapOrigin.position.x<<","<<mapOrigin.position.y<<"\n";
+	//cout<<"Map Resolution "<<mapResolution<<"\n";
+	//cout<<"Origin "<<mapOrigin.position.x<<","<<mapOrigin.position.y<<"\n";
 	mapcoords.x = grid.x * mapResolution + mapOrigin.position.x;
 	mapcoords.y = grid.y * mapResolution + mapOrigin.position.y;
 	mapcoords.z = 0;
@@ -350,8 +350,8 @@ Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double 
 }
 
 
-PathList *prevList;
-vector<int> goalSegnums;
+PathList *prevList = NULL;
+vector<int> goalSegnums (3, 0);
 // Call A* search for path, lots of conversions needed so put in separate function
 // pointList is the list of goal points (first point is assumed to be origin)
 PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
@@ -405,6 +405,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		} else {
 			prevList = (PathList*)malloc(sizeof(PathList));
 			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
+	
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 cout<<"PLANNER:calling a*\n";
@@ -418,6 +419,7 @@ cout<<"PLANNER:calling a*\n";
 				mapPts[k] = convertGridToMapCoords(segPts[k]);
 
 			}
+			cout<<"PLANNER:transformed\n";
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
     		if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
@@ -428,31 +430,40 @@ cout<<"PLANNER:calling a*\n";
 				 
 			}
 			
-
+			cout<<"planner:almost done for realz\n";
 		// convert vector<Point2i> to vector<Point3f>
 			PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
+			
+			cout<<"inserted turns\n";
 			for (uint j=0; j<pathseg.path_list.size(); j++)
 				turns.path_list.push_back(pathseg.path_list[j]);
-
+			cout<<"did some shit in a for loop\n";
 			PathSegment lastSeg = turns.path_list[turns.path_list.size() - 1];
+			cout<<"made a lastSeg\n";
 			switch(lastSeg.seg_type) {
 				case 1:
+					cout<<"case1\n";
 					heading = tf::getYaw(lastSeg.init_tan_angle);
+					cout<<"dude i did case1\n";
 					break;
 				case 3:
+					cout<<"case3\n";
 					heading = tf::getYaw(lastSeg.init_tan_angle) + lastSeg.seg_length;
 					if(heading > CV_PI) {
 						heading -= 2 * CV_PI;
 					} else if(heading < -CV_PI) {
 						heading += 2 * CV_PI;
 					}
+					cout<<"dude i did case3\n";
 					break;
 
 			}
 
 		}
-			
+	cout<<"assigning shit to prevList\n";	
+	if (prevList==NULL)cout<<"AAWWWWWW SHIT!!!!!!\n";	
 	*prevList = turns;
+	cout<<"dude I succesfully called aStar\n";
     return turns;
 }
 
