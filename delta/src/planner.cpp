@@ -464,7 +464,9 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
 	cout<<"PLANNER: lidar 2\n";
 	//lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
-	lastCSpace_CharMap.data = (uchar*) &(CSpace_Map->data[0]);
+	Mat_<char> temp = Mat::zeros(ceil(CSpace_Map->info.width),ceil(CSpace_Map->info.width),CV_8S);
+	temp.data = (uchar*) &(CSpace_Map->data[0]);
+	temp.copyTo(lastCSpace_CharMap);
 	cout<<"PLANNER: lidar 3\n";
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);
 	cout<<"PLANNER: lidar 4\n";
