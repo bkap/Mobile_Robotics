@@ -350,7 +350,7 @@ Point3f findPointAlongCircle(Point3f startPoint, double initial_heading, double 
 }
 
 
-PathList *prevList = NULL;
+PathList prevList;
 vector<int> goalSegnums (3, 0);
 // Call A* search for path, lots of conversions needed so put in separate function
 // pointList is the list of goal points (first point is assumed to be origin)
@@ -367,13 +367,14 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		double heading = initial_heading;
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
-		if(prevList != NULL) {
+		if(FirstTime) {
+			FirstTime = false;
 			if(segnum > goalSegnums[goalnum ]) {
 				goalnum++;
 			}
 			startLoop = goalnum + 1;
 			for(int i = 0; i < segnum; i++) {
-				turns.path_list.push_back(prevList->path_list[i]);
+				turns.path_list.push_back(prevList.path_list[i]);
 			}
 			//TODO: might have an off-by-one here
 			PathSegment oldSeg = oldPath[segnum];
@@ -461,8 +462,7 @@ cout<<"PLANNER:calling a*\n";
 
 		}
 	cout<<"assigning shit to prevList\n";	
-	if (prevList==NULL)cout<<"AAWWWWWW SHIT!!!!!!\n";	
-	*prevList = turns;
+	prevList = turns;
 	cout<<"dude I succesfully called aStar\n";
     return turns;
 }
