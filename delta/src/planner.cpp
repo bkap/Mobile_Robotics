@@ -324,11 +324,10 @@ PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
-	path = vector<PathSegment>(points.size() * 2);
 	for(int i =0; i<points.size()-1; i++)
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
-		if(fabs(old_heading - new_heading) < 0.2) {
+		if(fabs(old_heading - new_heading) > 0.2) {
 	 		path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
 		}
 	     path.push_back(MakeLine(points[i], points[i+1], path.size() + initialSegNum));
@@ -393,13 +392,13 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			if(oldSeg.seg_type == 1) {
 				//it's a line
 				//probably shouldn't hardcode acceleration, but we have to
-				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
+				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / oldSeg.accel_limit)) {
 			
-					startPoint.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+					startPoint.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(tf::getYaw(oldSeg.init_tan_angle));
 			
-					startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+					startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(tf::getYaw(oldSeg.init_tan_angle));
 				//shrink the segment length
-					turns.path_list[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
+					turns.path_list[segnum-1].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / oldSeg.accel_limit;
 				} else {
 					startPoint.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
 					startPoint.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
