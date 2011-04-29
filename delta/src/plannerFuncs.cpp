@@ -42,7 +42,8 @@ bool operator<(Node a, Node b)
 	return a.heuristic+a.pathCost > b.heuristic + b.pathCost;
 }
 
-#define WALL_THRESHOLD 140
+#define WALL_THRESHOLD 130
+
 
 vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;
@@ -177,7 +178,18 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	}
 	
 	free(nodeList);
-	
+	//Mat_<int> map2;
+	//inRange(map,WALL_THRESHOLD,255,map2);
+	//cvNamedWindow("banned",CV_WINDOW_AUTOSIZE);
+	//for(int i = 1;i<pathVec.size();i++){
+	//	line(map2,Point(pathVec[i-1].y,pathVec[i-1].x),Point(pathVec[i].y,pathVec[i].x),127);
+	//}
+	//imshow("banned",map2);
+	//waitKey(2);
+	//cvNamedWindow("PATH",CV_WINDOW_AUTOSIZE);
+	//imshow("PATH",map_);
+	//waitKey(2);
+
 	//delete current;
 	return pathVec;
 }

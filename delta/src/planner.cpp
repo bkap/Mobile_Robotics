@@ -324,7 +324,7 @@ PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
-	path = vector<PathSegment>();
+
 	for(int i =0; i<points.size()-1; i++)
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
@@ -382,32 +382,33 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			PathSegment oldSeg = prevList.path_list[segnum-1];
 			//put all segments up to segnum into turns
 
-		cout<<"PLANNER:start pos\n";
-		if(segnum != 0) {
-			startPoint = convertGeoPointToPoint3f(des_pose.position);
+			cout<<"PLANNER:start pos\n";
+			if(segnum != 0) {
+				startPoint = convertGeoPointToPoint3f(des_pose.position);
 
-			double heading = tf::getYaw(des_pose.orientation);
-		} else {
-			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
-		}
-			if(oldSeg.seg_type == 1) {
-				//it's a line
-				//probably shouldn't hardcode acceleration, but we have to
-				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
+				double heading = tf::getYaw(des_pose.orientation);
+		
+				if(oldSeg.seg_type == 1) {
+					//it's a line
+					//probably shouldn't hardcode acceleration, but we have to
+					if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / oldSeg.accel_limit)) {
 			
-					startPoint.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+						startPoint.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(tf::getYaw(oldSeg.init_tan_angle));
 			
-					startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+						startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(tf::getYaw(oldSeg.init_tan_angle));
 				//shrink the segment length
-					turns.path_list[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
-				} else {
-					startPoint.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
-					startPoint.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
-				}
-			} else if (oldSeg.seg_type == 3) {
+						turns.path_list[segnum-1].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / oldSeg.accel_limit;
+					} else {
+						startPoint.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
+						startPoint.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
+					}
+				} else if (oldSeg.seg_type == 3) {
 
-			//turn in place, adjust heading
-				heading += oldSeg.seg_length - distanceOnSeg;
+					//turn in place, adjust heading
+					heading += oldSeg.seg_length - distanceOnSeg;
+				}
+			} else {
+				startPoint = convertGeoPointToPoint3f(pointList.points[0]);
 			}
 		} else {
 
