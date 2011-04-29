@@ -358,6 +358,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
     	//lastCSpace_Map.convertTo(mapChar, CV_8SC1); //nope.
     	//find starting point
 		Point3f startPoint;
+		double heading = initial_heading;
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
 		if(prevList != NULL) {
@@ -371,22 +372,24 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			//TODO: might have an off-by-one here
 			PathSegment oldSeg = oldPath[segnum];
 			//put all segments up to segnum into turns
-			cout<<"PLANNER:start pos\n";
-			Point3f startPos = convertGeoPointToPoint3f(des_pose.position);
+
+		cout<<"PLANNER:start pos\n";
+			startPoint = convertGeoPointToPoint3f(des_pose.position);
+
 			double heading = tf::getYaw(des_pose.orientation);
 			if(oldSeg.seg_type == 1) {
 				//it's a line
 				//probably shouldn't hardcode acceleration, but we have to
 				if(oldSeg.seg_length - distanceOnSeg > (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1)) {
 			
-					startPos.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
+					startPoint.x += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * cos(heading);
 			
-					startPos.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
+					startPoint.y += (oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1) * sin(heading);
 				//shrink the segment length
 					oldPath[segnum].seg_length = distanceOnSeg + oldSeg.max_speeds.linear.x * oldSeg.max_speeds.linear.x / 0.1;
 				} else {
-					startPos.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
-					startPos.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
+					startPoint.x = oldSeg.ref_point.x + cos(heading) * oldSeg.seg_length;
+					startPoint.y = oldSeg.ref_point.y + sin(heading) * oldSeg.seg_length;
 				}
 			} else if (oldSeg.seg_type == 3) {
 
@@ -394,7 +397,8 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				heading += oldSeg.seg_length - distanceOnSeg;
 			}
 		} else {
-			prevList = (PathList*)malloc(sizeof(PathList)); 
+			prevList = (PathList*)malloc(sizeof(PathList));
+			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 cout<<"PLANNER:calling a*\n";
@@ -405,17 +409,39 @@ cout<<"PLANNER:calling a*\n";
 		cout<<"PLANNER:transform\n";
 			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
-    	if(i + 1 < pointList.points.size()) {
+    		if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
-			startPoint = convertGeoPointToPoint3f(pointList.points[i]);
-		}
+
 			cout<<"almost done\n";
-		// convert vector<Point2i> to vector<Point3f>
-		PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
-		for (uint j=0; j<pathseg.path_list.size(); j++)
-			turns.path_list.push_back(pathseg.path_list[j]);
+
+				startPoint = convertGeoPointToPoint3f(pointList.points[i]);
+				 
+			}
 			
+
+		// convert vector<Point2i> to vector<Point3f>
+			PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
+			for (uint j=0; j<pathseg.path_list.size(); j++)
+				turns.path_list.push_back(pathseg.path_list[j]);
+
+			PathSegment lastSeg = turns.path_list[turns.path_list.size() - 1];
+			switch(lastSeg.seg_type) {
+				case 1:
+					heading = tf::getYaw(lastSeg.init_tan_angle);
+					break;
+				case 3:
+					heading = tf::getYaw(lastSeg.init_tan_angle) + lastSeg.seg_length;
+					if(heading > CV_PI) {
+						heading -= 2 * CV_PI;
+					} else if(heading < -CV_PI) {
+						heading += 2 * CV_PI;
+					}
+					break;
+
+			}
+
 		}
+			
 	*prevList = turns;
     return turns;
 }

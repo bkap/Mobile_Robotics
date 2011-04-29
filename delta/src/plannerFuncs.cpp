@@ -73,6 +73,8 @@ vector<Node> getNeighbors(Node previous, Mat map, Node*** nodeList, Point2i goal
 
 vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 {
+	cout<<"start x,y "<<start.x<<","<<start.y<<"\n";
+	cout<<"end x,y "<<end.x<<","<<end.y<<"\n";
 	Node*** nodeList;
 	priority_queue<Node> Q;
 	cout<<"a*1\n";
