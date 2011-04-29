@@ -217,7 +217,7 @@ void addHits(Mat_<uchar>& grid, const sensor_msgs::PointCloud& cloud, vector<boo
 }
 void updateGrid(){
 
-	ROS_INFO("updating grid");
+	//ROS_INFO("updating grid");
 
         for(int i =0; i<cameraGrid.rows; i++)
 	{
@@ -231,9 +231,9 @@ void updateGrid(){
         }
 
 
-	cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	imshow("grid",LIDARGrid);
-	waitKey(2);
+	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
+	//imshow("grid",LIDARGrid);
+	//waitKey(2);
 
 
 		P->publish(grid);
@@ -374,7 +374,7 @@ void lidarCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud_)
 	static sensor_msgs::PointCloud scan_cloud;
 	tfl->transformPointCloud("map", *(scan_cloud_), scan_cloud);
 	if (!init)	return;
-	ROS_INFO("LIDAR callback");
+	//ROS_INFO("LIDAR callback");
 	updateLIDARROI(scan_cloud);
 	//return;
 	vector<bool> mask;
@@ -436,7 +436,7 @@ void cameraROICallback(const sensor_msgs::PointCloud::ConstPtr& cloud){
 
 int main(int argc,char **argv)
 {
-	cout<<"2\n";
+	ROS_INFO("mapper starting");
 	ros::init(argc,argv,"mapper");//name of this node
 
 	tfl = new tf::TransformListener();
@@ -449,11 +449,9 @@ int main(int argc,char **argv)
 		ROS_INFO("Mapper: error loading loopRate");
 	}
 */
-	cout<<"2\n";
 	ros::Rate loopTimer(loopRate); //will perform sleeps to enforce loop rate of "10" Hz
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
-	cout<<"2\n";
-
+	ROS_INFO("mapper done waiting");
 	P = new ros::Publisher();
 	Pcam = new ros::Publisher();
 	Plid = new ros::Publisher();
@@ -468,8 +466,6 @@ int main(int argc,char **argv)
 
 //	P->publish(grid);
 
-	cout<<"2\n";
-//	namedWindow("cSpace",CV_WINDOW_NORMAL);
 	while(ros::ok())
 	{
 		ros::spin();

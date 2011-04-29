@@ -455,25 +455,32 @@ cout<<"PLANNER:calling a*\n";
 }
 
 // Begin main loop, callbacks, etc
-
+nav_msgs::OccupancyGrid cspace;
 void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSpace_Map)
 {
+	cspace = *CSpace_Map;
 	//cout << "recieved width: " <<  (*CSpace_Map).info.width<< endl;
-	if(lastCSpace_Map != NULL) {
-		delete lastCSpace_Map;
-	}
+	//if(lastCSpace_Map != NULL) {
+	//	delete lastCSpace_Map;
+	//}
 	cout<<"PLANNER: lidar 1\n";
-	lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
+	//lastCSpace_Map = getMap(*CSpace_Map); // stored as a Mat_<bool>
 	cout<<"PLANNER: lidar 2\n";
 	//lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
-	Mat_<char> temp = Mat::zeros(ceil(CSpace_Map->info.width),ceil(CSpace_Map->info.width),CV_8S);
+
+	Mat_<char> temp = Mat::zeros(ceil(cspace.info.width),ceil(cspace.info.width),CV_8S);
+	ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
 	temp.data = (uchar*) &(CSpace_Map->data[0]);
-	temp.copyTo(lastCSpace_CharMap);
+	temp.convertTo(lastCSpace_CharMap,CV_8S);
+	cvNamedWindow("last map",CV_WINDOW_AUTOSIZE);
+	imshow("last map",lastCSpace_CharMap);
+	waitKey(-1);
+	//temp.copyTo(lastCSpace_CharMap);
 	cout<<"PLANNER: lidar 3\n";
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);
 	cout<<"PLANNER: lidar 4\n";
-	mapOrigin = (*CSpace_Map).info.origin;
-	mapResolution = (*CSpace_Map).info.resolution;
+	mapOrigin = cspace.info.origin;
+	mapResolution = cspace.info.resolution;
 	LIDARcalled = true;
 }
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
