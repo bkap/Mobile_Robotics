@@ -89,12 +89,10 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	}
 	cout<<"a*2\n";
 	//allocate temp space because convertTo gets mad if I don't
-
 	//Mat temp;
 	//map.copyTo(temp);
 	cout<<"a*3\n";
 	//temp.convertTo(map, CV_32S, 1, 129);
-
 	map = map.t();
 	//expand start
 	cout<<"a*4\n";
