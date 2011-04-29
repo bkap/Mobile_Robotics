@@ -217,7 +217,7 @@ int main(int argc,char **argv)
                     }
                     desState.des_pose = des_pose;
                 } else {
-                    cout << "\n\ndpc: LAST segment\n";
+                    ROS_INFO("\n\ndpc: LAST segment\n");
                     // desState.seg_number == pathlist.size() - 1 (last element of array)
                     finishedPath = true;
 		//			GotThere gt;
@@ -225,7 +225,7 @@ int main(int argc,char **argv)
 		//			areWeThereYet.publish(gt);
                 }
                 desState.seg_type = pathlist.path_list[desState.seg_number].seg_type;
-                cout << "\n\ndpc: NEW SEGMENT type " << (int)desState.seg_type;
+                ROS_INFO("\n\ndpc: NEW SEGMENT type %d", (int)desState.seg_type);
             }
         }
         /*cout << "\ndpc: s"<< desState.seg_number << " x = " << desState.des_pose.position.x << ", y=" << desState.des_pose.position.y;

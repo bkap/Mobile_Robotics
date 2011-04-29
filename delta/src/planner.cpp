@@ -32,7 +32,7 @@
 #define STD_TURN_RAD 6.0//.6 //given in the assignment but changed because it seemed to work better
 
 //define maximum speeds and accelerations
-#define MAX_LINEAR .3
+#define MAX_LINEAR .1
 #define MAX_ANGULAR .5
 #define MAX_LINEAR_ACC .5
 #define MAX_ANGULAR_ACC .5
@@ -329,8 +329,9 @@ vector<PathSegment> path;
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
 		if(fabs(old_heading - new_heading) > 0.7) {
-	 		path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
+	 		//path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
 		}
+		ROS_INFO("Making line : %f, %f: %f, %f", points[i].x, points[i].y, points[i+1].x, points[i+1].y);
 	     path.push_back(MakeLine(points[i], points[i+1], path.size() + initialSegNum));
 		old_heading = new_heading;
 	}
@@ -371,10 +372,11 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
 		if(segnum!=0) {
-			if(segnum > goalSegnums[goalnum ]) {
+			if(segnum >= goalSegnums[goalnum ]-1) {
 				goalnum++;
 			}
 			startLoop = goalnum + 1;
+			turns.path_list.clear();
 			for(int i = 0; i < segnum; i++) {
 				turns.path_list.push_back(prevList.path_list[i]);
 			}
@@ -386,7 +388,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 			if(segnum != 0) {
 				startPoint = convertGeoPointToPoint3f(des_pose.position);
 
-				double heading = tf::getYaw(des_pose.orientation);
+				heading = tf::getYaw(des_pose.orientation);
 		
 				if(oldSeg.seg_type == 1) {
 					//it's a line
@@ -426,7 +428,7 @@ cout<<"PLANNER:calling a*\n";
 			path2.push_back(Point2f(segPts[z].x, segPts[z].y));
 		}
 	
-		approxPolyDP(Mat(path2), path2, 3, false);
+		approxPolyDP(Mat(path2), path2, 1.5, false);
 
 			vector<Point3f> mapPts(path2.size());
 		cout<<"PLANNER:transform\n";
@@ -448,7 +450,7 @@ cout<<"PLANNER:calling a*\n";
 			
 			cout<<"planner:almost done for realz\n";
 		// convert vector<Point2i> to vector<Point3f>
-			PathList pathseg = insertTurns(initial_heading, mapPts, turns.path_list.size());
+			PathList pathseg = insertTurns(heading, mapPts, turns.path_list.size());
 			
 			cout<<"inserted turns\n";
 			for (uint j=0; j<pathseg.path_list.size(); j++)
@@ -696,7 +698,7 @@ int main(int argc,char **argv)
 
 		    for(int r = 0; r<(int)turns.path_list.size(); r++)
 			{
-				cout<<"seg_num, seg_type, length "<<turns.path_list[r].seg_number<<","<<turns.path_list[r].seg_type<<","<<turns.path_list[r].seg_length<<"\n";
+				cerr<<"seg_num, seg_type, length "<<turns.path_list[r].seg_number<<","<<(int)turns.path_list[r].seg_type<<","<<turns.path_list[r].seg_length << "," << turns.path_list[r].max_speeds.linear.x << "," << turns.path_list[r].max_speeds.angular.z << "\n";
 			}
 		    path_pub.publish(turns);
 		    cout<<"3published"<<"\n";	

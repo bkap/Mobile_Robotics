@@ -190,10 +190,17 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		}
 	}
 
+			vector<Point2f> path2;
+		for(int z = 0; z<(int)pathVec.size(); z++)
+		{
+			path2.push_back(Point2f(pathVec[z].x, pathVec[z].y));
+		}
+	
+		approxPolyDP(Mat(path2), path2, 2, false);
 	//inRange(map,WALL_THRESHOLD,255,map2);
 	cvNamedWindow("banned",CV_WINDOW_AUTOSIZE);
-	for(int i = 1;i<pathVec.size();i++){
-		line(map2,Point(pathVec[i-1].y,pathVec[i-1].x),Point(pathVec[i].y,pathVec[i].x),255*255);
+	for(int i = 1;i<path2.size();i++){
+		line(map2,Point(path2[i-1].y,path2[i-1].x),Point(path2[i].y,path2[i].x),255*255);
 	}
 	imshow("banned",map2);
 	waitKey(2);
