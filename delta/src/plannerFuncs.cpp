@@ -42,7 +42,7 @@ bool operator<(Node a, Node b)
 	return a.heuristic+a.pathCost > b.heuristic + b.pathCost;
 }
 
-#define WALL_THRESHOLD 200
+#define WALL_THRESHOLD 140
 
 vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;

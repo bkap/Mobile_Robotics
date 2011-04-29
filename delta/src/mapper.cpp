@@ -62,7 +62,7 @@ Mat_<Point2f> cameraROICorners(2,2,Point2f(0,0));
 
 const float gridWidth= 45;	//meters
 const float gridRes = 0.05;	//meters per pixel
-const float fattening=0.35;	//meters dilation of obstacles
+const float fattening=0.7;	//meters dilation of obstacles
 const int fixedPoints = 1;	//fractional bits for locations on grid
 const Point_<float> gridOrigin(-15,0); //grid x0,y0 in meters
 

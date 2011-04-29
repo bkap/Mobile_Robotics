@@ -324,11 +324,11 @@ PathList ReturnVal; //the path list that we will eventually return
 vector<PathSegment> path; 
 	//init_angle, final_angle, repoint, segnum
 	double old_heading = initial_heading;
-	path = vector<PathSegment>(points.size() * 2);
+	path = vector<PathSegment>();
 	for(int i =0; i<points.size()-1; i++)
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
-		if(fabs(old_heading - new_heading) < 0.2) {
+		if(fabs(old_heading - new_heading) > 0.2) {
 	 		path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
 		}
 	     path.push_back(MakeLine(points[i], points[i+1], path.size() + initialSegNum));
@@ -680,6 +680,11 @@ int main(int argc,char **argv)
 		
 		    cout<<"publishing\n";
 		    cout<<" the path has "<<turns.path_list.size()<<" points\n";
+
+		    for(int r = 0; r<(int)turns.path_list.size(); r++)
+			{
+				cout<<"seg_num, seg_type, length "<<turns.path_list[r].seg_number<<","<<turns.path_list[r].seg_type<<","<<turns.path_list[r].seg_length<<"\n";
+			}
 		    path_pub.publish(turns);
 		    cout<<"3published"<<"\n";	
 	    }

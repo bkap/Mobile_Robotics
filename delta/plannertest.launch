@@ -1,7 +1,8 @@
 <launch>
 
 	<!-- Launch local nodes -->
-	<node name="psonode" pkg="delta" type="fakepso" output="screen"/>
+	<param name="/use_sim_time" value="true" />
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find cwru_maps)/maps/2nd_floor_one_door.yaml" />
 	<node name="lidar" pkg="delta" type="lidar" output="screen"/>
 	<node name="mapper" pkg="delta" type="mapper" output="screen"/>
 	<node name="goalpublisher" pkg="delta" type="goalpublisher" output="screen"/>
