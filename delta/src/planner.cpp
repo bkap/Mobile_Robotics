@@ -328,7 +328,7 @@ vector<PathSegment> path;
 	for(int i =0; i<points.size()-1; i++)
 	{
 		double new_heading = atan2(points[i+1].y - points[i].y, points[i+1].x-points[i].x);
-		if(fabs(old_heading - new_heading) > 0.2) {
+		if(fabs(old_heading - new_heading) > 0.7) {
 	 		path.push_back(MakeTurnInPlace(old_heading, new_heading, points[i], path.size()+ initialSegNum));
 		}
 	     path.push_back(MakeLine(points[i], points[i+1], path.size() + initialSegNum));
@@ -426,7 +426,7 @@ cout<<"PLANNER:calling a*\n";
 			path2.push_back(Point2f(segPts[z].x, segPts[z].y));
 		}
 	
-		approxPolyDP(Mat(path2), path2, 2, false);
+		approxPolyDP(Mat(path2), path2, 3, false);
 
 			vector<Point3f> mapPts(path2.size());
 		cout<<"PLANNER:transform\n";
@@ -496,19 +496,31 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//cout<<"PLANNER: lidar 2\n";
 	//lastCSpace_CharMap = cv::Mat((*CSpace_Map).data,true);
 
-	Mat_<char> temp = Mat::zeros(ceil(cspace.info.width),ceil(cspace.info.width),CV_8S);
-	ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
-	temp.data = (uchar*) &(CSpace_Map->data[0]);
+	//Mat_<char> temp = Mat::zeros(ceil(cspace.info.width),ceil(cspace.info.width),CV_8S);
+	//ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
+	//temp.data = (uchar*) &(CSpace_Map->data[0]);
 	//cout<<"WTFWTFWTF\n";
 	for(int i = 0; i<(int)cspace.data.size(); i++)
 	{
 		lastCSpace_CharMap(i/lastCSpace_CharMap.cols, i%lastCSpace_CharMap.cols)=(char)cspace.data[i];
 	}
 
+	Mat_<int> map2 = Mat::zeros(900, 900, CV_32S);
+	
+	for(int i = 0; i<900; i++)
+	{
+		for(int j = 0; j<900; j++)
+		{
+			map2(j,i) = ((int) (lastCSpace_CharMap(j,i)))*255;
+			
+		//	if(j%100==0)cout<<i<<","<<j<<","<<map(j,i)<<"\n";
+		}
+	}
+
 	//temp.convertTo(lastCSpace_CharMap,CV_8S);
 	//cvNamedWindow("last map",CV_WINDOW_AUTOSIZE);
-	//imshow("last map",lastCSpace_CharMap);
-	//waitKey(-1);
+	//imshow("last map",map2);
+	//waitKey(2);
 	//temp.copyTo(lastCSpace_CharMap);
 	//cout<<"PLANNER: lidar 3\n";
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);

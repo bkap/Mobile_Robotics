@@ -86,7 +86,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	{
 		for(int j = 0; j<map.rows; j++)
 		{
-			map(j,i) = (int) map_(j,i)+129;
+			map(j,i) = ((int) map_(j,i))+129;
 		}
 	}
 	
@@ -178,11 +178,22 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	}
 	
 	free(nodeList);
-	Mat_<int> map2;
-	inRange(map,WALL_THRESHOLD,255,map2);
+	Mat_<int> map2 = Mat::zeros(map.rows, map.cols, CV_32S);
+	
+	for(int i = 0; i<map.cols; i++)
+	{
+		for(int j = 0; j<map.rows; j++)
+		{
+			map2(j,i) = ((int) (map(j,i)))*255;
+			
+		//	if(j%100==0)cout<<i<<","<<j<<","<<map(j,i)<<"\n";
+		}
+	}
+
+	//inRange(map,WALL_THRESHOLD,255,map2);
 	cvNamedWindow("banned",CV_WINDOW_AUTOSIZE);
 	for(int i = 1;i<pathVec.size();i++){
-		line(map2,Point(pathVec[i-1].y,pathVec[i-1].x),Point(pathVec[i].y,pathVec[i].x),127);
+		line(map2,Point(pathVec[i-1].y,pathVec[i-1].x),Point(pathVec[i].y,pathVec[i].x),255*255);
 	}
 	imshow("banned",map2);
 	waitKey(2);

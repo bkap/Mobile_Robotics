@@ -16,9 +16,10 @@
 #include "opencv2/core/core.hpp"
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 #include "cvFuncs.h"
 
-#define FILL_RATE 25
+#define FILL_RATE 255
 #define CLEAR_RATE 5
 #define CAMERA_ROI_FILE "cameraROI_base_link"
 
@@ -109,11 +110,14 @@ Mat_<uchar> patchInit(){
 	Mat_<uchar> patch=Mat::zeros(2 * fattening / gridRes, 2 * fattening / gridRes, CV_8U);
 	circle(patch,Point(patch.size().width/2.0,patch.size().width/2.0), fattening / gridRes - 3, FILL_RATE, -1, 8,1);
 	cout<<"patchSize "<<patch.size().width<<","<<patch.size().height<<"\n";
-	GaussianBlur(patch,patch,Size(3,3),0,0);
-		
-	cvNamedWindow("patch", CV_WINDOW_AUTOSIZE);
-	imshow("patch", patch);
-	waitKey(-1);
+	GaussianBlur(patch,patch,Size(11,11),5,5);
+	//patch = patch+patch;
+	cout<<"PATCH BIGGEST VALUE:"<<(int)(patch(patch.rows/2,patch.cols/2))<<"\n";
+
+	//normalize(patch,patch, 0, 255, NORM_MINMAX, -1);
+	//cvNamedWindow("patch", CV_WINDOW_AUTOSIZE);
+	//imshow("patch", patch);
+	//waitKey(-1);
 	return patch;
 }
 
@@ -192,7 +196,7 @@ void drawHit(Mat_<uchar>& grid, Point2f hit){
 	Rect roi = roi_ & gridMatBounds;
 	if(roi.size() != roi_.size()){
 		cerr<<"MAPPER: OH NOES!!!!\n";
-		ROS_INFO("roi doesnt fit: %i,%i : %i,%i",roi.width,roi.height,roi_.width,roi_.height);
+		ROS_INFO("roi doesnt fit: %i,%i ",center.x, center.y);
 		return;
 	}
 	Mat_<uchar> t(grid,roi);
@@ -203,7 +207,7 @@ void drawHit(Mat_<uchar>& grid, Point2f hit){
 		return;
 	}
 	//ROS_INFO("drawing a hit");
-	t+= patch;
+	t= max(t, patch);
 }
 
 /*
@@ -228,20 +232,40 @@ void updateGrid(){
 
 	//ROS_INFO("updating grid");
 
-        for(int i =0; i<cameraGrid.rows; i++)
+       for(int i =0; i<cameraGrid.rows; i++)
 	{
 		//cout<<"row "<<i<<"\n";
 		for (int j = 0; j<cameraGrid.cols; j++)
 		{
 
 			//cout<<" col "<<j<<"\n"; 
-                	grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j));//-128;
+                	//grid.data[i*cameraGrid.cols+j]= LIDARGrid(i,j)>cameraGrid(i,j)?(char)(LIDARGrid(i,j)) : (char)(cameraGrid(i,j)-128);
+
+		uchar lidar = LIDARGrid(i,j);
+		uchar cam = cameraGrid(i,j);
+		int max;
+
+		if (lidar>cam) max = lidar;
+		else max = cam;
+		
+		grid.data[i*cameraGrid.cols+j] = (char)(max-127);
+
+		//gridMat(i,j) =  (char)(LIDARGrid(i,j)>cameraGrid(i,j)?saturate_cast<char>(LIDARGrid(i,j)-128) : saturate_cast<char>(cameraGrid(i,j)-128));//saturate_cast<char>(max(LIDARGrid(i,j), cameraGrid(i,j))-128));
 		}
         }
-
-
+		
+	//Mat(max(LIDARGrid, cameraGrid)).convertTo(,CV_8S,1,128);
 	//cvNamedWindow("grid",CV_WINDOW_AUTOSIZE);
-	//imshow("grid",LIDARGrid);
+	
+	//Mat_<uchar> g2 = Mat::zeros(gridMat.cols, gridMat.rows, CV_8U);
+	//for (int i =0; i<gridMat.rows; i++)
+	//{
+	//	for(int j = 0; j<gridMat.cols; j++)
+	//	{
+	//		g2(i,j) = (uchar)(((int)(gridMat(i,j)))+128);
+	//	}
+	//}
+	//imshow("grid",g2);
 	//waitKey(2);
 
 
@@ -283,7 +307,8 @@ void cameraCallback(const sensor_msgs::PointCloud::ConstPtr& scan_cloud)
 	}
 	ROS_INFO("MAPPER found %d points",scan_cloud->points.size());
 	ROS_INFO("camera callback");
-	subtract(cameraGrid,clearColor,cameraGrid,cameraROI);
+	//subtract(cameraGrid,clearColor,cameraGrid,cameraROI);
+	bitwise_xor(cameraROI, cameraROI, cameraGrid, cameraROI);//don't ask-- wes and connor
 	//ROS_INFO("cleared ROI");
 	vector<bool> mask;
 	maskCamera(*scan_cloud,mask);
@@ -339,11 +364,12 @@ void clearLIDAR(const sensor_msgs::PointCloud& cloud, vector<bool> mask = vector
 		hit.x = points[i].x;
 		hit.y = points[i].y;
 		if(maskall || mask[i]){
-			//line(LIDARGrid, pointToGridPoint(robot,fixedPoints), pointToGridPoint(hit,fixedPoints), Scalar(-CLEAR_RATE), 1, 8, fixedPoints);
-			LineIterator it(LIDARGrid,pointToGridPoint(robot),pointToGridPoint(hit));
-			for(int j=0;j<it.count;j++, ++it){
-				**it = saturate_cast<uchar>((uchar) **it - (uchar)CLEAR_RATE);
-			}
+			line(LIDARGrid, pointToGridPoint(robot,fixedPoints), pointToGridPoint(hit,fixedPoints), 0, 3, 8, fixedPoints);
+			
+			//LineIterator it(LIDARGrid,pointToGridPoint(robot),pointToGridPoint(hit));
+			//for(int j=0;j<it.count;j++, ++it){
+			//	**it = saturate_cast<uchar>((uchar) **it - (uchar)CLEAR_RATE);
+			//}
 		}
 	}
 }
@@ -363,7 +389,7 @@ void maskLIDAR(const sensor_msgs::PointCloud& cloud, vector<bool>& mask){
 		hit.x = points[i].x;
 		hit.y = points[i].y;
 		float r = (hit.x-robot.x)*(hit.x-robot.x)+(hit.y-robot.y)*(hit.y-robot.y);
-		mask.push_back(gridBounds.contains(hit) && r < 400);
+		mask.push_back(gridBounds.contains(hit) && r < 6000);
 		//if(!gridBounds.contains(hit))
 			//ROS_INFO("hit at (%f,%f) out of bounds",hit.x,hit.y);
 		//if(r>=400)
