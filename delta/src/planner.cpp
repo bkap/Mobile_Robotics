@@ -367,8 +367,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		double heading = initial_heading;
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
-		if(FirstTime) {
-			FirstTime = false;
+		if(!FirstTime) {
 			if(segnum > goalSegnums[goalnum ]) {
 				goalnum++;
 			}
@@ -404,9 +403,8 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				heading += oldSeg.seg_length - distanceOnSeg;
 			}
 		} else {
-			prevList = (PathList*)malloc(sizeof(PathList));
 			startPoint = convertGeoPointToPoint3f(pointList.points[0]);
-	
+			FirstTime = false;	
 		}
     	//vector<Point2i> aStar (Mat map, Point2i start, Point2i end)
 cout<<"PLANNER:calling a*\n";
