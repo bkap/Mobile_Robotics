@@ -79,8 +79,16 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	Node*** nodeList;
 	priority_queue<Node> Q;
 	cout<<"a*1\n";
-	Mat_<int> map;
-	map_.convertTo(map,CV_32S);
+	Mat_<int> map = Mat::zeros(map_.rows, map_.cols, CV_32S);
+	
+	for(int i = 0; i<map.cols; i++)
+	{
+		for(int j = 0; j<map.rows; j++)
+		{
+			map(j,i) = (int) map_(j,i);
+		}
+	}
+	
 	nodeList = (Node***) calloc(map.rows, sizeof(Node**));
 	cout<<"map rows, cols "<<map.rows<<","<<map.cols<<"\n";
 	for(int i = 0; i<map.rows; i++)

@@ -413,7 +413,11 @@ cout<<"PLANNER:calling a*\n";
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
 			vector<Point3f> mapPts(segPts.size());
 		cout<<"PLANNER:transform\n";
-			transform(segPts.begin(), segPts.end(), mapPts.begin(), convertGridToMapCoords);
+
+			for(int k = 0; k <(int)segPts.size(); k++) {
+				mapPts[k] = convertGridToMapCoords(segPts[k]);
+
+			}
 			goalSegnums[i-1] = turns.path_list.size() + mapPts.size();
     		if(i + 1 < pointList.points.size()) {
 			//get startPos for next iteration
@@ -469,10 +473,16 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	Mat_<char> temp = Mat::zeros(ceil(cspace.info.width),ceil(cspace.info.width),CV_8S);
 	ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
 	temp.data = (uchar*) &(CSpace_Map->data[0]);
-	temp.convertTo(lastCSpace_CharMap,CV_8S);
-	cvNamedWindow("last map",CV_WINDOW_AUTOSIZE);
-	imshow("last map",lastCSpace_CharMap);
-	waitKey(-1);
+	cout<<"WTFWTFWTF\n";
+	for(int i = 0; i<(int)cspace.data.size(); i++)
+	{
+		lastCSpace_CharMap(i/lastCSpace_CharMap.cols, i%lastCSpace_CharMap.cols)=(char)cspace.data[i];
+	}
+
+	//temp.convertTo(lastCSpace_CharMap,CV_8S);
+	//cvNamedWindow("last map",CV_WINDOW_AUTOSIZE);
+	//imshow("last map",lastCSpace_CharMap);
+	//waitKey(-1);
 	//temp.copyTo(lastCSpace_CharMap);
 	cout<<"PLANNER: lidar 3\n";
 	//lastCSpace_CharMap = lastCSpace_CharMap.reshape(CSpace_Map->width);
