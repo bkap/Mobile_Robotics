@@ -47,9 +47,35 @@ For future improvements, we are considering methods of clearing places on the CS
 In general the procedure for clearing old points would be to assume that any point between the LIDAR sensor and a nearby ping (within 10 m) is now clear because it would be impossible for an object to occupy a space near the LIDAR sensor and not get hit by a ping.
 
 \lstinputlisting[caption=LIDAR Mapper,
-    label={lidarmapper.cpp},
+    label={mapper.cpp},
     breaklines=true,
-  ]{delta/src/lidarmapper.cpp}
+  ]{delta/src/mapper.cpp}
+
+\subsection{Camera Calibration}
+
+The camera calibration node is run separately from the rest of the program.  It subscribes to the front camera and the LIDAR.  This node's goal is to find a number of points of correspondance between the camera and LIDAR.  It runs a LIDAR callback and a camera callback simultaneously to find these points.
+
+First, in the LIDAR callback, the program searches for a rectangular feature that looks like the calibration rod.  It uses criteria of minimum separation from surroundings, minimum and maximum width, and maximum slope to discriminate the rod from the LIDAR scans.  If the rod is found, its location is recorded.
+
+Second, in the camera callback, the program searches for an orange blob that looks like the base of the calibration rod.  The camera callback normalizes colors and uses the cvBlob library to search for orange blobs.  If the camera callback successfully finds an orange blob, it checks whether the LIDAR callback found the rod on its last iteration.  If the camera callback and the LIDAR callback both simultaneously found points, those points are stored as a correspondance.
+
+The node runs until 120 correspondences between LIDAR and the camera are found.  Camera calibration then uses the OpenCV function findHomography to get a transformation matrix between camera coordinates and base link coordinates.  This matrix is saved to file for use in other nodes. 
+
+\lstinputlisting[caption=Camera Calibration,
+    label={robust_calibration.cpp},
+    breaklines=true,
+  ]{delta/src/vision/robust_calibration.cpp}
+
+\subsection{Camera}
+
+The camera node subscribes to the feed from Jinx's front camera.  It publishes a cloud of orange points in map coordinates.  On startup, the node loads the transformation matrix that was previously calibrated by the camera calibration node.  The main action happens whenever the node receives a new image from the camera.  First, it normalizes the colors and applies thresholds to create a binary matrix containing only points that satisfy the criteria for orange.  Next, the OpenCV function findContours is called.  This reduces orange blobs to their outlines, drastically reducing the number of points returned.
+Finally, the point cloud is transformed to map coordinates and published for use in the mapper node.
+
+\lstinputlisting[caption=Camera,
+    label={camera.cpp},
+    breaklines=true,
+  ]{delta/src/camera.cpp}
+  
 
 \subsection{Path Planner}
 
