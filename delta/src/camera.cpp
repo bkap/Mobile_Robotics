@@ -1,4 +1,3 @@
-//#include <camera_info_manager/camera_info_manager.h>
 #include <ros/ros.h>
 #include <iostream>
 #include <fstream>
@@ -23,6 +22,7 @@
 using namespace cv;
 using namespace std;
 
+// Function to load a matrix from a file
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
 	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
@@ -40,9 +40,6 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	temp.copyTo(mat);
 	delete[] data;
 }
-
-
-
 
 Mat cameraMat; //intrinsic parameters
 Mat distMat; //distortion parameters
@@ -87,6 +84,7 @@ void findOrange(cv::Mat& src,cv::Mat& dst)
   threshold(mats[2], mats[2], 180, 255, THRESH_BINARY);
   multiply(mats[0], mats[1], dst);
   multiply(dst, mats[2], dst);
+  // Erode and dilate to get rid of noise
   erode(dst, dst, Mat());
   dilate(dst, dst, Mat(), Point(-1,-1), 7);
 }
@@ -95,66 +93,49 @@ void findOrange(cv::Mat& src,cv::Mat& dst)
 */
 void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCloud& mapCloud){
 
-	sensor_msgs::PointCloud cloud;
-	cloud.header.frame_id = "base_laser1_link";
 	/* transform to base_link */
 	Mat_<Point2f> basePoints_;
 	perspectiveTransform(Mat(viewPoints),basePoints_,viewToBase);
 	
-	/*convert to point cloud*/
-	//vector<Point2f> points;
+	/*convert to ROS point cloud type*/
+	sensor_msgs::PointCloud cloud;
+	cloud.header.frame_id = "base_laser1_link";
 	for(unsigned int i = 0;i<viewPoints.size();i++){
 		geometry_msgs::Point32 point;
 		point.x = basePoints_(i).x;
 		point.y = basePoints_(i).y;
 		cloud.points.push_back(point);
-		//points.push_back(basePoints_(i));
 	}
 	
-	/*convert to point cloud*/
-	//cloud.points.erase(cloud.points.begin(), cloud.points.end());
-	//for(unsigned int i=0;i<points.size();i++){
-	//	geometry_msgs::Point32 geoPoint;
-	//	geoPoint.x =  points[i].x;
-	//	geoPoint.y =  points[i].y;
-	//	geoPoint.z = 0;
-	//	cloud.points.push_back(geoPoint);
-	//}
-
-	/*transform cloud to map*/
+	/*transform cloud to map coordinates*/
 	tfl->transformPointCloud("map", cloud, mapCloud);
 }
 
+// Normalizes colors of an input images
 void normalizeColor(cv::Mat& img){
 	cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
 	cv::Vec<uchar,3> p;
 	for(;it!=it_end;++it){
-		//p=*it; 
+		// To save processing time, the scale is R+G+B instead of Sqrt(R+G+B)
 		double scale = (*it)[0]+(*it)[1]+(*it)[2];
-		//p = scale * *it;// (255.0/scale));
 		*it = cv::Vec<uchar,3> (cv::saturate_cast<uchar> (255.0 / scale* (float)(*it)[0]),cv::saturate_cast<uchar>(255.0 / scale * (float)(*it)[1]),cv::saturate_cast<uchar>(255.0 /scale * (float)(*it)[2]));
 	}
 }
 
-
+// Takes an image, and returns a vector of orange points detected within the image
 void findPoints(Mat& image, vector<Point2f>& points){
+	// Normalize colors and find orange pixels
 	normalizeColor(image);
-	//cvNamedWindow("image");
-	//imshow("image",image);
-	//waitKey(2);
 	Mat orange = Mat::zeros(image.rows,image.cols,CV_8U);
 	findOrange(image,orange);
-	//cout<< orange.channels()<<endl;
-	//cvNamedWindow("orange");
-	//imshow("orange",orange);
-	//waitKey(2);
+	
+	// Reduce the number of points by finding enclosing contours
 	vector<vector<Point> > points_;
 	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
 	drawContours(outline,points_,-1,255);
-	//cvNamedWindow("outline");
-	//imshow("outline",outline);
-	//waitKey(2);
+	
+	// Pacage the points in a vector
 	int s = 0,s2=0;
 	for(int i =0;i<points_.size();i++){
 		s+=points_[i].size();
@@ -166,20 +147,19 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	ROS_INFO("CAMERA FINDS %d (%d) points",s,s2);
 }
 
+// This is called whenever the node gets a new image from the camera
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-
-  //ROS_INFO("image callback");
-
+  // Convert image from ROS format to OpenCV format
   static sensor_msgs::CvBridge bridge;
   static bool init = false;
   static vector<Point2f> viewCorners,foundPoints;
   cv::Mat image;
-  // Convert image from ROS format to OpenCV format
   try
   {
 	image = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
 	if(!init){
+		// Store the corners of the image for transformation purposes
 		viewCorners.push_back(Point2f(0,0));
 		viewCorners.push_back(Point2f(0,image.size().width-1));
 		viewCorners.push_back(Point2f(image.size().height-1,image.size().width-1));
@@ -189,9 +169,11 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	transformPoints(viewCorners,viewCloud);
 	pub_view_pts.publish(viewCloud);
 	
+	// Detect orange points in the image
 	foundPoints.clear();
 	findPoints(image,foundPoints);
 	if(foundPoints.size() > 1){
+		// Transform and publish points if you got any
 		transformPoints(foundPoints,pointCloud);
 		pub_nav_pts.publish(pointCloud);
 	}
@@ -206,19 +188,19 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 }
 
-
+// Called on node initialization
 DemoNode::DemoNode():
   it_(nh_)
 {
-        readMat(viewToBase,"viewToBase");
+	// Read in camera calibration parameters
+	readMat(viewToBase,"viewToBase");
+	// Subscribe to the appropriate image
 	sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
 
   // Publish a cloud of points on the orange line
 	pub_nav_pts = nh_.advertise<sensor_msgs::PointCloud>("Camera_Cloud", 1);
 	pub_view_pts =nh_.advertise<sensor_msgs::PointCloud>("Camera_view",1);
-
 }
-
 
 int main(int argc, char **argv)
 {
@@ -229,10 +211,11 @@ int main(int argc, char **argv)
 	tfl = new tf::TransformListener();
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout << "READY"  << endl;
-	DemoNode motion_tracker;
-
 	
-
+	// Initialize the node
+	DemoNode motion_tracker;
+	
+	// Just spin forever, all of the action happens in the camera callback
 	ROS_INFO("Camera Node Started");
 	ros::spin();
 	
