@@ -129,9 +129,11 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	Mat orange = Mat::zeros(image.rows,image.cols,CV_8U);
 	findOrange(image,orange);
 	
-	// Reduce the number of points by finding enclosing contours
+	// Reduce the number of points by finding contours in the image
 	vector<vector<Point> > points_;
 	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	
+	// Draw the contours on a new image (for debugging/visualization)
 	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
 	drawContours(outline,points_,-1,255);
 	

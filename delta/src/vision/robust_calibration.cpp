@@ -17,18 +17,15 @@ using namespace std;
 #define PRECAL 0
 
 /*
-	This should now work.  There is some code in the image callback which flips the image and is only necessary when testing from the harlie bagfile and should otherwise be disabled
-
 	The code if(PRECAL){...} in the image callback converts the camera image to the birdseye view
 
-	perspectiveTransform(Mat(CoordsInCameraIJ),CoordsInBaseXY,viewToBase) transforms points from the camera frame into base_link
-		no homogeneous co-ordinates needed
-
+	perspectiveTransform(Mat(CoordsInCameraIJ),CoordsInBaseXY,viewToBase) transforms points from 		  the camera frame into base_link (no homogeneous co-ordinates needed)
 */
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
 // Also declare a point datatype here to hold the location of the rod as detected by LIDAR
 Point2f rodLocation; //set this the x,y coordinate of any rod found
+
 vector<Point2f> baseXY; 	//aggregator for base_link co-ordinates
 vector<Point2f> birdsIJ;	//aggregator for birds eye pixel co-ordinates
 vector<Point2f> viewIJ;		//aggregator for view pixel co-ordinates
@@ -39,11 +36,12 @@ Mat_<double> orthoToBaseInv;	//transform between birds-eye pixel co-ordinates an
 
 Point2f orthoBounds(4,2);	//defines viewable area of overhead projection as: x in (0,orthoBOunds.x), y in (-orthoBounds.y,orthoBounds.y)
 double ppm = 200;		//pixels/m in ortho image
-
 Size orthoImageSize(2 * orthoBounds.y * ppm + 1 , orthoBounds.x * ppm + 1);
 
 Mat lastImage;			//last image pulled from the callback
 Mat firstImage;
+
+// Function reads an OpenCV Mat from disk
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
 	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
@@ -61,6 +59,8 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	temp.copyTo(mat);
 	delete[] data;
 }
+
+// Function writes an OpenCV Mat to disk
 template <typename T>
 void writeMat(cv::Mat_<T>& mat, char* file){
 	ofstream* ofile = new ofstream(file,ofstream::out|ofstream::binary);
@@ -72,6 +72,8 @@ void writeMat(cv::Mat_<T>& mat, char* file){
 	ofile->write((char*) mat.data,mat.rows*mat.cols*mat.elemSize());
 	ofile->close();
 }
+
+// function prints an OpenCV mat for debugging
 template<typename T>
 void printMat(cv::Mat_<T>& mat, ostream stream = cout){
 	for(int i=0;i<mat.rows;i++){
@@ -95,22 +97,33 @@ class DemoNode {
     image_transport::Publisher image_pub_;
 };
 
+// Class constructor initializes data structures
 DemoNode::DemoNode():
   it_(nh_)
 {
+	// Subscribe to the front camera and LIDAR, publish an image for visualization/debugging.
   sub_image_ = it_.subscribe("image", 1, &DemoNode::imageCallback, this);
   sub_lidar_ = nh_.subscribe<sensor_msgs::LaserScan>("lidar",1,&DemoNode::lidarCallback,this);
   image_pub_ = it_.advertise("demo_image", 1);
 }
 
+/*
+ * This function filters unwanted discontinuities from LIDAR scans.
+ * For each point in the scan, if it is near max range, it is replaced by
+ * the average of the two neighboring points.  This should reduce random
+ * noise in the LIDAR scans due to some pings getting lost (assuming
+ * that lost pings are assigned the value at max range)
+ */
 int filterLIDAR(sensor_msgs::LaserScan& scan){
   int num_filtered = 0;
   int num_points = scan.ranges.size();
+  
   for( int i=1; i<num_points-1; i++ )
   {
-    // This pixel is a candidate for filtering iff it is at max range
+    // This pixel is a candidate for filtering if it is at max range
     if( scan.ranges[i]>=scan.range_max-1.5 )
     {
+    	// Replace it with the average of its two neighbors
       scan.ranges[i] = 0.5*(scan.ranges[i-1]+scan.ranges[i+1]);
       num_filtered++;
     }
@@ -129,133 +142,175 @@ int filterLIDAR(sensor_msgs::LaserScan& scan){
 	return num_filtered;
 }
 
-bool findRod(sensor_msgs::LaserScan& scan){
-float rodSepThresh  = 0.4; //min dist of rod from surrounding
-float rodDispThresh = 0.05;//max radial diff between rod points
-float rodWidthThresh= 3;   //max pings of a rod
-float rodDistThresh = 4;   //max distance to rod
-bool maybeRod = false;
-int rodStart = -1;
-float minr = 1000;
-float maxr = 0;
+/*
+ * Given a LIDAR scan, this function returns true if the calibration
+ * rod could plausibly be explained by this scan.
+ */
+bool findRod(sensor_msgs::LaserScan& scan)
+{
+	float rodSepThresh  = 0.4; //min dist of rod from surroundings
+	float rodDispThresh = 0.05;//max radial diff between rod points
+	float rodWidthThresh= 3;   //max pings of a rod
+	float rodDistThresh = 4;   //max distance to rod
+	bool maybeRod = false;
+	int rodStart = -1;
+	float minr = 1000;
+	float maxr = 0;
 
-last_scan_valid = false;
+	last_scan_valid = false;
 
-for(unsigned int i=1;i<scan.ranges.size()-1;i++){
-        if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh){
-            maybeRod = true;
-            rodStart = i;
-            minr = scan.ranges[i];
-            maxr = scan.ranges[i];
-        }
-        if(maybeRod){
-            minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
-            maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
- 	    if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh){
-	         if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh){
-        	     maybeRod = false;
-            	 }
-	         else{
-                    float r = scan.ranges[i];//(maxr + minr) / 2;
-		    float t = CV_PI * ( ((float) (rodStart+i))/360.0 -0.5);
-			cout<<"rod at: "<<r<<" m "<<t*180/CV_PI<<endl;
-                    last_scan_valid = true;
-                    rodLocation.x = r*cos(t);
-                    rodLocation.y = r*sin(t);
-                    maybeRod = false;
-                    maxr = 0;
-                    minr = 1000;
-		    break;
-            	}
-	    }
+	// Iterate through each point in the scan to find the rod
+	for(unsigned int i=1;i<scan.ranges.size()-1;i++)
+	{
+		// You just saw a jump in distance that could plausibly signify the start of the rod
+		if(!maybeRod && (scan.ranges[i-1] - scan.ranges[i])>rodSepThresh)
+		{
+			maybeRod = true;
+			// Record the current postion as the start of the rod
+			rodStart = i;
+			minr = scan.ranges[i];
+			maxr = scan.ranges[i];
+		}
+		// If you think you might be looking at the rod
+		if(maybeRod)
+		{
+			// Keep track of the minimum and maximum distance you've seen
+			minr = scan.ranges[i] < minr? scan.ranges[i]:minr;
+			maxr = scan.ranges[i] > maxr? scan.ranges[i]:maxr;
+			
+			// You just saw a jump in distance that could plausibly signify the end of the rod
+			if(scan.ranges[i+1] - scan.ranges[i] > rodSepThresh)
+			{
+				// You did not detect a rod if the sequence of points you found was too wide, too
+				// far away, or had too steep of an angle.
+				if(i-rodStart >= rodWidthThresh || maxr - minr > rodDispThresh || maxr > rodDistThresh)
+				{
+					maybeRod = false;
+				}
+				// The sequence of points that you saw do look like the calibration rod
+				else
+				{
+					// Distance to the rod
+					float r = scan.ranges[i];
+					// Thickness of the rod
+					float t = CV_PI * ( ((float) (rodStart+i))/360.0 -0.5);
+					
+					// Signal to the main program that you found the rod.
+					last_scan_valid = true;
+					rodLocation.x = r*cos(t);
+					rodLocation.y = r*sin(t);
+					cout<<"rod at: "<<r<<" m "<<t*180/CV_PI<<endl;
+					
+					// start over
+					maybeRod = false;
+					maxr = 0;
+					minr = 1000;
+					break;
+				}
+			}
+		}
 	}
- }
-return last_scan_valid;
+	return last_scan_valid;
 }
 
 // Callback triggered whenever you receive a laser scan
-void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
-  sensor_msgs::LaserScan scan = *msg;
-  ROS_INFO("lidar callback starting");
-//  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
+void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
+{
+	sensor_msgs::LaserScan scan = *msg;
+	ROS_INFO("lidar callback starting");
+	//  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
 
-  // First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
-  int num_filtered = filterLIDAR(scan);
-  bool foundRod = findRod(scan);
+	// First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
+	int num_filtered = filterLIDAR(scan);
+	
+	// Check if you detect the calibration rod in this scan
+	bool foundRod = findRod(scan);
 
 	if(foundRod){
 		ROS_INFO("LIDAR detected rod after smoothing %d bad points",num_filtered);
 	}
 }
 
+// Callback triggered by receiving an image message
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-//  cout<<"IMAGE CALLBACK\n";
-ROS_INFO("image callback starting");
+	ROS_INFO("image callback starting");
   static sensor_msgs::CvBridge bridge;
   cv::Mat image;
   cv::Mat output;
   static bool first = true;
   try
   {
-	image = cv::Mat(bridge.imgMsgToCv(msg,"bgr8"));
+		image = cv::Mat(bridge.imgMsgToCv(msg,"bgr8"));
 	
-	/* code for flipping from harlie bag */  
+		/* code for flipping from harlie bag */  
     //Mat im_ = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
     //flip(im_,image,-1);
 	  
     lastImage = image.clone();
 
-	if(first)	firstImage = image.clone();
-	first = false;
-	ROS_INFO("converted image:\n\trxc:\t%dx%d\n\tdepth:\t%d",image.rows,image.cols,image.depth());
+		if(first)	firstImage = image.clone();
+		first = false;
+		ROS_INFO("converted image:\n\trxc:\t%dx%d\n\tdepth:\t%d",image.rows,image.cols,image.depth());
   }
   catch(...) //(sensor_msgs::CvBridgeException& e)
   {
-	ROS_ERROR("failed to convert");
-    //ROS_ERROR("Could not convert from '%s' to 'bgr8'. E was %s", msg->encoding.c_str(), e.what());
+		ROS_ERROR("failed to convert");
   }
-  try {
-	//cvNamedWindow("image",CV_WINDOW_AUTOSIZE);
-	//imshow("image",image);
-	//waitKey(0);
-	ROS_INFO("Image callback finding blob");
-    normalizeColors(image, output);
-     ROS_INFO("normalized colors");
-    CvPoint2D64f Center = blobfind(image, output);
-  ROS_INFO("Image callback checked for blob");
-    cv::Point2f center (Center.x, Center.y);
-    if(center.x>0 && last_scan_valid){
-	ROS_INFO("calbiration point acquired");
-	viewIJ.push_back(Point2f(center.y, center.x));	//image points are in (i,j) instead of (x,y) so co-ordinates are reversed
-	baseXY.push_back(Point2f(rodLocation.x,rodLocation.y));
-	birdsIJ.push_back(Point2f(
-					orthoImageSize.height - rodLocation.x * ppm,
-					(orthoImageSize.width-1)/2 - rodLocation.y * ppm));
-    }
-	if(PRECAL){
-		warpPerspective(image.t(),output,viewToOrthoInv,Size(orthoImageSize.height,orthoImageSize.width),WARP_INVERSE_MAP);
-		output = output.t();
-    }
-    IplImage temp = output;
-   image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
-   ROS_INFO("ending blob finding");
-  }
-  catch (...)
+  try
   {
-    ROS_ERROR("failed for some reason");
-  }
-   ROS_INFO("ending image callback");
+		//cvNamedWindow("image",CV_WINDOW_AUTOSIZE);
+		//imshow("image",image);
+		//waitKey(0);
+		
+		// Detect orange blobs
+		ROS_INFO("Image callback finding blob");
+		normalizeColors(image, output);
+		ROS_INFO("normalized colors");
+		CvPoint2D64f Center = blobfind(image, output);
+		ROS_INFO("Image callback checked for blob");
+		cv::Point2f center (Center.x, Center.y);
+		
+		// If you detected a blob, AND the last lidar scan detected the calibration rod
+		if(center.x>0 && last_scan_valid)
+		{
+			// You found a valid calibration point.
+			ROS_INFO("calbiration point acquired");
+			
+			// Store the latest point
+			viewIJ.push_back(Point2f(center.y, center.x));	//image points are in (i,j) instead of (x,y) so co-ordinates are reversed
+			baseXY.push_back(Point2f(rodLocation.x,rodLocation.y));
+			birdsIJ.push_back(Point2f(
+			orthoImageSize.height - rodLocation.x * ppm,
+			(orthoImageSize.width-1)/2 - rodLocation.y * ppm));
+		}
+		if(PRECAL)
+		{
+			warpPerspective(image.t(),output,viewToOrthoInv,Size(orthoImageSize.height,orthoImageSize.width),WARP_INVERSE_MAP);
+			output = output.t();
+		}
+		
+		// Publish the image for visualization/debugging
+		IplImage temp = output;
+		image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
+		ROS_INFO("ending blob finding");
+	}
+	catch (...)
+	{
+	ROS_ERROR("failed for some reason");
+	}
+	ROS_INFO("ending image callback");
 }
 
 int main(int argc, char **argv)
 {
 
 
-	if(PRECAL){
-	        //readMat<double>(viewToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/viewToBaseInv");
-	        //readMat<double>(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
-	        //readMat<double>(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/orthoBaseInv");
+	if(PRECAL)
+	{
+    //readMat<double>(viewToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/viewToBaseInv");
+    //readMat<double>(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
+    //readMat<double>(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/orthoBaseInv");
 	}
   ros::init(argc, argv, "robust_calibration");
   DemoNode motion_tracker;
@@ -264,18 +319,17 @@ int main(int argc, char **argv)
   ROS_INFO("Calibration procedure started");
   ros::Rate naptime(75);
 
+	// Wait for the callbacks to run until you've acquired enough calibration points
   while(ros::ok() && (PRECAL || viewIJ.size()<120))
   {
-        naptime.sleep();
+    naptime.sleep();
   	ros::spinOnce();
   }
-//	ros::spin();
+  
 	if(PRECAL){
 		return 0;
 	}
 	ROS_INFO("beginning calibration");
-
-
 
 	/*	Initialization	*/
 	Mat viewIJ_ = Mat(viewIJ);
@@ -304,17 +358,23 @@ int main(int argc, char **argv)
 	Mat_<Point2f> orthoCornersIJ_,viewCornersBaseXY_;
 	vector<unsigned char> mask1,mask2,mask3;
 	/*	Computation	*/
-	Mat_<double> viewToBaseInv = findHomography(baseXY_,viewIJ_,mask1,RANSAC,10);	//transform between camera pixel co-ordinates and base_link (x,y)
-	Mat_<double> viewToOrthoInv= findHomography(birdsIJ_,viewIJ_,mask2,RANSAC,10);	//transform between camera and birds-eye pixel co-ordinates
-	Mat_<double> orthoToBaseInv= findHomography(baseXY_,birdsIJ_,mask3,RANSAC,10);	//transform between birds-eye pixel co-ordinates and base_link (x,y)
+	//transform between camera pixel co-ordinates and base_link (x,y)
+	Mat_<double> viewToBaseInv = findHomography(baseXY_,viewIJ_,mask1,RANSAC,10);	
+	//transform between camera and birds-eye pixel co-ordinates
+	Mat_<double> viewToOrthoInv= findHomography(birdsIJ_,viewIJ_,mask2,RANSAC,10);	
+	//transform between birds-eye pixel co-ordinates and base_link (x,y)
+	Mat_<double> orthoToBaseInv= findHomography(baseXY_,birdsIJ_,mask3,RANSAC,10);	
 	Mat_<double> orthoToBase,viewToBase,viewToOrtho;
 	invert(orthoToBaseInv,orthoToBase);
 	invert(viewToBaseInv,viewToBase); 
 	invert(viewToOrthoInv,viewToOrtho);
-	/*	Logging and Verification	*/
+	
+	// Write the transformation matrix to file
 	writeMat(viewToBase,"viewToBase");
 	//writeMat(viewToOrthoInv,"viewToOrthoInv");
 	//writeMat(orthoToBaseInv,"baseToOrthoInv");
+
+	/* The following code is for debugging, to verify that the transformation was successful */
 
 	cout<<"viewToBase inliers "<<countNonZero(Mat(mask1))<<"\nviewToOrtho inliers "<<countNonZero(Mat(mask2))<<"\northoToBase inliers "<<countNonZero(Mat(mask3))<<endl;
 	cout<<"Birds eye image size width,height: "<<orthoImageSize.width<<","<<orthoImageSize.height<<endl;
@@ -327,10 +387,8 @@ int main(int argc, char **argv)
 
 	writeMat(viewCornersBaseXY_,"cameraROI_base_link");
 
-
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);
 	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
-
 
 	Mat out_;
 	warpPerspective(firstImage.t(),out_,viewToOrtho,Size(orthoImageSize.height,orthoImageSize.width));
