@@ -14,10 +14,9 @@
 \subsection{Goal Publisher}
 
 The goal publisher's sole purpose is to publish goalPose.
-It does not subscribe to anything, and at present the goal pose never changes.
-Also, at present, even though the Path Planner listens to the Goal Publisher, it does not take its output into consideration except for deciding where on the path to stop.
-It is hoped that in the future we will implement a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.
-When that happens, Goal Publisher's information will become more relevant.
+It is defunct now.
+In short, we don't use it.
+Its functionality was merged into planner.
 
 
 \subsection{LIDAR Driver}
@@ -25,6 +24,8 @@ When that happens, Goal Publisher's information will become more relevant.
 The LIDAR Driver was provided for us by the TA's.
 It pulls LIDAR pings from the LIDAR sensor at a frequency of 75hz, transforms them into map coordinates and sends them to the LIDAR Mapper.
 When it was given to us, it initially used the odom frame, but we decided that we would consistently use the map frame for all of our other nodes, so that we would be working in a consistent frame which could be debugged easily by looking at the map in stage.
+
+It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
 
 
 \subsection{LIDAR Mapper}
@@ -58,14 +59,19 @@ Finally, the point cloud is transformed to map coordinates and published for use
 \subsection{Path Planner}
 
 The path planner subscribes to LIDARMap,PoseDes and goalPose and publishes pathList.
-The planner has been pre-programmed for this demo with a path that it should be following unless it sees an obstacle with an A* search on the map hopefully forthcoming over break.
-At present, the response to an obstruction in the path is a hardcoded pattern consisting of a swerve left followed by a swerve right once the path to the right is clear.
-The swerve is always a fixed distance, and no further attempt to find obstacles is made during curves or swerves, so the current algorithm would likely crash if there were multiple nearby obstacles or if there were an obstacle in a curve or swerve.
-In general, the Speed Profiler is still attmepting to search the current path for obstacles, so the robot should not hit any obstacles, but it may get stuck.
-After generating the path, the Path Planner publishes the path as a PathList.
-One possible algorithm to be considered was published by Valve, a video game company, in a whitepaper, \url{http://www.valvesoftware.com/publications/2009/ai_systems_of_l4d_mike_booth.pdf}.
-In general the algorithm could work quite well, but there are concerns about the re-pathing speed.
-Also, we will need to impose a boundry around the world so that the pathfinding algorithm will run in finite time.
+
+We implemented an A* search in PlannerFuncs which took the CSpace map published by Mapper and attempted to find a path on it.
+The standard implementation of A* search keeps a hashSet of "expanded nodes" which have already been explored by the search algorithm, and checks membership based purely on the state variables of each Node.  
+Because we are constrained to a 2D space, it is simple enough to keep a 2D grid of pointers to expanded nodes, or rather a Node***. 
+This pointers start being initialized to NULL, and are initialized to values if and only if those states are added to the expanded set.
+This gives us a trivial hash set implementation with a very fast hash function and is guaranteed not to result in collisions.
+
+In addition, the standard implementation keeps a priority queue of nodes, sorted by the sum of path cost and heuristic with the lowest values being picked first.
+In our implementation, we just use a standard C++ priority queue, but by default, it is a max heap using the less than operator.
+Since we needed to define the operator already, we simply used greater than instead of less than inside of the definition of the operator to make the max heap into a min heap.
+
+The Path Planner then makes a call to the approxPolyDP function in openCV to reduce the number of perpindicular paths, which is necessary even though it could lead to collisions.
+The importance of this is discussed in the bug report section of the report.
 
 \subsection{Desired Path Crawler}
 
@@ -80,6 +86,8 @@ For curves, the profiler needs to compute a position that moves along the curve.
 The heading is incremented or decremented by the angular velocity of the robot, and basic trigonometry is then used to find the current point along the curve.
 After deciding a desired pose, the Desired Path Crawler publishes the desied path.
 
+It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
+
 
 \subsection{Speed Profiler}
 
@@ -89,6 +97,7 @@ It attempts to choose accelerate at the maximum allowed rate until it matches sp
 It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.
 The path planner is then expected to repath around obstacles.
 
+It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
 
 \subsection{Steering Module}
 
@@ -98,6 +107,8 @@ The corrections are performed by projecting the vector from desired pose to actu
 This calculation is the same for both arcs and line segments, so the allowable path errors for good operation are less on an arc than for a line segment.
 The steering correction on the arcs additionally feeds-forward the linear voloctiy correction to the angular velocity corrretion.
 The corrections above nominal velocity are capped to .3 m / s for linear velocity and .5 rad / s for angular velocity and the total commanded linear velocity is constrained to be non-negative.
+
+It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
 
 \subsection{Other Code Files}
 \subsubsection{CSpaceFuncs}
