@@ -41,11 +41,11 @@ In general the procedure for clearing old points would be to assume that any poi
 
 \subsection{Camera Calibration}
 
-The camera calibration node is run separately from the rest of the program.  It subscribes to the front camera and the LIDAR.  This node's goal is to find a number of points of correspondance between the camera and LIDAR.  It runs a LIDAR callback and a camera callback simultaneously to find these points.
+The camera calibration node is run separately from the rest of the program.  It subscribes to the front camera and the LIDAR.  This node's goal is to find a number of points of correspondence between the camera and LIDAR.  It runs a LIDAR callback and a camera callback simultaneously to find these points.
 
 First, in the LIDAR callback, the program searches for a rectangular feature that looks like the calibration rod.  It uses criteria of minimum separation from surroundings, minimum and maximum width, and maximum slope to discriminate the rod from the LIDAR scans.  If the rod is found, its location is recorded.
 
-Second, in the camera callback, the program searches for an orange blob that looks like the base of the calibration rod.  The camera callback normalizes colors and uses the cvBlob library to search for orange blobs.  If the camera callback successfully finds an orange blob, it checks whether the LIDAR callback found the rod on its last iteration.  If the camera callback and the LIDAR callback both simultaneously found points, those points are stored as a correspondance.
+Second, in the camera callback, the program searches for an orange blob that looks like the base of the calibration rod.  The camera callback normalizes colors and uses the cvBlob library to search for orange blobs.  If the camera callback successfully finds an orange blob, it checks whether the LIDAR callback found the rod on its last iteration.  If the camera callback and the LIDAR callback both simultaneously found points, those points are stored as a correspondence.
 
 The node runs until 120 correspondences between LIDAR and the camera are found.  Camera calibration then uses the OpenCV function findHomography to get a transformation matrix between camera coordinates and base link coordinates.  This matrix is saved to file for use in other nodes. 
 
@@ -70,13 +70,13 @@ In addition, the standard implementation keeps a priority queue of nodes, sorted
 In our implementation, we just use a standard C++ priority queue, but by default, it is a max heap using the less than operator.
 Since we needed to define the operator already, we simply used greater than instead of less than inside of the definition of the operator to make the max heap into a min heap.
 
-The Path Planner then makes a call to the approxPolyDP function in openCV to reduce the number of perpindicular paths, which is necessary even though it could lead to collisions.
+The Path Planner then makes a call to the approxPolyDP function in openCV to reduce the number of perpendicular paths, which is necessary even though it could lead to collisions.
 The importance of this is discussed in the bug report section of the report.
 
 \subsection{Desired Path Crawler}
 
 The Desired Path Crawler listens to the current speed put out by the Speed Profiler, and the PathList published by the Path Planner.
-The Crawler moves a breadcrumb along the path published by the Path Planner at the speed that the Speed Profiler aledges we are moving.
+The Crawler moves a breadcrumb along the path published by the Path Planner at the speed that the Speed Profiler alleges we are moving.
 It leaves the current speed blank so that the Speed Profiler can fill in what speed it would like to go.
 Each type of path segment is a special case.
 Lines are the easiest, the reference point given is the start point, the heading does not vary throughout the segment, and the position can just be incremented by the velocity vector each iteration.
@@ -84,7 +84,7 @@ Turning in place is also easy because the linear velocity is zero and the refere
 Curves are the most difficult. 
 For curves, the profiler needs to compute a position that moves along the curve. 
 The heading is incremented or decremented by the angular velocity of the robot, and basic trigonometry is then used to find the current point along the curve.
-After deciding a desired pose, the Desired Path Crawler publishes the desied path.
+After deciding a desired pose, the Desired Path Crawler publishes the desired path.
 
 It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
 
@@ -105,7 +105,7 @@ The Steering Module subscribes to NominalSpeed and odom and publishes $cmd_vel$.
 From NominalSpeed, the desired speed and pose are extracted for comparison with the actual pose from odom to generate steering corrections to return the robot to the desired path and schedule.
 The corrections are performed by projecting the vector from desired pose to actual pose onto both the desired heading and a leftward normal to the desired heading to calculate following and lateral errors respectively.
 This calculation is the same for both arcs and line segments, so the allowable path errors for good operation are less on an arc than for a line segment.
-The steering correction on the arcs additionally feeds-forward the linear voloctiy correction to the angular velocity corrretion.
+The steering correction on the arcs additionally feeds-forward the linear velocity correction to the angular velocity correction.
 The corrections above nominal velocity are capped to .3 m / s for linear velocity and .5 rad / s for angular velocity and the total commanded linear velocity is constrained to be non-negative.
 
 It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
@@ -132,7 +132,7 @@ Furthermore, we know that the planner node can find paths successfully, therefor
 There is a not well understood error in the interaction of the planner and the path crawler which only occurs when we attempt to repath on a curve or turn in place. 
 The bug seemed to prevent the path from being followed at all.
 Luckily for us, the bug did not appear to manifest with straight lines, so we just drove all of our paths with no turns and allowed the steering node to make up the difference.
-This did not work terribly well because the steering node does not know how to steer correctly when the heading error is nearly perpindicular, and resulted in the shuddering and shaking which was observed when we ran the demo in the simulator and on an actual robot.
+This did not work terribly well because the steering node does not know how to steer correctly when the heading error is nearly perpendicular, and resulted in the shuddering and shaking which was observed when we ran the demo in the simulator and on an actual robot.
 
 The planner node had an additional bug which could have been fixed with some work, but usually wasn't an issue.  
 In the case that no path exists, planner will crash because it attempts to read from a priority_queue which has no elements.
@@ -147,8 +147,8 @@ The mapper node also sometimes died on initialization, but only some of the time
 \subsection{Group Policies and Ideas for Improvement}
 
 In general, our group has found it very useful to make use of version control systems and online backup, in particular, github.
-We decided as a group that all positions will be in the map frame with the same origin across all nodes to reduce possible transform erros.
-In addition, we found that OpenCV is rather convienent to use, and it is our opinion that we should replace all of the CSpace message types with OpenCV matrices or sparse matrices due to their convienence of use.
+We decided as a group that all positions will be in the map frame with the same origin across all nodes to reduce possible transform errors.
+In addition, we found that OpenCV is rather convenient to use, and it is our opinion that we should replace all of the CSpace message types with OpenCV matrices or sparse matrices due to their convenience of use.
 We have noted though that the OpenCV documentation is not accurate for the version included in CTurtle, so it is our recommendation that the class be switched over to Diamondback at the soonest possible time because the documentation appears to be much more accurate for that version.
 
 \end{document}
