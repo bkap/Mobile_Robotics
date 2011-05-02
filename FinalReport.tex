@@ -1,7 +1,7 @@
 \documentclass{article}
-\author{Connor Balin and Wesley Gould of team Delta}
-\title{EECS 476 Midterm Report}
-\date{3 March 2011}
+\author{William Kulp, Connor Balin, and Wesley Gould of team Delta}
+\title{EECS 476 Final Report}
+\date{2 May 2011}
 \usepackage{fullpage}
 \usepackage{url}
 \usepackage{listings}
@@ -11,7 +11,6 @@
 \small
 \section{Architecture Description}
 
-\lstset{language=C++}
 \subsection{Goal Publisher}
 
 The goal publisher's sole purpose is to publish goalPose.
@@ -20,10 +19,6 @@ Also, at present, even though the Path Planner listens to the Goal Publisher, it
 It is hoped that in the future we will implement a path finding algorithm, rather than hard coding an initial path and inserting a swerve when we detect an obstacle.
 When that happens, Goal Publisher's information will become more relevant.
 
-\lstinputlisting[caption=Goal Publisher,
-    label={goalpublisher.cpp},
-    breaklines=true,
-  ]{delta/src/goalpublisher.cpp}
 
 \subsection{LIDAR Driver}
 
@@ -31,10 +26,6 @@ The LIDAR Driver was provided for us by the TA's.
 It pulls LIDAR pings from the LIDAR sensor at a frequency of 75hz, transforms them into map coordinates and sends them to the LIDAR Mapper.
 When it was given to us, it initially used the odom frame, but we decided that we would consistently use the map frame for all of our other nodes, so that we would be working in a consistent frame which could be debugged easily by looking at the map in stage.
 
-\lstinputlisting[caption=LIDAR Driver,
-    label={lidar.cpp},
-    breaklines=true,
-  ]{delta/src/lidar.cpp}
 
 \subsection{LIDAR Mapper}
 
@@ -75,7 +66,6 @@ Finally, the point cloud is transformed to map coordinates and published for use
     label={camera.cpp},
     breaklines=true,
   ]{delta/src/camera.cpp}
-  
 
 \subsection{Path Planner}
 
@@ -88,11 +78,6 @@ After generating the path, the Path Planner publishes the path as a PathList.
 One possible algorithm to be considered was published by Valve, a video game company, in a whitepaper, \url{http://www.valvesoftware.com/publications/2009/ai_systems_of_l4d_mike_booth.pdf}.
 In general the algorithm could work quite well, but there are concerns about the re-pathing speed.
 Also, we will need to impose a boundry around the world so that the pathfinding algorithm will run in finite time.
-
-\lstinputlisting[caption=Path Planner,
-    label={planner.cpp},
-    breaklines=true,
-  ]{delta/src/planner.cpp}
 
 \subsection{Desired Path Crawler}
 
@@ -107,10 +92,6 @@ For curves, the profiler needs to compute a position that moves along the curve.
 The heading is incremented or decremented by the angular velocity of the robot, and basic trigonometry is then used to find the current point along the curve.
 After deciding a desired pose, the Desired Path Crawler publishes the desied path.
 
-\lstinputlisting[caption=Desired Path Crawler,
-    label={desiredpathcrawler.cpp},
-    breaklines=true,
-  ]{delta/src/desiredpathcrawler.cpp}
 
 \subsection{Speed Profiler}
 
@@ -120,10 +101,6 @@ It attempts to choose accelerate at the maximum allowed rate until it matches sp
 It is also looking to see if there are any obstacles in the current path, and will attempt to brake at the maximum safe rate to try to prevent immediate collisions.
 The path planner is then expected to repath around obstacles.
 
-\lstinputlisting[caption=Profiler,
-    label={profiler.cpp},
-    breaklines=true,
-  ]{delta/src/profiler.cpp}
 
 \subsection{Steering Module}
 
@@ -134,37 +111,10 @@ This calculation is the same for both arcs and line segments, so the allowable p
 The steering correction on the arcs additionally feeds-forward the linear voloctiy correction to the angular velocity corrretion.
 The corrections above nominal velocity are capped to .3 m / s for linear velocity and .5 rad / s for angular velocity and the total commanded linear velocity is constrained to be non-negative.
 
-\lstinputlisting[caption=Steering Module,
-    label={steering.cpp},
-    breaklines=true,
-  ]{delta/src/steering.cpp}
-
 \subsection{Other Code Files}
 \subsubsection{CSpaceFuncs}
 The CSpaceFuncs file contains two functions for the manipulation of CSpace maps.  The fist, GetMap, generates an openCV matrix from an Occupancy Grid.  The other function PlotMap plots points to the map in RViz.  We didn't quite get PlotMap working yet, but we think that it could be a nice debug tool.
 
-\lstinputlisting[caption=CSpaceFuncs.h,
-    label={CSpaceFuncs.h},
-    breaklines=true,
-  ]{delta/src/CSpaceFuncs.h}
-
-\lstinputlisting[caption=CSpaceFuncs.cpp,
-    label={CSpaceFuncs.cpp},
-    breaklines=true,
-  ]{delta/src/CSpaceFuncs.cpp}
-
-\subsubsection{MathyStuff}
-MathyStuff was written by Wesley Gould for use in his research with the Physics department.  It was imported because it had an implementation of vectors, called Point3.  We later found that openCV has nearly the exact same functionality in its point classes, so the MathyStuff file will be phased out in newer versions of the code.
-
-\lstinputlisting[caption=MathyStuff.h,
-    label={MathyStuff.h},
-    breaklines=true,
-  ]{delta/src/MathyStuff.h}
-
-\lstinputlisting[caption=MathyStuff.cpp,
-    label={MathyStuff.cpp},
-    breaklines=true,
-  ]{delta/src/MathyStuff.cpp}
 
 \section{Discussion}
 \subsection{Observation of Performance}

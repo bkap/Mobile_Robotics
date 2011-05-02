@@ -100,32 +100,9 @@ cv::Vec2f calculateSteeringCorrections(cv::Vec3f sdp,eecs376_msgs::CrawlerDesire
 			{
 				//cout<<"STEERING IN A LINE\n";
 				cv::Vec3f v(kS, 0 , 0);
-				cv::Vec3f w(0 , kD, 0);
-				cv::Vec3f u(0 , 0 , kP);
-				
-				double lin_feedback = sdp.dot(v);
-				
-				double ang_feedback_lateral = sdp.dot(w);
-				double ang_feedback_heading = sdp.dot(u);
-				double ang_feedback;
+				cv::Vec3f w(0 , kD, kP);
 
-				// Individually saturate the components of the angular feedback
-				// Put a weight of 1.0 on lateral offset, so that if the heading term is greater, it will dominate
-				if( fabs(ang_feedback_lateral) > maxSteerW ){
-					ang_feedback_lateral = maxSteerW * fabs(ang_feedback_lateral)/ang_feedback_lateral;
-				}
-				// Put a weight of 1.5 on heading offset
-				if( fabs(ang_feedback_heading) > maxSteerW*1.5 ){
-					ang_feedback_heading = maxSteerW * fabs(ang_feedback_heading)/ang_feedback_heading;
-				}
-				
-				// Add the terms together, and saturate a second time
-				ang_feedback = ang_feedback_lateral + ang_feedback_heading;
-				if( fabs(ang_feedback) > maxSteerW ){
-					ang_feedback = maxSteerW * fabs(ang_feedback)/ang_feedback;
-				}
-				
-				setVec(vw,lin_feedback,ang_feedback);
+				setVec(vw,sdp.dot(v),sdp.dot(w));
 				break;
 			}
 

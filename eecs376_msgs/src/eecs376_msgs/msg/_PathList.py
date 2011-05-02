@@ -4,7 +4,7 @@ import struct
 
 import eecs376_msgs.msg
 import geometry_msgs.msg
-import std_msgs.msg
+import roslib.msg
 
 class PathList(roslib.message.Message):
   _md5sum = "d011726f2e956efaa86429c23d6081da"
@@ -17,7 +17,7 @@ Header header
 eecs376_msgs/PathSegment[] path_list
 
 ================================================================================
-MSG: std_msgs/Header
+MSG: roslib/Header
 # Standard metadata for higher-level stamped data types.
 # This is generally used to communicate timestamped data 
 # in a particular coordinate frame.
@@ -112,11 +112,11 @@ float64 z
       super(PathList, self).__init__(*args, **kwds)
       #message fields cannot be None, assign default values for those that are
       if self.header is None:
-        self.header = std_msgs.msg._Header.Header()
+        self.header = roslib.msg._Header.Header()
       if self.path_list is None:
         self.path_list = []
     else:
-      self.header = std_msgs.msg._Header.Header()
+      self.header = roslib.msg._Header.Header()
       self.path_list = []
 
   def _get_types(self):
@@ -175,7 +175,7 @@ float64 z
     """
     try:
       if self.header is None:
-        self.header = std_msgs.msg._Header.Header()
+        self.header = roslib.msg._Header.Header()
       end = 0
       _x = self
       start = end
@@ -295,7 +295,7 @@ float64 z
     """
     try:
       if self.header is None:
-        self.header = std_msgs.msg._Header.Header()
+        self.header = roslib.msg._Header.Header()
       end = 0
       _x = self
       start = end
