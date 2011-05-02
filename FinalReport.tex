@@ -37,10 +37,6 @@ These constraints are imposed to improve the accuracy of the CSpace map, and to 
 For future improvements, we are considering methods of clearing places on the CSpace map which are no longer occupied.
 In general the procedure for clearing old points would be to assume that any point between the LIDAR sensor and a nearby ping (within 10 m) is now clear because it would be impossible for an object to occupy a space near the LIDAR sensor and not get hit by a ping.
 
-\lstinputlisting[caption=LIDAR Mapper,
-    label={mapper.cpp},
-    breaklines=true,
-  ]{delta/src/mapper.cpp}
 
 \subsection{Camera Calibration}
 
@@ -52,20 +48,12 @@ Second, in the camera callback, the program searches for an orange blob that loo
 
 The node runs until 120 correspondences between LIDAR and the camera are found.  Camera calibration then uses the OpenCV function findHomography to get a transformation matrix between camera coordinates and base link coordinates.  This matrix is saved to file for use in other nodes. 
 
-\lstinputlisting[caption=Camera Calibration,
-    label={robust_calibration.cpp},
-    breaklines=true,
-  ]{delta/src/vision/robust_calibration.cpp}
-
 \subsection{Camera}
 
 The camera node subscribes to the feed from Jinx's front camera.  It publishes a cloud of orange points in map coordinates.  On startup, the node loads the transformation matrix that was previously calibrated by the camera calibration node.  The main action happens whenever the node receives a new image from the camera.  First, it normalizes the colors and applies thresholds to create a binary matrix containing only points that satisfy the criteria for orange.  Next, the OpenCV function findContours is called.  This reduces orange blobs to their outlines, drastically reducing the number of points returned.
 Finally, the point cloud is transformed to map coordinates and published for use in the mapper node.
 
-\lstinputlisting[caption=Camera,
-    label={camera.cpp},
-    breaklines=true,
-  ]{delta/src/camera.cpp}
+
 
 \subsection{Path Planner}
 
@@ -119,23 +107,37 @@ The CSpaceFuncs file contains two functions for the manipulation of CSpace maps.
 \section{Discussion}
 \subsection{Observation of Performance}
 
-At present, the robot is able to navigate down an empty hallway, or a hallway with 1 obstacle.  There were bugs that occured if it was allowed to do multiple swerves, so that feature was disabled for the demo.
-The Path Planner does not attempt to see if a swerve is clear because it operates under the assumption that swerving a fixed amount to the left will clear an obstacle.  
-This assumption will not necessarily always be true, and if it isn't, the robot could crash into obstacles while attempting to swerve.
-The robot does not follow as close to the wall as it should.  This comes from it not actually pathfinding.  The path is just harcoded.
+We demonstrated that we could successfully navigate down the hallway with obstacles found using LIDAR.  
+The robot was able to find the path entirely on its own, but it shaked and shuddered for reasons which will be discussed in the Bug Report.
+Also, the planner node will die if there is no path, which will result in the other nodes driving the last valid path that planner put out before it died.  
+The old path will likely not know about all of the obstacles in its way, so the robot will drive into things in this case, and should be stopped immediately on the death of the planner node.
+We believe that it can also find obstacles using the cameras, but we only observed this behavior on a bag file and not on the actual robot.
+There was not enough time to do test the camera's functionality before the final demo, when tested on the bag file, the camera node appeared to send coordinates to the mapper node in a way that resulted in a plausible CSpace map.
+Furthermore, we know that the planner node can find paths successfully, therefore it is plausible to believe that we had the vision portion of the demo working as well.
+
 
 \subsection{Bug Report}
 
-There were a number of hacks that were done at the last minute to get the demo working.  We can only do 1 swerve currently. 
-The size of the patch on the CSpace map was reduced because the robot somtimes got confused while going down the hallway.
-the sizes of the turns were reduced because the robot was hitting the walls.
-In general, there were a number of issues that resulted from planner just being a dumb planner, and many of our hacks will not be needed in future tests.
+There is a not well understood error in the interaction of the planner and the path crawler which only occurs when we attempt to repath on a curve or turn in place. 
+The bug seemed to prevent the path from being followed at all.
+Luckily for us, the bug did not appear to manifest with straight lines, so we just drove all of our paths with no turns and allowed the steering node to make up the difference.
+This did not work terribly well because the steering node does not know how to steer correctly when the heading error is nearly perpindicular, and resulted in the shuddering and shaking which was observed when we ran the demo in the simulator and on an actual robot.
+
+The planner node had an additional bug which could have been fixed with some work, but usually wasn't an issue.  
+In the case that no path exists, planner will crash because it attempts to read from a priority_queue which has no elements.
+The simplest fix would be to raise the WALL_THRESHOLD value, which would then allow the planner to invent a path even if it went through a known wall.  
+This fix is obviously sub-optimal because planner would deliberately make paths through walls.
+The failure mode for the death of planner is also an issue because the surviving nodes will attempt to follow the last known path, which almost certainly results in collisions.
+Overall, this wasn't an issue because the hallway was wide enough in the demo, and we had an emergency stop button to kill the power to the motors.
+
+
+The mapper node also sometimes died on initialization, but only some of the time, and the cause was never fully investigated because more than likely, just restarting all of the nodes would make it run just fine.
 
 \subsection{Group Policies and Ideas for Improvement}
 
 In general, our group has found it very useful to make use of version control systems and online backup, in particular, github.
 We decided as a group that all positions will be in the map frame with the same origin across all nodes to reduce possible transform erros.
 In addition, we found that OpenCV is rather convienent to use, and it is our opinion that we should replace all of the CSpace message types with OpenCV matrices or sparse matrices due to their convienence of use.
-
+We have noted though that the OpenCV documentation is not accurate for the version included in CTurtle, so it is our recommendation that the class be switched over to Diamondback at the soonest possible time because the documentation appears to be much more accurate for that version.
 
 \end{document}
