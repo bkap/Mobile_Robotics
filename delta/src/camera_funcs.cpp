@@ -208,6 +208,8 @@ list<Point2f> linesToNastyPolyLine(list<Point2f> Lines, double IMAGE_ORIGIN_X, d
 }
 
 //Cleans the PolyLine, may not be necessary after all.
+//this ended up not being used in the final, but it was used in the line following demo
+//was also copied into planner because we thought we might use it for path smoothing there too, but we ended up not because we used approxPolyDP instead.
 list<Point2f> cleanNastyPolyLine(list<Point2f> NastyPolyLine, int NumRemaining)
 {
 	list<Point2f>::iterator leastSignificant;
