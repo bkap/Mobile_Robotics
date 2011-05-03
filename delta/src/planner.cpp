@@ -50,6 +50,8 @@ int goalnum = 0;
 geometry_msgs::Pose des_pose;
 double distanceOnSeg = 0.0;
 
+//the only one of these used is lastCSpace_CharMap, which is the map handed to us by mapper
+//used to do path planning, where CHAR_MIN is clear area, 0 is unknown, and CHAR_MAX is a wall.
 cv::Mat_<bool> *lastCSpace_Map;
 cv::Mat_<bool> *lastVISION_Map;
 cv::Mat_<bool> *lastSONAR_Map;
@@ -69,6 +71,8 @@ bool goalPosecalled = false;
 bool poseActualcalled = false;
 bool pointListcalled = true;
 
+
+//converts between coordinate systems.
 Point3f convertGridToMapCoords(Point2i grid) {
 	Point3f mapcoords;
 
@@ -79,9 +83,13 @@ Point3f convertGridToMapCoords(Point2i grid) {
 	mapcoords.z = 0;
 	return mapcoords;
 }
+
+//converts between coordinate systems.
 Point3f convertGridToMapCoords(Point2f grid) {
 	return convertGridToMapCoords(Point2i((int)grid.x, (int)grid.y));
 }
+
+//converts between coordinate systems.
 Point2i convertMapToGridCoords(Point3f map) {
 
 	cout<<"Map Resolution "<<mapResolution<<"\n";
@@ -91,6 +99,8 @@ Point2i convertMapToGridCoords(Point3f map) {
 	gridcoords.y = (int)((map.y - mapOrigin.position.y) / mapResolution);
 	return gridcoords;
 }
+
+//converts between coordinate systems.
 // Point type conversions
 geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
 {
@@ -101,6 +111,7 @@ geometry_msgs::Point convertPoint3fToGeoPoint(Point3f p3f)
     return geopt;
 }
 
+//converts between coordinate systems.
 Point3f convertGeoPointToPoint3f(geometry_msgs::Point geopt)
 {
     Point3f p3f;
@@ -110,6 +121,7 @@ Point3f convertGeoPointToPoint3f(geometry_msgs::Point geopt)
     return p3f;
 }
 
+//converts between coordinate systems.
 Point3f convertGeoPointToPoint3f(geometry_msgs::Point32 geopt)
 {
     Point3f p3f;
@@ -119,6 +131,7 @@ Point3f convertGeoPointToPoint3f(geometry_msgs::Point32 geopt)
     return p3f;
 }
 
+//converts between coordinate systems.
 Point2i convertGeoPointToPoint2i(geometry_msgs::Point32 geopt)
 {
 	
@@ -142,6 +155,7 @@ float dotProduct(Point3f A, Point3f B)
 {
     return A.x*B.x + A.y*B.y + A.z*B.z;
 }
+
 
 // Make a line from A to B
 PathSegment MakeLine(Point3f A, Point3f B, int SegNum)
@@ -172,6 +186,7 @@ PathSegment MakeLine(Point3f A, Point3f B, int SegNum)
 	return P;
 }
 
+//*UNUSED* I THINK
 // Generate a turn in place given an initial heading, a final heading, and a point to turn on.
 PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_point, int SegNum)
 {
@@ -204,6 +219,7 @@ PathSegment MakeTurnInPlace (double InitAngle, double FinalAngle, Point3f ref_po
 	return P;
 }
 
+//*UNUSED* I THINK
 // Make a curve given initial and final headings as well as start and end points
 PathSegment MakeCurve(double InitAngle, double FinalAngle, Point3f A, Point3f B, int SegNum)
 {
@@ -257,6 +273,7 @@ double getHeading(Point3f a, Point3f b)
     return atan((b.x-a.x)/(b.y-a.y));
 }
 
+//*UNUSED* I THINK
 // Take three points, return a smooth path with an arc by the middle one
 // replacing shady vector math of GetCurveAndLines with slightly less shady trigonometry
 void GetCurveAndLines2(Point3f a, Point3f b, Point3f c, PathSegment* line1, PathSegment* curve, PathSegment* line2, int* segNum)
@@ -372,11 +389,17 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 		int startLoop = 1;
 		cout<<"PLANNER:if condition that checks for null\n";
 		if(segnum!=0) {
+
+			//should we move on to the next goal?
 			if(segnum >= goalSegnums[goalnum ]-1) {
 				goalnum++;
 			}
+
+			//startLoop is the goal that we are using first
 			startLoop = goalnum + 1;
 			turns.path_list.clear();
+
+			//copy the old path in up to the current path segment
 			for(int i = 0; i < segnum; i++) {
 				turns.path_list.push_back(prevList.path_list[i]);
 			}
@@ -389,7 +412,7 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 				startPoint = convertGeoPointToPoint3f(des_pose.position);
 
 				heading = tf::getYaw(des_pose.orientation);
-		
+		//find out where we are starting from, and the type that we are on
 				if(oldSeg.seg_type == 1) {
 					//it's a line
 					//probably shouldn't hardcode acceleration, but we have to
@@ -421,15 +444,22 @@ PathList callAStar(sensor_msgs::PointCloud pointList, double initial_heading)
 cout<<"PLANNER:calling a*\n";
 		for(uint i = startLoop; i < pointList.points.size(); i++) {
 		cout<<i<<"\n";
+
+		//this is where the actual call to A* happens, and it returns a series of points in CSpace map coordinates
     		vector<Point2i> segPts = aStar(mapChar, convertMapToGridCoords(startPoint), convertGeoPointToPoint2i(pointList.points[i]));
+
+		//convert those coordinates to floats, so that they can be used by approxPolyDP
 			vector<Point2f> path2;
 		for(int z = 0; z<(int)segPts.size(); z++)
 		{
 			path2.push_back(Point2f(segPts[z].x, segPts[z].y));
 		}
 	
+		//this approximation makes the path a little smoother, which is necessary because we are not doing turns, which causes issues for the steering node due to perpindicular paths. The tradeoff here is that the path is less like the one that A* put out which was a very safe path, therefore the approximate path is a bit less safe even if it is easier to drive.  We decided that 1.5 squares, or 7.5 cm was a reasonable threshold to use.
 		approxPolyDP(Mat(path2), path2, 1.5, false);
 
+
+		//convert to map coordinates
 			vector<Point3f> mapPts(path2.size());
 		cout<<"PLANNER:transform\n";
 
@@ -453,9 +483,12 @@ cout<<"PLANNER:calling a*\n";
 			PathList pathseg = insertTurns(heading, mapPts, turns.path_list.size());
 			
 			cout<<"inserted turns\n";
+
 			for (uint j=0; j<pathseg.path_list.size(); j++)
 				turns.path_list.push_back(pathseg.path_list[j]);
 			cout<<"did some shit in a for loop\n";
+
+			//modify the segment that we are on because we can cut it short if we need to re-path
 			PathSegment lastSeg = turns.path_list[turns.path_list.size() - 1];
 			cout<<"made a lastSeg\n";
 			switch(lastSeg.seg_type) {
@@ -502,13 +535,19 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	//ROS_INFO("temp created with size %d x %d",temp.rows,temp.cols);
 	//temp.data = (uchar*) &(CSpace_Map->data[0]);
 	//cout<<"WTFWTFWTF\n";
+
+	//copy the occupancy grid from to a mat that we have reserved because we want to use the opencv stuff.
 	for(int i = 0; i<(int)cspace.data.size(); i++)
 	{
 		lastCSpace_CharMap(i/lastCSpace_CharMap.cols, i%lastCSpace_CharMap.cols)=(char)cspace.data[i];
 	}
 
+	//make a temp mat
 	Mat_<int> map2 = Mat::zeros(900, 900, CV_32S);
 	
+
+	//copy the values over because convertTo doesn't work properly in CTurtle
+	//this was just used for visualization purposes
 	for(int i = 0; i<900; i++)
 	{
 		for(int j = 0; j<900; j++)
@@ -531,6 +570,8 @@ void LIDAR_Callback(const boost::shared_ptr<nav_msgs::OccupancyGrid  const>& CSp
 	mapResolution = cspace.info.resolution;
 	LIDARcalled = true;
 }
+
+//get the current segment number from the desired path crawler
 void segnum_Callback(const eecs376_msgs::CrawlerDesiredState::ConstPtr& crawledState) {
 	segnum = (*crawledState).seg_number+1;
 	distanceOnSeg = (*crawledState).des_lseg;
@@ -547,22 +588,30 @@ void VISION_Callback(const boost::shared_ptr<cv::Mat  const>& VISION_Map)
 	lastVISION_Map = *VISION_Map;
 }
 */
+
+//get the actual position from the pso
 void poseActual_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseActual) 
 {
 	poseActual = *newPoseActual;
 	poseActualcalled=true;
 }
+
+//get the poseDes from crawler
 void poseDes_Callback(const geometry_msgs::PoseStamped::ConstPtr& newPoseDes)
 {
 	poseDes = *newPoseDes;
 	poseDescalled = true;
 }
+
+//this gets the goalPose from goalPublisher->not used
 void goalPose_Callback(const geometry_msgs::Pose::ConstPtr& newGoalPose)
 {
 	goalPose = *newGoalPose;
 	goalPosecalled = true;
 }
 
+//get a pointcloud of things that the camera was finding
+//pretty sure that this was last used in the line following demo
 void pointList_Callback(const sensor_msgs::PointCloud::ConstPtr& newPointList)
 {
     //pointList = *newPointList;
@@ -592,6 +641,7 @@ int main(int argc,char **argv)
 	visualization_msgs::MarkerArray markers;
 	
 	// hax to test
+	// makes sure that we have a pso running
 	while(!poseActualcalled) {ros::spinOnce();}
 
 
@@ -608,6 +658,8 @@ int main(int argc,char **argv)
 	// goal points (these need changed for actual demo)
 	geometry_msgs::Point32 p;
 		
+	//add three goal points to the planner for us to attempt to go to.
+
 	//along front
 	//p.x = 4.326;
 	//p.y = 4.26;
@@ -664,6 +716,7 @@ int main(int argc,char **argv)
 	    if(LIDARcalled && goalPosecalled && pointListcalled) {
 		    if(!poseDescalled) {
 			    //this means we haven't used yet, so use our actual pose
+			    //and by actual pose, we mean some hard coded holdover from a very old demo
 			    poseDes.pose.position.x = 7.57;
 			    poseDes.pose.position.y = 14.26;
 			    poseDes.pose.orientation =  tf::createQuaternionMsgFromYaw(-2.361);
@@ -686,11 +739,15 @@ int main(int argc,char **argv)
 	
 		    //PathList turns = bugAlgorithm(lastCSpace_Map, Point2d(goalPose.position.x, goalPose.position.y),poseDes, mapOrigin);
 		    //PathList turns = joinPoints(initial_heading,pointList);
+
+			//the callAStar function calls A* once to go to the first goal, and then more times to go to subsequent goals, and returns a pathList that can be published
 			cout<<"PLANNER:calling A*\n";
 			PathList turns = callAStar(pointList, initial_heading);
 			cout<<"PLANNER:called A*\n";
 			// Publish a visualization of the points
 			//markers = visualizePoints(turns)
+
+			//publish said pathList
 			vis_pub.publish(markers);
 		
 		    cout<<"publishing\n";

@@ -34,14 +34,17 @@ vector<Point2i> aStar (Mat_<char>& map, Point2i start, Point2i end);
 vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution);
 vector<Point2f> reducePoints(vector<Point2f> victor);
 
+
+//The node class is for use in the A* search.  Each instance of the class is a point we have found and a possible member of the 2D array which represents the set of expanded points
 class Node
 {
 	public:
-	int x, y;
-	Node* parent;
-	double heuristic;
-	double pathCost;
+	int x, y; //the x and y coordinates of the node
+	Node* parent; // a pointer to the node that this was spawned off of. a recursive call can then generate a path trivially.
+	double heuristic;//a place to store a heuristic function's value
+	double pathCost;//a place to store the total path cost
 	
+	//normal constructor
 	Node(int x, int y, Node* parent, double heuristic, double pathCost)
 	{
 		this->x = x;
@@ -51,6 +54,7 @@ class Node
 		this->pathCost = pathCost;
 	}
 	
+	//copy constructor
 	Node(const Node& N)
 	{
 		this->x = N.x;
@@ -60,6 +64,7 @@ class Node
 		this->pathCost = N.pathCost;
 	}
 
+	//default constructor which ought not to be used
 	Node()
 	{
 		x = y = -1;

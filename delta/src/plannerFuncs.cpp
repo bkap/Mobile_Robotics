@@ -27,24 +27,28 @@ using namespace std;
 
 using namespace eecs376_msgs;
 
+//a heuristic function based on euclidean distance.  much less important than the path cost because of how path cost is defined
 inline double heuristic(int x, int y, Point2i goal) {
 	Point2i nodePoint(x, y);
 	return norm(nodePoint - goal);
 }
 
+//computes the cost of this node, given the previous node's (expanding's) cost, and a value between 0 and 255 which roughly represents the likleyhood of a collision.  Due to how this is defined, the saftey of a path is weighted as being much more important than the shortness of the path.
 inline double cost(Node expanding, double locCost) {
-	return expanding.pathCost+locCost;//+ exp(locCost/20.0);
+	return expanding.pathCost+locCost;
 }
 
 
+//this operator is defined in a strange way because the default c++ implementation requires a less than operator to be defined, but is a max-heap.  We just defined < as > which turned it into a min heap, which is required for A* search to function correctly.
 bool operator<(Node a, Node b) 
 {
 	return a.heuristic+a.pathCost > b.heuristic + b.pathCost;
 }
 
-#define WALL_THRESHOLD 130
+#define WALL_THRESHOLD 130 //anything greater than or equal to this number is a wall and planner will not attempt to pass through it.
+//can result in crashes if no path exists
 
-
+//gets the nearest neighbors in a vector of nodes, takes a node previous which we are finding the neighbors of, the current map so it can find path costs, the current nodeList so it can check for membership in the expanded set, and a goal so it can find a value for the heuristic function.
 vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point2i goal) {
 	vector<Node> nodes;
 
@@ -55,10 +59,10 @@ vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point
 		
 		if(newX >= 0 && newX < map.rows && newY >= 0 && newY < map.cols) {
 			//okay, we're on the map. Now let's check to see if we're allowed
-			//to move here
-		
-			if(nodeList[newX][newY] == NULL && map(newX,newY) < WALL_THRESHOLD) {
+			//to move here, based on the set of expanded nodes and the wall threhold
 			
+			if(nodeList[newX][newY] == NULL && map(newX,newY) < WALL_THRESHOLD) {
+				//yay, we are allowed, make a new node
 				Node n;
 				n.pathCost = cost(previous,map(newX,newY));
 				n.heuristic = heuristic(newX, newY, goal);
@@ -72,14 +76,17 @@ vector<Node> getNeighbors(Node previous, Mat_<int> &map, Node*** nodeList, Point
 	return nodes;
 }
 
+//the actual aStar search itself, takes the CSpace map, a start point and an end point, and attempts to find a path between them
 vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 {
 	ROS_INFO("astar: map size %dx%d",map_.rows,map_.cols);
 	cout<<"start x,y "<<start.x<<","<<start.y<<"\n";
 	cout<<"end x,y "<<end.x<<","<<end.y<<"\n";
-	Node*** nodeList;
-	priority_queue<Node> Q;
+	Node*** nodeList; //a triple pointer gives us a 2D array of pointers so we can just check to see if a thing exists in it by seeing if nodeList[x][y]!=NULL
+	priority_queue<Node> Q;//the priority queue that C++ gives us, note that it is a min heap only due to operator overloading
 	cout<<"a*1\n";
+
+	// we need to convert from the format that the mapper hands us to a format that has 0 as the min not CHAR_MIN because A* doesn't work well if there exist negative path lengths
 	Mat_<int> map = Mat::zeros(map_.rows, map_.cols, CV_32S);
 	
 	for(int i = 0; i<map.cols; i++)
@@ -90,7 +97,8 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		}
 	}
 	
-	nodeList = (Node***) calloc(map.rows, sizeof(Node**));
+	//initialize everything to NULL indicating that there are no nodes in the table
+	nodeList = (Node***) calloc(map.rows, sizeof(Node**)); 
 	cout<<"map rows, cols "<<map.rows<<","<<map.cols<<"\n";
 	for(int i = 0; i<map.rows; i++)
 	{
@@ -102,14 +110,20 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	//map.copyTo(temp);
 	cout<<"a*3\n";
 	//temp.convertTo(map, CV_32S, 1, 129);
+
+	//I don't know why we need this transpose, but we seem to have transposed things along the way, and this fixes the issue.
 	map = map.t();
 	//expand start
 	cout<<"a*4\n";
+
+	//do a start node, and expand it
 	double h = heuristic(start.x,start.y,end);
 	cout<<"heuristic of "<<h<<"\n";
 	nodeList[start.x][start.y] = new Node(start.x, start.y, NULL, h, 0);
 	//add all nearby start to the priority queue
 	cout<<"a*4a\n";
+
+	//get the neighbors of this start node and add them to the priority queue
 	vector<Node> neighbors = getNeighbors(*(nodeList[start.x][start.y]), map, nodeList, end);
 	cout<<"a*4b\n";
 	for(int i = 0; i<(int)neighbors.size(); i++)
@@ -117,6 +131,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		Q.push(neighbors[i]);
 	}
 	cout<<"a*5\n";
+
 	//while we have not found the path, 
 	bool done = false;
 	Node *current = new Node();
@@ -125,16 +140,20 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		//expand the best thing in the priority queue
 		*current = Q.top();
 		
-		if(Q.size()==0) 
+		if(Q.size()==0) //see if we are about to die...
 		{
+			//give an error message if there is no path
+			//the node may die at this point, then again, it might not... who knows
+			//we assume that a valid path exists due to how the professor phrased the problem, so this should never be an issue, in theory, maybe, yeah...
 			cout<<"AAAWWWW SHIIIITTTT!!!! THERE IS NO VALID PATH WTF WTF WTF!!!!!!!!!!!!!\n";
 			break;
 		}
-		else Q.pop();
+		else Q.pop();//remove it because we don't need it anymore
 		
 		if(nodeList[current->x][current->y]!=NULL) continue;
 		nodeList[current->x][current->y] =  new Node(*current);
 		
+		//check to see if we are at the end
 		if(current->x == end.x&&current->y == end.y)
 		{
 			done = true;
@@ -164,7 +183,7 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	//make list into vector and return it.
 	vector<Point2i> pathVec (pathList.begin(),pathList.end());
 	
-	
+	//free stuff so we don't memory leak
 	for(int i = 0; i<map.rows; i++)
 	{
 		for(int j = 0; j<map.cols; j++)
@@ -178,6 +197,8 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	}
 	
 	free(nodeList);
+
+	//map2 was sometimes used to visualize stuff
 	Mat_<int> map2 = Mat::zeros(map.rows, map.cols, CV_32S);
 	
 	for(int i = 0; i<map.cols; i++)
@@ -190,6 +211,8 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 		}
 	}
 
+
+//MORE DEFUNCT CODE IN A BIG BLOCK
 	/*		vector<Point2f> path2;
 		for(int z = 0; z<(int)pathVec.size(); z++)
 		{
@@ -208,10 +231,13 @@ vector<Point2i> aStar (Mat_<char> &map_, Point2i start, Point2i end)
 	//imshow("PATH",map_);
 	//waitKey(2);
 */
+
+//return the vector 
 	//delete current;
 	return pathVec;
 }
 
+//converts a vector named victor to map coordinates from CSpace coordinates.  I don't know if this is used or not... it seems like duplicates exist.
 vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double resolution)
 {
 	vector<Point2f> RetVal;
@@ -222,6 +248,7 @@ vector<Point2f> convertToMap(vector<Point2i> victor, Point2f origin, double reso
 	return RetVal;
 }
 
+// the pathnode may have been used at some point in time for a smoothing algorithm that we found in a medical imaging journal. Probably not used
 class PathNode
 {
 	public:
@@ -235,6 +262,10 @@ bool operator<(PathNode A, PathNode B)
 	return A.Significance<B.Significance;
 }
 
+//this was the supposed path cleaning algorithm... wasn't used.
+// see: http://www.google.com/url?sa=t&source=web&cd=7&ved=0CEAQFjAG&url=http%3A%2F%2Fciteseerx.ist.psu.edu%2Fviewdoc%2Fdownload%3Fdoi%3D10.1.1.1.8427%26rep%3Drep1%26type%3Dpdf&rct=j&q=remove%20insignificant%20line%20segments&ei=COd7TbTqDqrC0QGFwp30Aw&usg=AFQjCNFN6JN0kmN5l74DigQxRgSx9ApiEQ
+
+//this code was used in the line following demo, but isn't currently used.  it did indeed work then... but yeah, ugly code
 vector<Point2f> cleanPath(vector<Point2f> NastyPolyLineOrig, int NumRemaining)
 {
 	list<Point2f> NastyPolyLine(NastyPolyLineOrig.begin(), NastyPolyLineOrig.end());
@@ -245,6 +276,8 @@ vector<Point2f> cleanPath(vector<Point2f> NastyPolyLineOrig, int NumRemaining)
 	{
 		//cout<<"loopin "<<i++<<"\n";
 		minSignif = 10000000; 
+
+		//HOORAY FOR ITERATORS.  THEY DON'T HAVE A NEXT OR PREVIOUS POINTER WTF WTF WTF!!!!!!!
 		for (list<Point2f>::iterator it=++(++(NastyPolyLine.begin())); it!=--(NastyPolyLine.end()); it++)
 		{
 			Point2f A = (*(--it))-(*(++it));
