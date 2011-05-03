@@ -28,33 +28,39 @@ When it was given to us, it initially used the odom frame, but we decided that w
 It was changed very little since the midterm. The only changes to it are changes in indentation and minor bugfixes.
 
 
-\subsection{LIDAR Mapper}
+\subsection{Mapper}
 
-The LIDARmapper subscribes to LIDARCloud and publishes LIDARMap, the fattened CSpace map.
-The CSPace is returned as an OccupancyGrid with an origin at -10,-10 and height and width 35 in the map frame to contain the entire area of interest for this assignment.
-The points in the point cloud are fattened by ORing a pre-generated template containing a disk of radius 15cm with the pixel containing the ping and its' neighbors.
-Only pings within 10m of the robot are considered and only points for which the entirety of the fattened area would lie within the grid are added to the map.
-These constraints are imposed to improve the accuracy of the CSpace map, and to prevent overflowing the array respectively.
-For future improvements, we are considering methods of clearing places on the CSpace map which are no longer occupied.
-In general the procedure for clearing old points would be to assume that any point between the LIDAR sensor and a nearby ping (within 10 m) is now clear because it would be impossible for an object to occupy a space near the LIDAR sensor and not get hit by a ping.
+The mapper subscribes to LIDAR_Cloud, Camera_Cloud,camera_view and odom and publishes CSPaceMap, map_cam, and map_lid.  map_cam and map_lid, the individual sensor grids, are published solely for debug purposed and are subscribed to only by rviz.
+I made the camera_view topic because it made more sense for the camera to tell the mapper what it could see than it did for the mapper to calculate it.
+The values in cells of the grid correspond to the available sensor information: 0 indicates no information, while positive numbers indicate likely obstacles and negative numbers indicate likely free space.
+Internally, the camera and lidar occupancies are maintained on separate grids to prevent conflicts when only one sensor can detect an obstacle.
+Clearing of the camera grid is performed for the entire viewable area assuming a trapezoidal view calculated from the robot location and camera calibration
+LIDAR clearing is performed via raytracing from the current robot location to the pings
+To prevent improper projection of tall objects onto the ground plane by camera, only camera points which lie within the area most recently swept out by LIDAR pings are incorporated into the grid, since others are quite likely not on the ground.
+The mapper has two modes of operation with regard to occupancy calculation and a flag set in the file switches between them.  We did not demo the additive mode, but it has been tested thoroughly.  In the additive mode, each fattened ping increments the appropriate cells on the sensor grid by the FILL_RATE, with a gaussian decay outward to the fattening radius.  When the ADDITIVE flag is not set, a patch instead assigns the max of its value and the present occupancy at each appropriate cell.  This approach provides a few advantages over the additive approach.  The primary advanage is that setting rather than incrementing guarantees that the grid will not saturate and that there will be a smooth gaussian decay with distance from obstacles.  This allows the path planner to provide paths that preferentially steer away from obstacles rather than merely not intersecting and also allows smoother performance when adjusting the parameter in planner which specifies the maximum traversable occupancy value.  However, strictly setting the occupancy results in much greater sensitivity to spurious sensor readings than incrementing, which mitigates the effect of a single outlier.
 
+A potential improvement to the current implementation would be to use incremental filling with a solid disk rather than a gaussian one and apply a gaussian blur to the merged occupancy grid before publishing.  This may permit the robustness benefits of both the incremental filling and clearing and the planning benefits of the setting, but might be too expensive with the gaussian blur of the entire grid calculated at teh publishing rate rather than once for the precomputed patch.
 
 \subsection{Camera Calibration}
+calibration subscribes to LIDAR and the camera
+The camera calibration procedure uses identified correspondances between the LIDAR data and camera data to compute several transformation matrices.
+The primary transformation calculated (and the only one used elsewhere) is the homography between the image plane and base_link coordinate system.
+Additional transformations include the plan-view transform using view image specifications (physical pixel size and image physical extents) specified as parameters to the calibration procedure and a transform from the birdseye image plane to base_link co-ordinates
 
-The camera calibration node is run separately from the rest of the program.  It subscribes to the front camera and the LIDAR.  This node's goal is to find a number of points of correspondence between the camera and LIDAR.  It runs a LIDAR callback and a camera callback simultaneously to find these points.
+Use of openCV's homography matrices and associated transform functions obviates the need for use of homogeneous co-ordinates, which are handled internally, and 	implements RANSAC in the determination of the transforms.
 
-First, in the LIDAR callback, the program searches for a rectangular feature that looks like the calibration rod.  It uses criteria of minimum separation from surroundings, minimum and maximum width, and maximum slope to discriminate the rod from the LIDAR scans.  If the rod is found, its location is recorded.
-
-Second, in the camera callback, the program searches for an orange blob that looks like the base of the calibration rod.  The camera callback normalizes colors and uses the cvBlob library to search for orange blobs.  If the camera callback successfully finds an orange blob, it checks whether the LIDAR callback found the rod on its last iteration.  If the camera callback and the LIDAR callback both simultaneously found points, those points are stored as a correspondence.
-
-The node runs until 120 correspondences between LIDAR and the camera are found.  Camera calibration then uses the OpenCV function findHomography to get a transformation matrix between camera coordinates and base link coordinates.  This matrix is saved to file for use in other nodes. 
+potential correspondences are identified in the LIDAR by searching for closely grouped pings, which differ from each other by no more than a few centimeters and from pings to either side by no less than .4 meters.  Any group meeting these criteria is marked as a potential rod.
+Potential correspondences are identified in the images by identifying centroids of orange blobs.  Any such points are recorded.
+If, in the camera callback, both the most recent lidar scan and image show potential correspondences, the correspondence is confirmed and each point is pushed into its respective vector of correspondences.  This is done in the camera callback to guarantee that the image is fresh, which means that the robot has not travelled substantially between the corresponding sensor readings, since that would mess up the transform.
+When sufficient correspondences are recorded (currently a threshold of 120), the findHomography function from opencv is called to find the homography between the image plane and base_link co-ordinates.
 
 \subsection{Camera}
 
-The camera node subscribes to the feed from Jinx's front camera.  It publishes a cloud of orange points in map coordinates.  On startup, the node loads the transformation matrix that was previously calibrated by the camera calibration node.  The main action happens whenever the node receives a new image from the camera.  First, it normalizes the colors and applies thresholds to create a binary matrix containing only points that satisfy the criteria for orange.  Next, the OpenCV function findContours is called.  This reduces orange blobs to their outlines, drastically reducing the number of points returned.
-Finally, the point cloud is transformed to map coordinates and published for use in the mapper node.
-
-
+Camera subsribes to the rectified image stream and published Camera_cloud and camera_view.
+Camera_Cloud is a PointCloud in map frame which contains all pixels corresponding to borders of orange blobs identified by the camera
+camera_view is a PointCloud in map frame which contains points corresponding to the 4 corners of the currently viewable camera frame for use in mapper.
+On initialization, the node reads from the disk the homography matrix stored by camera calibration.  This matrix is the homography between the base_link co-ordinate system and the camera's pixel co-ordinate system.  It is used for determination of map location of desired pixels, including orange blobs and image corners.
+The node spins until receiving an image callback.  When a new image is recieved, the node normalizes and thresholds the colors to binarize the image and preserve only orange blobs.  Then, the contours are isolated and transformed into map co-ordinates for publishing.  Blob contours are used instead of centroids because the contour will carry accurate information about object extents even for extended and large objects.  Also, when the mapper masks non ground-plane camera points, certain extended objects not on lidar could disappear entirely if represented by a centroid.
 
 \subsection{Path Planner}
 
@@ -138,11 +144,8 @@ The planner node had an additional bug which could have been fixed with some wor
 In the case that no path exists, planner will crash because it attempts to read from a priority_queue which has no elements.
 The simplest fix would be to raise the WALL_THRESHOLD value, which would then allow the planner to invent a path even if it went through a known wall.  
 This fix is obviously sub-optimal because planner would deliberately make paths through walls.
-The failure mode for the death of planner is also an issue because the surviving nodes will attempt to follow the last known path, which almost certainly results in collisions.
-Overall, this wasn't an issue because the hallway was wide enough in the demo, and we had an emergency stop button to kill the power to the motors.
-
-
-The mapper node also sometimes died on initialization, but only some of the time, and the cause was never fully investigated because more than likely, just restarting all of the nodes would make it run just fine.
+The failure mode for the death of planner is also an issue because the surviving nodes will attempt to follow the last known path, which almost certainly results in the robot becoming stop when profiler emergency stops and no replanning occurs.  Luckily this did not happen much.
+Intermittently, the mapper dies on initialization.  Since it never dies during operation, it is likely that it fails to wait on something necessary, but we never looked into it since restarting the node fixed it and it ran stably once it initialized.
 
 \subsection{Group Policies and Ideas for Improvement}
 

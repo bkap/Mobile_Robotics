@@ -14,12 +14,13 @@ using namespace cv;
 using namespace std;
 
 
-#define PRECAL 0
+/*	Connor Balin
 
-/*
-	The code if(PRECAL){...} in the image callback converts the camera image to the birdseye view
+	The camera calibration procedure uses identified correspondances between the LIDAR data and camera data to compute several transformation matrices.
+	The primary transformation calculated (and the only one used elsewhere) is the homography between the image plane and base_link coordinate system.
+	Additional transformations include the plan-view transform using view image specifications (physical pixel size and image physical extents) specified as parameters 		to the calibration procedure and a transform from the birdseye image plane to base_link co-ordinates
 
-	perspectiveTransform(Mat(CoordsInCameraIJ),CoordsInBaseXY,viewToBase) transforms points from 		  the camera frame into base_link (no homogeneous co-ordinates needed)
+	Use of openCV's homography matrices and associated transform functions obviates the need for use of homogeneous co-ordinates, which are handled internally, and 	implements RANSAC in the determination of the transforms.
 */
 
 bool last_scan_valid; // This is set to true by the LIDAR callback if it detects a plausible location for the rod.
@@ -39,9 +40,11 @@ double ppm = 200;		//pixels/m in ortho image
 Size orthoImageSize(2 * orthoBounds.y * ppm + 1 , orthoBounds.x * ppm + 1);
 
 Mat lastImage;			//last image pulled from the callback
-Mat firstImage;
+Mat firstImage;			//first image pulled from the callback
 
-// Function reads an OpenCV Mat from disk
+/*
+	 Function reads an OpenCV Mat from disk
+*/
 template <typename T>
 void readMat(cv::Mat_<T>& mat, char* file){
 	ifstream* infile = new ifstream(file,ifstream::in|ifstream::binary);
@@ -60,7 +63,9 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	delete[] data;
 }
 
-// Function writes an OpenCV Mat to disk
+/*
+	Function writes an OpenCV Mat to disk
+*/
 template <typename T>
 void writeMat(cv::Mat_<T>& mat, char* file){
 	ofstream* ofile = new ofstream(file,ofstream::out|ofstream::binary);
@@ -73,7 +78,9 @@ void writeMat(cv::Mat_<T>& mat, char* file){
 	ofile->close();
 }
 
-// function prints an OpenCV mat for debugging
+/*
+	function prints an OpenCV mat for debugging
+*/
 template<typename T>
 void printMat(cv::Mat_<T>& mat, ostream stream = cout){
 	for(int i=0;i<mat.rows;i++){
@@ -111,7 +118,7 @@ DemoNode::DemoNode():
  * This function filters unwanted discontinuities from LIDAR scans.
  * For each point in the scan, if it is near max range, it is replaced by
  * the average of the two neighboring points.  This should reduce random
- * noise in the LIDAR scans due to some pings getting lost (assuming
+ * errors in the LIDAR scans due to some pings getting lost (assuming
  * that lost pings are assigned the value at max range)
  */
 int filterLIDAR(sensor_msgs::LaserScan& scan){
@@ -218,51 +225,47 @@ void DemoNode::lidarCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
 	sensor_msgs::LaserScan scan = *msg;
 	ROS_INFO("lidar callback starting");
-	//  cout<<"got scan in frame -> "<<scan.header.frame_id<<"\n";
 
-	// First, filter the laser scan to remove random bad pings.  Search through the laser scan, and pick out all points with max range.  Replace these points by the average of the two points on either side of the bad point.
-	int num_filtered = filterLIDAR(scan);
+	int num_filtered = filterLIDAR(scan);	//smooth out any spikes to max range and record number of fixed points
 	
-	// Check if you detect the calibration rod in this scan
-	bool foundRod = findRod(scan);
+	bool foundRod = findRod(scan);	// Check for detection of the calibration rod in this scan
 
 	if(foundRod){
 		ROS_INFO("LIDAR detected rod after smoothing %d bad points",num_filtered);
 	}
 }
 
-// Callback triggered by receiving an image message
+/*
+	The image callback
+*/
 void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
 	ROS_INFO("image callback starting");
-  static sensor_msgs::CvBridge bridge;
-  cv::Mat image;
-  cv::Mat output;
-  static bool first = true;
-  try
-  {
+  	static sensor_msgs::CvBridge bridge;
+  	cv::Mat image;
+  	cv::Mat output;
+  	static bool first = true;
+  	try
+  	{
 		image = cv::Mat(bridge.imgMsgToCv(msg,"bgr8"));
 	
-		/* code for flipping from harlie bag */  
-    //Mat im_ = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
-    //flip(im_,image,-1);
+		/* code for flipping from harlie bag */
+		// used a hack for flipping because accounting for all possible permutations of orientation made the transforms inconvenient  
+    		//Mat im_ = cv::Mat(bridge.imgMsgToCv(msg, "bgr8"));
+    		//flip(im_,image,-1);
 	  
-    lastImage = image.clone();
+    		lastImage = image.clone();
 
 		if(first)	firstImage = image.clone();
 		first = false;
 		ROS_INFO("converted image:\n\trxc:\t%dx%d\n\tdepth:\t%d",image.rows,image.cols,image.depth());
-  }
-  catch(...) //(sensor_msgs::CvBridgeException& e)
-  {
+	}
+	catch(...) //catch everything incase cvBridge messes up extra hard
+	{
 		ROS_ERROR("failed to convert");
-  }
-  try
-  {
-		//cvNamedWindow("image",CV_WINDOW_AUTOSIZE);
-		//imshow("image",image);
-		//waitKey(0);
-		
+	}
+	try
+	{
 		// Detect orange blobs
 		ROS_INFO("Image callback finding blob");
 		normalizeColors(image, output);
@@ -284,18 +287,17 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 			orthoImageSize.height - rodLocation.x * ppm,
 			(orthoImageSize.width-1)/2 - rodLocation.y * ppm));
 		}
-		if(PRECAL)
-		{
-			warpPerspective(image.t(),output,viewToOrthoInv,Size(orthoImageSize.height,orthoImageSize.width),WARP_INVERSE_MAP);
-			output = output.t();
-		}
+		/*	code for displaying plan-view transform if transforms are already around
+		warpPerspective(image.t(),output,viewToOrthoInv,Size(orthoImageSize.height,orthoImageSize.width),WARP_INVERSE_MAP);
+		output = output.t();
+		*/
 		
 		// Publish the image for visualization/debugging
 		IplImage temp = output;
 		image_pub_.publish(bridge.cvToImgMsg(&temp, "bgr8"));
 		ROS_INFO("ending blob finding");
 	}
-	catch (...)
+	catch (...)	//continue to catch everything incase cvBridge messes up extra hard
 	{
 	ROS_ERROR("failed for some reason");
 	}
@@ -304,31 +306,20 @@ void DemoNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 int main(int argc, char **argv)
 {
-
-
-	if(PRECAL)
-	{
-    //readMat<double>(viewToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/viewToBaseInv");
-    //readMat<double>(viewToOrthoInv,"/home/connor/Code/Mobile_Robotics/delta/viewToOrthoInv");
-    //readMat<double>(orthoToBaseInv,"/home/connor/Code/Mobile_Robotics/delta/orthoBaseInv");
-	}
-  ros::init(argc, argv, "robust_calibration");
-  DemoNode motion_tracker;
-  cvNamedWindow("birdseye",CV_WINDOW_AUTOSIZE); //these cv* calls are need if you want to use cv::imshow anywhere in your program
-  //cvStartWindowThread();
-  ROS_INFO("Calibration procedure started");
-  ros::Rate naptime(75);
+	ros::init(argc, argv, "robust_calibration");
+	DemoNode motion_tracker;
+	cvNamedWindow("birdseye",CV_WINDOW_AUTOSIZE); //these cv* calls are need if you want to use cv::imshow anywhere in your program
+	//cvStartWindowThread();
+	ROS_INFO("Calibration procedure started");
+	ros::Rate naptime(75);
 
 	// Wait for the callbacks to run until you've acquired enough calibration points
-  while(ros::ok() && (PRECAL || viewIJ.size()<120))
-  {
-    naptime.sleep();
-  	ros::spinOnce();
-  }
-  
-	if(PRECAL){
-		return 0;
+	while(ros::ok() && viewIJ.size()<120)
+	{
+		naptime.sleep();
+		ros::spinOnce();
 	}
+  
 	ROS_INFO("beginning calibration");
 
 	/*	Initialization	*/
@@ -357,13 +348,18 @@ int main(int argc, char **argv)
 
 	Mat_<Point2f> orthoCornersIJ_,viewCornersBaseXY_;
 	vector<unsigned char> mask1,mask2,mask3;
+
 	/*	Computation	*/
 	//transform between camera pixel co-ordinates and base_link (x,y)
 	Mat_<double> viewToBaseInv = findHomography(baseXY_,viewIJ_,mask1,RANSAC,10);	
+
 	//transform between camera and birds-eye pixel co-ordinates
 	Mat_<double> viewToOrthoInv= findHomography(birdsIJ_,viewIJ_,mask2,RANSAC,10);	
+
 	//transform between birds-eye pixel co-ordinates and base_link (x,y)
 	Mat_<double> orthoToBaseInv= findHomography(baseXY_,birdsIJ_,mask3,RANSAC,10);	
+
+	//transforms going the other way
 	Mat_<double> orthoToBase,viewToBase,viewToOrtho;
 	invert(orthoToBaseInv,orthoToBase);
 	invert(viewToBaseInv,viewToBase); 
@@ -390,6 +386,7 @@ int main(int argc, char **argv)
 	perspectiveTransform(Mat(viewCornersIJ),orthoCornersIJ_,viewToOrtho);
 	//cout<<"project view pixels:\n"<<Mat(viewCornersIJ)<<"\nto birds-eye pixels:\n"<<orthoCornersIJ_<<endl<<endl;
 
+	//display the first image after applying the plan-view transform to verify transform corrrectness
 	Mat out_;
 	warpPerspective(firstImage.t(),out_,viewToOrtho,Size(orthoImageSize.height,orthoImageSize.width));
 	out_=out_.t();
@@ -398,6 +395,6 @@ int main(int argc, char **argv)
 	waitKey(-1);
 
 	cout<<"got there"<<endl;
-    cvDestroyWindow("birdseye");
+	cvDestroyWindow("birdseye");
 	return 0;
 }

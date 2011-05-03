@@ -17,10 +17,30 @@
 #include "camera_funcs.h"
 #include "cvFuncs.h"
 
-#define CAMERA_ROI_FILE "cameraROI_base_link"
 
 using namespace cv;
 using namespace std;
+
+/*	Connor Balin
+	
+	The camera node identifies contours of orange things and tells the mapper about them.  It also tells the mapper where it can see.
+	Orange pixels are identified by thresholding the L1 normalized color.  Noise is reduced by killing small blobs and holes with sequential erosion and dilation
+	Boundary pixels of remaining blobs are determined by OpenCV's findContours.
+	The co-ordinates of these pixels are transformed into map co-ordinates and shoved into a PointCloud to be published.
+
+	The change from centroids to contours was made for because contours are better.
+	
+	First, centroids are a poor measure of the location or extents of large
+	or orange-ratchet-strap-like objects.  The mapper would have no reliable way of guaranteeing sufficient fattening based only on centroids.
+	
+	Secondly, contours are quite likely to have at least some points which lie on the ground, whereas the centroid pretty
+	much never lies on the ground for a sizable obstacle. This again increases the localization accuracy of the contour.
+	Since our mapper masks non-ground-plane camera points to the best of its ability, centroids of tall things would be thrown away.  While
+	for any single obstacle, this would not be a problem since the lidar picks it up, configurations involving abutting barrels and ribbons
+	could be constructed which would falsely fail to detect the ribbon if the centroid were thrown away and falsely project the barrel onto
+	the ground if it were not.
+	
+*/
 
 // Function to load a matrix from a file
 template <typename T>
@@ -41,8 +61,6 @@ void readMat(cv::Mat_<T>& mat, char* file){
 	delete[] data;
 }
 
-Mat cameraMat; //intrinsic parameters
-Mat distMat; //distortion parameters
 tf::TransformListener *tfl;
 
 class DemoNode {
@@ -67,29 +85,17 @@ class DemoNode {
 */
 void findOrange(cv::Mat& src,cv::Mat& dst)
 {
-  //Make a vector of Mats to hold the invidiual B,G,R channels
-  vector<Mat> mats;
-  //Split the input into 3 separate channels
-  split(src, mats);
-  // Set all values below value to zero, leave rest the same
-  // Then inverse binary threshold the remaining pixels
-  // Threshold blue channel
-  threshold(mats[0], mats[0], 60, 255, THRESH_TOZERO_INV);
-  threshold(mats[0], mats[0], 0, 255, THRESH_BINARY);
-  // Threshold green channel
-  threshold(mats[1], mats[1], 120, 255, THRESH_TOZERO_INV);
-  threshold(mats[1], mats[1], 0, 255, THRESH_BINARY);
-  // Threshold red channel
-  threshold(mats[2], mats[2], 255, 255, THRESH_TOZERO_INV);
-  threshold(mats[2], mats[2], 180, 255, THRESH_BINARY);
-  multiply(mats[0], mats[1], dst);
-  multiply(dst, mats[2], dst);
-  // Erode and dilate to get rid of noise
-  erode(dst, dst, Mat());
-  dilate(dst, dst, Mat(), Point(-1,-1), 7);
+	static const Scalar_<uchar> lower(0,0,180),
+				    upper(60,120,255);
+	inRange(src,lower,upper,dst);
+
+	// Erode and dilate to get rid of noise
+	erode(dst, dst, Mat());
+	dilate(dst, dst, Mat(), Point(-1,-1), 7);
 }
+
 /*
-	converts vector<Point2f> of camera coordinates to corresponding PointCloud in map coordinates
+	shoves a vector<Point2f> of camera coordinates into a PointCloud and transforms to map coordinates
 */
 void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCloud& mapCloud){
 
@@ -111,7 +117,10 @@ void DemoNode::transformPoints(vector<Point2f>& viewPoints, sensor_msgs::PointCl
 	tfl->transformPointCloud("map", cloud, mapCloud);
 }
 
-// Normalizes colors of an input images
+/*
+	in-place L1 color normalization of a 3 channel Mat_<uchar>
+	not typesafe because typesafety is no fun
+*/
 void normalizeColor(cv::Mat& img){
 	cv::MatIterator_<cv::Vec<uchar,3> > it=img.begin<cv::Vec<uchar,3> >(),it_end=img.end<cv::Vec<uchar,3> >();
 	cv::Vec<uchar,3> p;
@@ -122,7 +131,10 @@ void normalizeColor(cv::Mat& img){
 	}
 }
 
-// Takes an image, and returns a vector of orange points detected within the image
+/*
+	populates the input vector with points containing pixel coordinates
+	of boundaries of orange blobs
+*/
 void findPoints(Mat& image, vector<Point2f>& points){
 	// Normalize colors and find orange pixels
 	normalizeColor(image);
@@ -133,20 +145,15 @@ void findPoints(Mat& image, vector<Point2f>& points){
 	vector<vector<Point> > points_;
 	findContours(orange, points_, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 	
-	// Draw the contours on a new image (for debugging/visualization)
-	Mat outline = Mat::zeros(orange.rows,orange.cols,CV_8U);
-	drawContours(outline,points_,-1,255);
-	
-	// Pacage the points in a vector
-	int s = 0,s2=0;
+	// Package the points in a vector
+	int s = 0;
 	for(int i =0;i<points_.size();i++){
 		s+=points_[i].size();
 		for(int j=0;j<points_[i].size();j++){
 			points.push_back(Point2f(points_[i][j].y, points_[i][j].x));
-			s2++;
 		}
 	}
-	ROS_INFO("CAMERA FINDS %d (%d) points",s,s2);
+	ROS_INFO("CAMERA FINDS %d points",s);
 }
 
 // This is called whenever the node gets a new image from the camera
@@ -209,7 +216,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "CameraNode");
 	cout << "Camera Initialized" << endl;
 
-  // Wait until you get transform data
+	// Wait until you get transform data
 	tfl = new tf::TransformListener();
 	while (ros::ok()&&!tfl->canTransform("map", "odom", ros::Time::now())) ros::spinOnce();
 	cout << "READY"  << endl;
