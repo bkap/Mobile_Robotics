@@ -32,7 +32,7 @@ It was changed very little since the midterm. The only changes to it are changes
 
 The mapper subscribes to LIDAR_Cloud, Camera_Cloud,camera_view and odom and publishes CSPaceMap, map_cam, and map_lid.  
 map_cam and map_lid, the individual sensor grids, are published solely for debug purposed and are subscribed to only by rviz.
-I made the camera_view topic because it made more sense for the camera to tell the mapper what it could see than it did for the mapper to calculate it.
+The camera_view topic was created because it made more sense for the camera to tell the mapper what it could see than it did for the mapper to calculate it.
 The values in cells of the grid correspond to the available sensor information: 0 indicates no information, while positive numbers indicate likely obstacles and negative numbers indicate likely free space.
 Internally, the camera and lidar occupancies are maintained on separate grids to prevent conflicts when only one sensor can detect an obstacle.
 Clearing of the camera grid is performed for the entire viewable area assuming a trapezoidal view calculated from the robot location and camera calibration
