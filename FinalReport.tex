@@ -30,16 +30,25 @@ It was changed very little since the midterm. The only changes to it are changes
 
 \subsection{Mapper}
 
-The mapper subscribes to LIDAR_Cloud, Camera_Cloud,camera_view and odom and publishes CSPaceMap, map_cam, and map_lid.  map_cam and map_lid, the individual sensor grids, are published solely for debug purposed and are subscribed to only by rviz.
+The mapper subscribes to LIDAR_Cloud, Camera_Cloud,camera_view and odom and publishes CSPaceMap, map_cam, and map_lid.  
+map_cam and map_lid, the individual sensor grids, are published solely for debug purposed and are subscribed to only by rviz.
 I made the camera_view topic because it made more sense for the camera to tell the mapper what it could see than it did for the mapper to calculate it.
 The values in cells of the grid correspond to the available sensor information: 0 indicates no information, while positive numbers indicate likely obstacles and negative numbers indicate likely free space.
 Internally, the camera and lidar occupancies are maintained on separate grids to prevent conflicts when only one sensor can detect an obstacle.
 Clearing of the camera grid is performed for the entire viewable area assuming a trapezoidal view calculated from the robot location and camera calibration
-LIDAR clearing is performed via raytracing from the current robot location to the pings
+LIDAR clearing is performed via raytracing from the current robot location to the pings.
 To prevent improper projection of tall objects onto the ground plane by camera, only camera points which lie within the area most recently swept out by LIDAR pings are incorporated into the grid, since others are quite likely not on the ground.
-The mapper has two modes of operation with regard to occupancy calculation and a flag set in the file switches between them.  We did not demo the additive mode, but it has been tested thoroughly.  In the additive mode, each fattened ping increments the appropriate cells on the sensor grid by the FILL_RATE, with a gaussian decay outward to the fattening radius.  When the ADDITIVE flag is not set, a patch instead assigns the max of its value and the present occupancy at each appropriate cell.  This approach provides a few advantages over the additive approach.  The primary advanage is that setting rather than incrementing guarantees that the grid will not saturate and that there will be a smooth gaussian decay with distance from obstacles.  This allows the path planner to provide paths that preferentially steer away from obstacles rather than merely not intersecting and also allows smoother performance when adjusting the parameter in planner which specifies the maximum traversable occupancy value.  However, strictly setting the occupancy results in much greater sensitivity to spurious sensor readings than incrementing, which mitigates the effect of a single outlier.
+The mapper has two modes of operation with regard to occupancy calculation and a flag set in the file switches between them.
+We did not demo the additive mode, but it has been tested thoroughly.  
+In the additive mode, each fattened ping increments the appropriate cells on the sensor grid by the FILL_RATE, with a gaussian decay outward to the fattening radius.  
+When the ADDITIVE flag is not set, a patch instead assigns the max of its value and the present occupancy at each appropriate cell.  
+This approach provides a few advantages over the additive approach.  
+The primary advanage is that setting rather than incrementing guarantees that the grid will not saturate and that there will be a smooth gaussian decay with distance from obstacles.  
+This allows the path planner to provide paths that preferentially steer away from obstacles rather than merely not intersecting and also allows smoother performance when adjusting the parameter in planner which specifies the maximum traversable occupancy value.  
+However, strictly setting the occupancy results in much greater sensitivity to spurious sensor readings than incrementing, which mitigates the effect of a single outlier.
 
-A potential improvement to the current implementation would be to use incremental filling with a solid disk rather than a gaussian one and apply a gaussian blur to the merged occupancy grid before publishing.  This may permit the robustness benefits of both the incremental filling and clearing and the planning benefits of the setting, but might be too expensive with the gaussian blur of the entire grid calculated at teh publishing rate rather than once for the precomputed patch.
+A potential improvement to the current implementation would be to use incremental filling with a solid disk rather than a gaussian one and apply a gaussian blur to the merged occupancy grid before publishing.  
+This may permit the robustness benefits of both the incremental filling and clearing and the planning benefits of the setting, but might be too expensive with the gaussian blur of the entire grid calculated at the publishing rate rather than once for the precomputed patch.
 
 \subsection{Camera Calibration}
 calibration subscribes to LIDAR and the camera
@@ -64,7 +73,8 @@ The node spins until receiving an image callback.  When a new image is recieved,
 
 \subsection{Path Planner}
 
-The path planner subscribes to LIDARMap,PoseDes and goalPose and publishes pathList.
+The path planner subscribes to LIDARMap,PoseDes and goalPose and publishes pathList.  
+The LIDARMap is just an occupancy grid representing the likelyhood of there being a wall in a given location where 0 is unknown, CHAR_MIN is an open area, and CHAR_MAX is a wall.
 
 We implemented an A* search in PlannerFuncs which took the CSpace map published by Mapper and attempted to find a path on it.
 The standard implementation of A* search keeps a hashSet of "expanded nodes" which have already been explored by the search algorithm, and checks membership based purely on the state variables of each Node.  
@@ -78,6 +88,10 @@ Since we needed to define the operator already, we simply used greater than inst
 
 The Path Planner then makes a call to the approxPolyDP function in openCV to reduce the number of perpendicular paths, which is necessary even though it could lead to collisions.
 The importance of this is discussed in the bug report section of the report.
+
+To update the path, the planner follows the rule that it only changes the future paths, and not the current path or previous paths. 
+This is done because the desired path crawler uses both the segment number and the position in the vector of paths to lookup information about the segment that it is on.  Because the crawler was unable to repath successfully with anything other than a straight line, we made a last minute change to have the path planner only make straight lines.
+
 
 \subsection{Desired Path Crawler}
 
